@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Bot,
   Calendar,
   CheckCircle2,
   CheckSquare,
@@ -17,6 +18,7 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   UserCheck,
   UserCog,
   UserPlus,

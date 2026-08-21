@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cho phép mọi người dùng (kể cả khách vãng lai) đọc dữ liệu mới nhất
+    match /{document=**} {
+      allow read: if true;
+      allow write: if true; // Hỗ trợ lưu trữ trực tiếp từ các phiên quản trị
+    }
+  }
+}

@@ -230,12 +230,14 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
         </button>
       </div>
 
-      {/* AI Voice Reader Module */}
-      <AIVoiceReader
-        title="AI Đọc bài viết báo chí"
-        textToRead={`${article.title}. ${article.excerpt}. ${paragraphs.join('. ')}`}
-        sourceType="article"
-      />
+      {/* AI Voice Reader */}
+      <div className="space-y-2.5">
+        <AIVoiceReader
+          title="Đọc bài viết báo chí"
+          textToRead={`${article.title}. ${article.excerpt}. ${paragraphs.join('. ')}`}
+          sourceType="article"
+        />
+      </div>
 
       {/* 4. Sapo / Lead Paragraph */}
       <div className="text-sm md:text-base font-bold text-gray-800 leading-relaxed bg-amber-50/70 p-4 rounded-md border-l-4 border-red-700">

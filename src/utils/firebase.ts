@@ -1,0 +1,544 @@
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import {
+  getFirestore,
+  Firestore,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  updateDoc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
+import {
+  getAuth,
+  Auth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth';
+import {
+  Article,
+  DocumentItem,
+  LectureItem,
+  MeetingDocumentItem,
+  MeetingRoomItem,
+  MeetingRoomSettings,
+  MeetingVote,
+  SiteConfig,
+  UncleHoQuote,
+  UncleHoSettings,
+  User,
+} from '../types';
+
+// Load config from firebase-applet-config.json or environment variables
+let firebaseConfig: Record<string, string> = {};
+
+try {
+  // Try importing or falling back
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
+  firebaseConfig = {
+    apiKey: env.VITE_FIREBASE_API_KEY || 'AIzaSyBL4KnlyJtCUl7qcMdZP1GF6Pm8iT9KjM4',
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || 'modern-program-0q6d2.firebaseapp.com',
+    projectId: env.VITE_FIREBASE_PROJECT_ID || 'modern-program-0q6d2',
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || 'modern-program-0q6d2.firebasestorage.app',
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1081328282123',
+    appId: env.VITE_FIREBASE_APP_ID || '1:1081328282123:web:b0b79acac086148218f50e',
+    firestoreDatabaseId: env.VITE_FIREBASE_DATABASE_ID || 'ai-studio-web95-e6373b51-4fa1-45e9-beb6-22404ec54f93',
+  };
+} catch {
+  // Fallback
+}
+
+let appInstance: FirebaseApp | null = null;
+let firestoreInstance: Firestore | null = null;
+let authInstance: Auth | null = null;
+
+export function getFirebaseApp(): FirebaseApp | null {
+  if (appInstance) return appInstance;
+  try {
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) return null;
+    if (getApps().length > 0) {
+      appInstance = getApp();
+    } else {
+      appInstance = initializeApp(firebaseConfig);
+    }
+    return appInstance;
+  } catch (e) {
+    console.warn('Firebase init error:', e);
+    return null;
+  }
+}
+
+export function getFirebaseDb(): Firestore | null {
+  if (firestoreInstance) return firestoreInstance;
+  const app = getFirebaseApp();
+  if (!app) return null;
+  try {
+    const dbId = firebaseConfig.firestoreDatabaseId;
+    if (dbId && dbId !== '(default)') {
+      firestoreInstance = getFirestore(app, dbId);
+    } else {
+      firestoreInstance = getFirestore(app);
+    }
+    return firestoreInstance;
+  } catch (e) {
+    console.warn('Firestore init error:', e);
+    return null;
+  }
+}
+
+export function getFirebaseAuth(): Auth | null {
+  if (authInstance) return authInstance;
+  const app = getFirebaseApp();
+  if (!app) return null;
+  try {
+    authInstance = getAuth(app);
+    return authInstance;
+  } catch (e) {
+    console.warn('Firebase Auth init error:', e);
+    return null;
+  }
+}
+
+export const isFirebaseConfigured = (): boolean => {
+  return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+};
+
+/* =========================================================================
+   FIRESTORE DATABASE SERVICES
+   ========================================================================= */
+
+export const firestoreDb = {
+  // -------------------------------------------------------------
+  // 1. HỒ SƠ QUÂN NHÂN & TÀI KHOẢN (Collection: users)
+  // -------------------------------------------------------------
+  async fetchUsers(): Promise<User[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'users');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: User[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        list.push({
+          id: d.id ?? Number(docSnap.id),
+          username: d.username,
+          password: d.password,
+          fullName: d.fullName,
+          birthDate: d.birthDate || '',
+          rank: d.rank || '',
+          position: d.position || '',
+          rankUnit: d.rankUnit,
+          avatar: d.avatar,
+          role: d.role,
+          canViewDoc: d.canViewDoc ?? true,
+          canUploadDoc: d.canUploadDoc ?? false,
+          canJoinPartyMeeting: d.canJoinPartyMeeting ?? false,
+          canUploadMeetingDoc: d.canUploadMeetingDoc ?? (d.role === 'admin'),
+          canDeleteMeetingDoc: d.canDeleteMeetingDoc ?? (d.role === 'admin'),
+        });
+      });
+      return list.sort((a, b) => a.id - b.id);
+    } catch (err) {
+      console.warn('Firestore fetchUsers error:', err);
+      return null;
+    }
+  },
+
+  async upsertUser(user: User): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'users', String(user.id));
+      await setDoc(docRef, { ...user }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertUser error:', err);
+      return false;
+    }
+  },
+
+  async deleteUser(userId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'users', String(userId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteUser error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 2. BÀI VIẾT & TIN TỨC (Collection: articles)
+  // -------------------------------------------------------------
+  async fetchArticles(): Promise<Article[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'articles');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: Article[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        list.push({
+          id: d.id ?? Number(docSnap.id),
+          title: d.title,
+          category: d.category,
+          author: d.author,
+          date: d.date,
+          image: d.image || '',
+          excerpt: d.excerpt || '',
+          content: d.content || '',
+          status: d.status || 'published',
+          views: d.views || 0,
+          sectionKey: d.sectionKey || d.section_key,
+        });
+      });
+      return list.sort((a, b) => b.id - a.id);
+    } catch (err) {
+      console.warn('Firestore fetchArticles error:', err);
+      return null;
+    }
+  },
+
+  async upsertArticle(article: Article): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'articles', String(article.id));
+      await setDoc(docRef, { ...article }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertArticle error:', err);
+      return false;
+    }
+  },
+
+  async deleteArticle(articleId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'articles', String(articleId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteArticle error:', err);
+      return false;
+    }
+  },
+
+  async incrementArticleViews(articleId: number, currentViews: number): Promise<void> {
+    const db = getFirebaseDb();
+    if (!db) return;
+    try {
+      const docRef = doc(db, 'articles', String(articleId));
+      await updateDoc(docRef, { views: (currentViews || 0) + 1 });
+    } catch (err) {
+      console.warn('Firestore incrementArticleViews error:', err);
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 3. KHO VĂN BẢN (Collection: documents)
+  // -------------------------------------------------------------
+  async fetchDocuments(): Promise<DocumentItem[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'documents');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: DocumentItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        list.push({
+          id: d.id ?? Number(docSnap.id),
+          code: d.code || '',
+          title: d.title || '',
+          category: d.category || '',
+          issuer: d.issuer || '',
+          date: d.date || '',
+          type: d.type || 'Hành chính',
+        });
+      });
+      return list.sort((a, b) => b.id - a.id);
+    } catch (err) {
+      console.warn('Firestore fetchDocuments error:', err);
+      return null;
+    }
+  },
+
+  async upsertDocument(documentItem: DocumentItem): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'documents', String(documentItem.id));
+      await setDoc(docRef, { ...documentItem }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertDocument error:', err);
+      return false;
+    }
+  },
+
+  async deleteDocument(docId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'documents', String(docId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteDocument error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 4. BÀI GIẢNG ĐIỆN TỬ (Collection: lectures)
+  // -------------------------------------------------------------
+  async fetchLectures(): Promise<LectureItem[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'lectures');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: LectureItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        list.push({
+          id: d.id ?? Number(docSnap.id),
+          title: d.title || '',
+          target: d.target || '',
+          author: d.author || '',
+          desc: d.desc || '',
+          date: d.date || '',
+          fileType: d.fileType || 'powerpoint',
+          fileName: d.fileName || '',
+          fileSize: d.fileSize || '',
+          fileUrl: d.fileUrl || '',
+          downloads: d.downloads || 0,
+        });
+      });
+      return list.sort((a, b) => b.id - a.id);
+    } catch (err) {
+      console.warn('Firestore fetchLectures error:', err);
+      return null;
+    }
+  },
+
+  async upsertLecture(lecture: LectureItem): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'lectures', String(lecture.id));
+      await setDoc(docRef, { ...lecture }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertLecture error:', err);
+      return false;
+    }
+  },
+
+  async deleteLecture(lectureId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'lectures', String(lectureId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteLecture error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 5. CẤU HÌNH GIAO DIỆN (Collection: configs, Doc: site_config)
+  // -------------------------------------------------------------
+  async fetchSiteConfig(): Promise<SiteConfig | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'site_config');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return null;
+      return docSnap.data() as SiteConfig;
+    } catch (err) {
+      console.warn('Firestore fetchSiteConfig error:', err);
+      return null;
+    }
+  },
+
+  async upsertSiteConfig(config: SiteConfig): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'configs', 'site_config');
+      await setDoc(docRef, { ...config }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertSiteConfig error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 6. PHÒNG HỌP & TÀI LIỆU CUỘC HỌP (Collection: meeting_rooms, meeting_docs)
+  // -------------------------------------------------------------
+  async fetchMeetingRooms(): Promise<MeetingRoomItem[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_rooms');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: MeetingRoomItem[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as MeetingRoomItem);
+      });
+      return list;
+    } catch (err) {
+      console.warn('Firestore fetchMeetingRooms error:', err);
+      return null;
+    }
+  },
+
+  async upsertMeetingRoom(room: MeetingRoomItem): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'meeting_rooms', room.id);
+      await setDoc(docRef, { ...room }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertMeetingRoom error:', err);
+      return false;
+    }
+  },
+
+  async deleteMeetingRoom(roomId: string): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'meeting_rooms', roomId);
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteMeetingRoom error:', err);
+      return false;
+    }
+  },
+
+  async fetchMeetingDocuments(): Promise<MeetingDocumentItem[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_documents');
+      const snapshot = await getDocs(colRef);
+      if (snapshot.empty) return null;
+      const list: MeetingDocumentItem[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as MeetingDocumentItem);
+      });
+      return list.sort((a, b) => a.id - b.id);
+    } catch (err) {
+      console.warn('Firestore fetchMeetingDocuments error:', err);
+      return null;
+    }
+  },
+
+  async upsertMeetingDocument(docItem: MeetingDocumentItem): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'meeting_documents', String(docItem.id));
+      await setDoc(docRef, { ...docItem }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertMeetingDocument error:', err);
+      return false;
+    }
+  },
+
+  async deleteMeetingDocument(docId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'meeting_documents', String(docId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore deleteMeetingDocument error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 7. LỜI BÁC DẠY & CẤU HÌNH BÁC HỒ
+  // -------------------------------------------------------------
+  async fetchUncleHoQuotes(): Promise<UncleHoQuote[] | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_quotes');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return null;
+      const data = docSnap.data();
+      return (data.quotes as UncleHoQuote[]) || null;
+    } catch (err) {
+      console.warn('Firestore fetchUncleHoQuotes error:', err);
+      return null;
+    }
+  },
+
+  async upsertUncleHoQuotes(quotes: UncleHoQuote[]): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_quotes');
+      await setDoc(docRef, { quotes }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertUncleHoQuotes error:', err);
+      return false;
+    }
+  },
+
+  async fetchUncleHoSettings(): Promise<UncleHoSettings | null> {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_settings');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return null;
+      return (docSnap.data() as UncleHoSettings) || null;
+    } catch (err) {
+      console.warn('Firestore fetchUncleHoSettings error:', err);
+      return null;
+    }
+  },
+
+  async upsertUncleHoSettings(settings: UncleHoSettings): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_settings');
+      await setDoc(docRef, { ...settings }, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertUncleHoSettings error:', err);
+      return false;
+    }
+  },
+};

@@ -165,21 +165,18 @@ export function App() {
     isOpen: false,
     lectureToEdit: null,
   });
-
-  // Initial cloud sync if Supabase is configured
+  // Initial cloud sync: Automatically fetches latest articles, users, documents, settings from Firestore / Database for all visitors
   useEffect(() => {
-    if (isSupabaseConfigured()) {
-      cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => setSiteConfig(data));
-      cloudStorage.loadArticles(defaultArticles).then((data) => setArticles(data));
-      cloudStorage.loadUsers(defaultUsers).then((data) => setUsers(data));
-      cloudStorage.loadDocuments(defaultDocuments).then((data) => setDocuments(data));
-      cloudStorage.loadLectures(defaultLectures).then((data) => setLectures(data));
-      cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => setUncleHoQuotes(data));
-      cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => setUncleHoSettings(data));
-      cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => setMeetingDocuments(data));
-      cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => setMeetingSettings(data));
-      cloudStorage.loadMeetingVotes({}).then((data) => setMeetingVotes(data));
-    }
+    cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => setSiteConfig(data));
+    cloudStorage.loadArticles(defaultArticles).then((data) => setArticles(data));
+    cloudStorage.loadUsers(defaultUsers).then((data) => setUsers(data));
+    cloudStorage.loadDocuments(defaultDocuments).then((data) => setDocuments(data));
+    cloudStorage.loadLectures(defaultLectures).then((data) => setLectures(data));
+    cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => setUncleHoQuotes(data));
+    cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => setUncleHoSettings(data));
+    cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => setMeetingDocuments(data));
+    cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => setMeetingSettings(data));
+    cloudStorage.loadMeetingVotes({}).then((data) => setMeetingVotes(data));
   }, []);
 
   // Sync state to LocalStorage

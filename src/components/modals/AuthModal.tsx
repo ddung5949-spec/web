@@ -118,9 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoginPass('');
       onClose();
     } else {
-      alert(
-        'Tên đăng nhập hoặc mật khẩu chưa chính xác! (Tài khoản mẫu: admin / 123 hoặc canbo24 / 123)'
-      );
+      alert('Tên đăng nhập hoặc mật khẩu chưa chính xác! Vui lòng kiểm tra lại.');
     }
   };
 
@@ -190,11 +188,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } else {
       alert('Tên tài khoản này đã tồn tại trên hệ thống, vui lòng chọn tên tài khoản khác!');
     }
-  };
-
-  const fillQuickAccount = (u: string, p: string) => {
-    setLoginUser(u);
-    setLoginPass(p);
   };
 
   const isPasswordMatched =
@@ -296,37 +289,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 cursor-pointer p-1"
                   >
                     {showLoginPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick Login Helpers */}
-              <div className="bg-amber-50/80 border border-amber-200 p-3 rounded-lg text-[11px] text-amber-950 space-y-1.5">
-                <div className="font-bold flex items-center gap-1 text-amber-900">
-                  <UserCheck className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Đăng nhập nhanh tài khoản mẫu:</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => fillQuickAccount('admin', '123')}
-                    className="bg-white border border-amber-300 text-amber-900 px-2.5 py-1 rounded text-[11px] hover:bg-amber-100 font-semibold cursor-pointer shadow-2xs"
-                  >
-                    Admin (Ban Chính trị)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillQuickAccount('canbo24', '123')}
-                    className="bg-white border border-amber-300 text-amber-900 px-2.5 py-1 rounded text-[11px] hover:bg-amber-100 font-semibold cursor-pointer shadow-2xs"
-                  >
-                    Đảng ủy viên Trung đoàn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillQuickAccount('chiensi66', '123')}
-                    className="bg-white border border-amber-300 text-amber-900 px-2.5 py-1 rounded text-[11px] hover:bg-amber-100 font-semibold cursor-pointer shadow-2xs"
-                  >
-                    Chiến sĩ Tiểu đoàn 1
                   </button>
                 </div>
               </div>
