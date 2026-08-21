@@ -35,6 +35,7 @@ import {
   defaultUsers,
 } from './data/initialData';
 import { cloudStorage, isSupabaseConfigured, safeStore } from './utils/storage';
+import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
 
 // Components
 import { Header } from './components/Header';
@@ -165,6 +166,19 @@ export function App() {
     isOpen: false,
     lectureToEdit: null,
   });
+
+  // Global Toast Notifications
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = (type: ToastType, title: string, message?: string, duration = 4000) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   // Initial cloud sync: Automatically fetches latest articles, users, documents, settings from Firestore / Database for all visitors
   useEffect(() => {
     cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => setSiteConfig(data));
@@ -177,6 +191,17 @@ export function App() {
     cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => setMeetingDocuments(data));
     cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => setMeetingSettings(data));
     cloudStorage.loadMeetingVotes({}).then((data) => setMeetingVotes(data));
+
+    // Real-time listener for articles: guarantees any update in Firestore automatically syncs to all devices without refresh
+    const unsubscribe = cloudStorage.subscribeArticles((remoteArticles) => {
+      if (remoteArticles && remoteArticles.length > 0) {
+        setArticles(remoteArticles);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Sync state to LocalStorage
@@ -865,16 +890,18 @@ export function App() {
     });
   };
 
-  const handlePostArticle = (data: {
+  const handlePostArticle = async (data: {
     title: string;
     category: string;
     author: string;
     image: string;
+    images?: import('./types').ArticleImage[];
     excerpt: string;
     content: string;
+    embedCode?: string;
     sectionKey: SectionType;
     status?: 'approved' | 'pending';
-  }) => {
+  }): Promise<boolean> => {
     const isAdmin = currentUser?.role === 'admin';
     const now = new Date();
     const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
@@ -888,55 +915,126 @@ export function App() {
       author: data.author,
       date: dateStr,
       image: data.image,
+      images: data.images,
       excerpt: data.excerpt,
       content: data.content,
+      embedCode: data.embedCode,
       status: data.status || (isAdmin ? 'approved' : 'pending'),
       views: 1,
       sectionKey: data.sectionKey,
     };
 
     setArticles((prev) => [newArt, ...prev]);
-    cloudStorage.saveArticle(newArt);
+    const res = await cloudStorage.saveArticle(newArt);
+
+    if (res.success) {
+      if (newArt.status === 'approved') {
+        showToast(
+          'success',
+          'Xuất bản tin bài thành công!',
+          'Bài viết đã được lưu trực tiếp vào Cơ sở dữ liệu và hiển thị trực tuyến.'
+        );
+      } else {
+        showToast(
+          'info',
+          'Đã gửi dự thảo tin bài',
+          'Dự thảo đã được lưu vào hệ thống và chuyển đến Ban Biên tập để chờ phê duyệt.'
+        );
+      }
+      return true;
+    } else {
+      showToast(
+        'error',
+        'Lỗi lưu bài viết vào Cơ sở dữ liệu',
+        res.error || 'Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.'
+      );
+      return false;
+    }
   };
 
-  const handleUpdateArticle = (updated: Article) => {
+  const handleUpdateArticle = async (updated: Article): Promise<boolean> => {
     setArticles((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-    cloudStorage.saveArticle(updated);
 
     if (selectedArticle?.id === updated.id) {
       setSelectedArticle(updated);
     }
+
+    const res = await cloudStorage.saveArticle(updated);
+    if (res.success) {
+      showToast(
+        'success',
+        'Cập nhật bài viết thành công!',
+        'Nội dung và hình ảnh bài viết đã được cập nhật trực tiếp lên Cơ sở dữ liệu.'
+      );
+      return true;
+    } else {
+      showToast(
+        'error',
+        'Lỗi cập nhật bài viết',
+        res.error || 'Không thể lưu thay đổi lên Cơ sở dữ liệu. Vui lòng thử lại.'
+      );
+      return false;
+    }
   };
 
-  const handleApproveArticle = (articleId: number) => {
+  const handleApproveArticle = async (articleId: number) => {
+    let updatedArticle: Article | null = null;
     setArticles((prev) =>
       prev.map((a) => {
         if (a.id === articleId) {
-          const updated = { ...a, status: 'approved' as const };
-          cloudStorage.saveArticle(updated);
-          return updated;
+          updatedArticle = { ...a, status: 'approved' as const };
+          return updatedArticle;
         }
         return a;
       })
     );
-    alert('Đã duyệt và xuất bản bài viết công khai thành công!');
-  };
 
-  const handleRejectArticle = (articleId: number) => {
-    if (confirm('Từ chối và gỡ bỏ dự thảo bài viết này?')) {
-      setArticles((prev) => prev.filter((a) => a.id !== articleId));
-      cloudStorage.deleteArticle(articleId);
+    if (updatedArticle) {
+      const res = await cloudStorage.saveArticle(updatedArticle);
+      if (res.success) {
+        showToast(
+          'success',
+          'Phê duyệt tin bài thành công!',
+          'Bài viết đã được xuất bản công khai cho toàn thể cán bộ, chiến sĩ theo dõi.'
+        );
+      } else {
+        showToast('error', 'Lỗi phê duyệt bài viết', res.error);
+      }
     }
   };
 
-  const handleDeleteArticle = (articleId: number) => {
+  const handleRejectArticle = async (articleId: number) => {
+    if (confirm('Từ chối và gỡ bỏ dự thảo bài viết này khỏi hệ thống?')) {
+      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      const res = await cloudStorage.deleteArticle(articleId);
+      if (res.success) {
+        showToast('info', 'Đã từ chối dự thảo', 'Dự thảo tin bài đã được xóa khỏi danh sách chờ duyệt.');
+      } else {
+        showToast('error', 'Lỗi gỡ bỏ dự thảo', res.error);
+      }
+    }
+  };
+
+  const handleDeleteArticle = async (articleId: number): Promise<boolean> => {
     if (confirm('Đồng chí có chắc chắn muốn xóa bài viết này vĩnh viễn?')) {
       setArticles((prev) => prev.filter((a) => a.id !== articleId));
-      cloudStorage.deleteArticle(articleId);
       if (selectedArticle?.id === articleId) {
         setCurrentPage('home');
       }
+      const res = await cloudStorage.deleteArticle(articleId);
+      if (res.success) {
+        showToast(
+          'success',
+          'Đã xóa bài viết thành công',
+          'Bài viết đã được gỡ bỏ hoàn toàn khỏi Cơ sở dữ liệu.'
+        );
+        return true;
+      } else {
+        showToast('error', 'Lỗi xóa bài viết', res.error);
+        return false;
+      }
     }
+    return false;
   };
 
   // Document Actions
@@ -1690,6 +1788,9 @@ export function App() {
           onSave={handleSaveQuickActions}
         />
       )}
+
+      {/* 7. Real-time Toast Notification Feedback */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

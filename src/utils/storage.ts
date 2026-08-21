@@ -76,21 +76,59 @@ export const cloudStorage = {
     return safeStore.get('mangyang_articles', fallback);
   },
 
-  async saveArticle(article: Article): Promise<void> {
+  subscribeArticles(onUpdate: (articles: Article[]) => void): (() => void) | null {
     if (isFirebaseConfigured()) {
-      await firestoreDb.upsertArticle(article);
+      const unsubscribe = firestoreDb.subscribeArticles(onUpdate);
+      if (unsubscribe) return unsubscribe;
     }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.upsertArticle(article);
+    return null;
+  },
+
+  async saveArticle(article: Article): Promise<{ success: boolean; error?: string }> {
+    let saved = false;
+    let errorMsg = '';
+    try {
+      if (isFirebaseConfigured()) {
+        const res = await firestoreDb.upsertArticle(article);
+        if (res) saved = true;
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.upsertArticle(article);
+        saved = true;
+      }
+      // Keep local store synchronized as resilient offline buffer
+      const currentList = safeStore.get<Article[]>('mangyang_articles', []);
+      const existsIdx = currentList.findIndex((a) => a.id === article.id);
+      let updatedList: Article[];
+      if (existsIdx >= 0) {
+        updatedList = currentList.map((a) => (a.id === article.id ? article : a));
+      } else {
+        updatedList = [article, ...currentList];
+      }
+      safeStore.set('mangyang_articles', updatedList);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error saving article:', e);
+      errorMsg = e?.message || 'Lỗi không xác định khi lưu vào Cơ sở dữ liệu';
+      return { success: saved, error: errorMsg };
     }
   },
 
-  async deleteArticle(articleId: number): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.deleteArticle(articleId);
-    }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.deleteArticle(articleId);
+  async deleteArticle(articleId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (isFirebaseConfigured()) {
+        await firestoreDb.deleteArticle(articleId);
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.deleteArticle(articleId);
+      }
+      const currentList = safeStore.get<Article[]>('mangyang_articles', []);
+      const filtered = currentList.filter((a) => a.id !== articleId);
+      safeStore.set('mangyang_articles', filtered);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error deleting article:', e);
+      return { success: false, error: e?.message || 'Lỗi khi xóa bài viết' };
     }
   },
 

@@ -8,6 +8,7 @@ import {
   Grid,
   Image as ImageIcon,
   LayoutTemplate,
+  Loader2,
   Plus,
   Save,
   Send,
@@ -44,10 +45,12 @@ interface PostArticleModalProps {
     embedCode?: string;
     sectionKey: SectionType;
     status?: 'approved' | 'pending';
-  }) => void;
-  onUpdateArticle?: (updated: Article) => void;
-  onDeleteArticle?: (articleId: number) => void;
+  }) => Promise<boolean | void> | boolean | void;
+  onUpdateArticle?: (updated: Article) => Promise<boolean | void> | boolean | void;
+  onDeleteArticle?: (articleId: number) => Promise<boolean | void> | boolean | void;
 }
+
+const DRAFT_STORAGE_KEY = 'mangyang_article_active_draft';
 
 export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   isOpen,
@@ -60,8 +63,8 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   onUpdateArticle,
   onDeleteArticle,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
+  const activeArticleIdRef = useRef<number | 'new' | null>(null);
 
   const [selectedSection, setSelectedSection] = useState<SectionType>(sectionKey);
   const [title, setTitle] = useState('');
@@ -73,8 +76,10 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   const [content, setContent] = useState('');
   const [embedCode, setEmbedCode] = useState('');
   const [status, setStatus] = useState<'approved' | 'pending'>('pending');
-  const [imageInputMode, setImageInputMode] = useState<'device' | 'url'>('device');
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const isEditing = Boolean(articleToEdit);
 
@@ -82,12 +87,31 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     siteConfig?.sections?.[selectedSection] || defaultSiteConfig.sections[selectedSection];
   const categories = currentSectionConfig?.categories || [];
 
+  // Initialize form state ONLY when modal transitions from closed to open or articleToEdit changes
   useEffect(() => {
+    if (!isOpen) {
+      activeArticleIdRef.current = null;
+      setFormError(null);
+      setIsSubmitting(false);
+      setIsDeleting(false);
+      return;
+    }
+
+    const currentTargetId = articleToEdit ? articleToEdit.id : 'new';
+
+    // Only re-initialize if the active target article has changed
+    if (activeArticleIdRef.current === currentTargetId) {
+      return;
+    }
+
+    activeArticleIdRef.current = currentTargetId;
+    setFormError(null);
+
     if (articleToEdit) {
       setSelectedSection(articleToEdit.sectionKey);
-      setTitle(articleToEdit.title);
-      setCategory(articleToEdit.category);
-      setAuthor(articleToEdit.author);
+      setTitle(articleToEdit.title || '');
+      setCategory(articleToEdit.category || '');
+      setAuthor(articleToEdit.author || '');
       setImageUrl(articleToEdit.image || '');
       setEmbedCode(articleToEdit.embedCode || '');
       setArticleImages(
@@ -104,30 +128,83 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
             ]
           : []
       );
-      setExcerpt(articleToEdit.excerpt);
-      setContent(articleToEdit.content);
-      setStatus(articleToEdit.status);
+      setExcerpt(articleToEdit.excerpt || '');
+      setContent(articleToEdit.content || '');
+      setStatus(articleToEdit.status || 'approved');
     } else {
-      setSelectedSection(sectionKey);
-      const defaultCats =
-        siteConfig?.sections?.[sectionKey]?.categories ||
-        defaultSiteConfig.sections[sectionKey]?.categories ||
-        [];
-      setCategory(defaultCats[0] || 'Tin tức hoạt động');
-      if (currentUser) {
-        setAuthor(`${currentUser.fullName} (${currentUser.rankUnit})`);
-      } else {
-        setAuthor('');
+      // Check if there is an un-submitted draft in sessionStorage
+      let restoredDraft: any = null;
+      try {
+        const saved = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+        if (saved) {
+          restoredDraft = JSON.parse(saved);
+        }
+      } catch {
+        // Ignore
       }
-      setTitle('');
-      setImageUrl('');
-      setEmbedCode('');
-      setArticleImages([]);
-      setExcerpt('');
-      setContent('');
-      setStatus(currentUser?.role === 'admin' ? 'approved' : 'pending');
+
+      if (restoredDraft && (restoredDraft.title || restoredDraft.content)) {
+        setSelectedSection(restoredDraft.sectionKey || sectionKey);
+        setTitle(restoredDraft.title || '');
+        setCategory(restoredDraft.category || categories[0] || 'Tin tức hoạt động');
+        setAuthor(
+          restoredDraft.author ||
+            (currentUser ? `${currentUser.fullName} (${currentUser.rankUnit})` : '')
+        );
+        setImageUrl(restoredDraft.imageUrl || '');
+        setEmbedCode(restoredDraft.embedCode || '');
+        setArticleImages(restoredDraft.articleImages || []);
+        setExcerpt(restoredDraft.excerpt || '');
+        setContent(restoredDraft.content || '');
+        setStatus(restoredDraft.status || (currentUser?.role === 'admin' ? 'approved' : 'pending'));
+      } else {
+        setSelectedSection(sectionKey);
+        const defaultCats =
+          siteConfig?.sections?.[sectionKey]?.categories ||
+          defaultSiteConfig.sections[sectionKey]?.categories ||
+          [];
+        setCategory(defaultCats[0] || 'Tin tức hoạt động');
+        if (currentUser) {
+          setAuthor(`${currentUser.fullName} (${currentUser.rankUnit})`);
+        } else {
+          setAuthor('');
+        }
+        setTitle('');
+        setImageUrl('');
+        setEmbedCode('');
+        setArticleImages([]);
+        setExcerpt('');
+        setContent('');
+        setStatus(currentUser?.role === 'admin' ? 'approved' : 'pending');
+      }
     }
-  }, [articleToEdit, sectionKey, currentUser, isOpen, siteConfig]);
+  }, [isOpen, articleToEdit]);
+
+  // Auto-save draft for new articles to prevent losing content on accidental tab switch or refresh
+  useEffect(() => {
+    if (!isOpen || isEditing) return;
+    if (title || content || excerpt) {
+      try {
+        sessionStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({
+            sectionKey: selectedSection,
+            title,
+            category,
+            author,
+            imageUrl,
+            articleImages,
+            excerpt,
+            content,
+            embedCode,
+            status,
+          })
+        );
+      } catch {
+        // Ignore
+      }
+    }
+  }, [isOpen, isEditing, selectedSection, title, category, author, imageUrl, articleImages, excerpt, content, embedCode, status]);
 
   // When section changes, ensure valid category
   const handleSectionChange = (newSec: SectionType) => {
@@ -243,79 +320,114 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !author.trim() || !excerpt.trim() || !content.trim()) {
-      alert('Vui lòng điền đầy đủ các thông tin bắt buộc (*)!');
+    setFormError(null);
+
+    if (!title.trim()) {
+      setFormError('Vui lòng nhập tiêu đề bài viết (*)!');
+      return;
+    }
+    if (!author.trim()) {
+      setFormError('Vui lòng nhập tác giả / đơn vị (*)!');
+      return;
+    }
+    if (!excerpt.trim()) {
+      setFormError('Vui lòng nhập tóm tắt trích yếu bài viết (*)!');
+      return;
+    }
+    if (!content.trim()) {
+      setFormError('Vui lòng nhập nội dung chi tiết bài viết (*)!');
       return;
     }
 
-    const defaultImg =
-      selectedSection === 'ctd'
-        ? 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
-        : selectedSection === 'hl'
-        ? 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=800&auto=format&fit=crop'
-        : 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop';
+    setIsSubmitting(true);
 
-    const finalImage = imageUrl.trim() || (articleImages[0]?.url) || defaultImg;
+    try {
+      const defaultImg =
+        selectedSection === 'ctd'
+          ? 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
+          : selectedSection === 'hl'
+          ? 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=800&auto=format&fit=crop'
+          : 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop';
 
-    // Ensure articleImages has at least 1 image item if image exists
-    const finalImagesList =
-      articleImages.length > 0
-        ? articleImages
-        : [
-            {
-              id: 'img-1',
-              url: finalImage,
-              caption: title.trim(),
-              position: 'top' as ArticleImagePosition,
-            },
-          ];
+      const finalImage = imageUrl.trim() || (articleImages[0]?.url) || defaultImg;
 
-    if (isEditing && articleToEdit && onUpdateArticle) {
-      const updated: Article = {
-        ...articleToEdit,
-        title: title.trim(),
-        category: category || categories[0] || 'Thông tin chung',
-        author: author.trim(),
-        image: finalImage,
-        images: finalImagesList,
-        excerpt: excerpt.trim(),
-        content: content.trim(),
-        embedCode: embedCode.trim() || undefined,
-        sectionKey: selectedSection,
-        status: status,
-      };
-      onUpdateArticle(updated);
-      alert('Đã cập nhật bài viết và danh sách hình ảnh thành công!');
-    } else {
-      onSubmitArticle({
-        title: title.trim(),
-        category: category || categories[0] || 'Thông tin chung',
-        author: author.trim(),
-        image: finalImage,
-        images: finalImagesList,
-        excerpt: excerpt.trim(),
-        content: content.trim(),
-        embedCode: embedCode.trim() || undefined,
-        sectionKey: selectedSection,
-        status: status,
-      });
+      // Ensure articleImages has at least 1 image item if image exists
+      const finalImagesList =
+        articleImages.length > 0
+          ? articleImages
+          : [
+              {
+                id: 'img-1',
+                url: finalImage,
+                caption: title.trim(),
+                position: 'top' as ArticleImagePosition,
+              },
+            ];
 
-      if (currentUser?.role === 'admin') {
-        alert('Đã xuất bản bài viết thành công lên trang thông tin!');
+      if (isEditing && articleToEdit && onUpdateArticle) {
+        const updated: Article = {
+          ...articleToEdit,
+          title: title.trim(),
+          category: category || categories[0] || 'Thông tin chung',
+          author: author.trim(),
+          image: finalImage,
+          images: finalImagesList,
+          excerpt: excerpt.trim(),
+          content: content.trim(),
+          embedCode: embedCode.trim() || undefined,
+          sectionKey: selectedSection,
+          status: status,
+        };
+        const res = await onUpdateArticle(updated);
+        if (res === false) {
+          throw new Error('Lưu cập nhật bài viết không thành công');
+        }
       } else {
-        alert('Đã gửi bài viết thành công! Ban Biên tập sẽ duyệt trước khi hiển thị công khai.');
+        const res = await onSubmitArticle({
+          title: title.trim(),
+          category: category || categories[0] || 'Thông tin chung',
+          author: author.trim(),
+          image: finalImage,
+          images: finalImagesList,
+          excerpt: excerpt.trim(),
+          content: content.trim(),
+          embedCode: embedCode.trim() || undefined,
+          sectionKey: selectedSection,
+          status: status,
+        });
+        if (res === false) {
+          throw new Error('Tạo bài viết mới không thành công');
+        }
       }
-    }
 
-    onClose();
+      // Success: clear session draft and close modal
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      setIsSubmitting(false);
+      onClose();
+    } catch (err: any) {
+      console.error('Error submitting article:', err);
+      setFormError(err?.message || 'Có lỗi xảy ra trong quá trình lưu dữ liệu. Bản soạn thảo của đồng chí đã được giữ nguyên để thử lại.');
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = () => {
-    if (articleToEdit && onDeleteArticle) {
-      onDeleteArticle(articleToEdit.id);
+  const handleDelete = async () => {
+    if (!articleToEdit || !onDeleteArticle) return;
+    if (!confirm('Đồng chí có chắc chắn muốn xóa bài viết này vĩnh viễn?')) return;
+    setIsDeleting(true);
+    setFormError(null);
+    try {
+      const res = await onDeleteArticle(articleToEdit.id);
+      if (res === false) {
+        throw new Error('Xóa bài viết thất bại');
+      }
+      setIsDeleting(false);
       onClose();
+    } catch (err: any) {
+      setFormError(err?.message || 'Lỗi khi xóa bài viết');
+      setIsDeleting(false);
     }
   };
 
@@ -343,11 +455,48 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+            disabled={isSubmitting || isDeleting}
+            className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Draft Notice & Error Banner */}
+        {!isEditing && (
+          <div className="bg-amber-50 px-4 py-1.5 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Hệ thống tự động lưu trữ và bảo vệ bản thảo trong khi soạn thảo.</span>
+            </span>
+            {(title || content) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Làm trống bản thảo hiện tại?')) {
+                    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+                    setTitle('');
+                    setContent('');
+                    setExcerpt('');
+                    setImageUrl('');
+                    setArticleImages([]);
+                    setEmbedCode('');
+                  }
+                }}
+                className="text-amber-800 hover:underline font-bold cursor-pointer"
+              >
+                Làm mới biểu mẫu
+              </button>
+            )}
+          </div>
+        )}
+
+        {formError && (
+          <div className="bg-red-50 border-b border-red-200 p-3 px-5 text-xs text-red-800 font-medium flex items-center gap-2">
+            <X className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
@@ -666,10 +815,11 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-lg flex items-center gap-1.5 border border-red-200 transition-colors cursor-pointer"
+                disabled={isSubmitting || isDeleting}
+                className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-lg flex items-center gap-1.5 border border-red-200 transition-colors cursor-pointer disabled:opacity-50"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Xóa bài viết</span>
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                <span>{isDeleting ? 'Đang xóa...' : 'Xóa bài viết'}</span>
               </button>
             ) : (
               <div />
@@ -679,17 +829,27 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg cursor-pointer"
+                disabled={isSubmitting || isDeleting}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg cursor-pointer disabled:opacity-50"
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-md cursor-pointer text-xs"
+                disabled={isSubmitting || isDeleting}
+                className="px-5 py-2 bg-[#b91c1c] hover:bg-red-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-md cursor-pointer text-xs disabled:opacity-60 transition-all"
               >
-                {isEditing ? <Save className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isEditing ? (
+                  <Save className="w-4 h-4" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
                 <span>
-                  {isEditing
+                  {isSubmitting
+                    ? 'ĐANG LƯU VÀO DATABASE...'
+                    : isEditing
                     ? 'LƯU THAY ĐỔI'
                     : currentUser?.role === 'admin'
                     ? 'XUẤT BẢN TIN BÀI'

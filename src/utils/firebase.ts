@@ -11,6 +11,8 @@ import {
   updateDoc,
   query,
   orderBy,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import {
   getAuth,
@@ -191,21 +193,64 @@ export const firestoreDb = {
         const d = docSnap.data() as any;
         list.push({
           id: d.id ?? Number(docSnap.id),
-          title: d.title,
-          category: d.category,
-          author: d.author,
-          date: d.date,
+          title: d.title || '',
+          category: d.category || '',
+          author: d.author || '',
+          date: d.date || '',
           image: d.image || '',
+          images: Array.isArray(d.images) ? d.images : undefined,
           excerpt: d.excerpt || '',
           content: d.content || '',
-          status: d.status || 'published',
+          embedCode: d.embedCode || undefined,
+          status: d.status === 'pending' ? 'pending' : 'approved',
           views: d.views || 0,
-          sectionKey: d.sectionKey || d.section_key,
+          sectionKey: d.sectionKey || d.section_key || 'ctd',
         });
       });
       return list.sort((a, b) => b.id - a.id);
     } catch (err) {
       console.warn('Firestore fetchArticles error:', err);
+      return null;
+    }
+  },
+
+  subscribeArticles(onUpdate: (articles: Article[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'articles');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          if (snapshot.empty) return;
+          const list: Article[] = [];
+          snapshot.forEach((docSnap) => {
+            const d = docSnap.data() as any;
+            list.push({
+              id: d.id ?? Number(docSnap.id),
+              title: d.title || '',
+              category: d.category || '',
+              author: d.author || '',
+              date: d.date || '',
+              image: d.image || '',
+              images: Array.isArray(d.images) ? d.images : undefined,
+              excerpt: d.excerpt || '',
+              content: d.content || '',
+              embedCode: d.embedCode || undefined,
+              status: d.status === 'pending' ? 'pending' : 'approved',
+              views: d.views || 0,
+              sectionKey: d.sectionKey || d.section_key || 'ctd',
+            });
+          });
+          const sorted = list.sort((a, b) => b.id - a.id);
+          onUpdate(sorted);
+        },
+        (error) => {
+          console.warn('Firestore real-time articles listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeArticles error:', err);
       return null;
     }
   },
