@@ -50,7 +50,8 @@ interface PostArticleModalProps {
   onDeleteArticle?: (articleId: number) => Promise<boolean | void> | boolean | void;
 }
 
-const DRAFT_STORAGE_KEY = 'mangyang_article_active_draft';
+const getDraftKey = (articleId?: number | null) =>
+  articleId ? `mangyang_article_draft_${articleId}` : 'mangyang_article_draft_new';
 
 export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   isOpen,
@@ -64,7 +65,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   onDeleteArticle,
 }) => {
   const multiFileInputRef = useRef<HTMLInputElement>(null);
-  const activeArticleIdRef = useRef<number | 'new' | null>(null);
+  const activeSessionTargetRef = useRef<string | null>(null);
 
   const [selectedSection, setSelectedSection] = useState<SectionType>(sectionKey);
   const [title, setTitle] = useState('');
@@ -80,6 +81,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const isEditing = Boolean(articleToEdit);
 
@@ -87,76 +89,97 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     siteConfig?.sections?.[selectedSection] || defaultSiteConfig.sections[selectedSection];
   const categories = currentSectionConfig?.categories || [];
 
-  // Initialize form state ONLY when modal transitions from closed to open or articleToEdit changes
+  // Initialize form state ONLY when modal transitions from closed to open or a different article is selected
   useEffect(() => {
     if (!isOpen) {
-      activeArticleIdRef.current = null;
+      activeSessionTargetRef.current = null;
       setFormError(null);
       setIsSubmitting(false);
       setIsDeleting(false);
+      setDraftRestored(false);
       return;
     }
 
-    const currentTargetId = articleToEdit ? articleToEdit.id : 'new';
+    const currentSessionTarget = articleToEdit ? `edit_${articleToEdit.id}` : 'new_article';
 
-    // Only re-initialize if the active target article has changed
-    if (activeArticleIdRef.current === currentTargetId) {
+    // If modal is already open for this exact target, DO NOT re-initialize (protects active user typing)
+    if (activeSessionTargetRef.current === currentSessionTarget) {
       return;
     }
 
-    activeArticleIdRef.current = currentTargetId;
+    activeSessionTargetRef.current = currentSessionTarget;
     setFormError(null);
+    setDraftRestored(false);
+
+    const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
+    let savedDraft: any = null;
+
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        savedDraft = JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('Could not parse localStorage draft', e);
+    }
 
     if (articleToEdit) {
-      setSelectedSection(articleToEdit.sectionKey);
-      setTitle(articleToEdit.title || '');
-      setCategory(articleToEdit.category || '');
-      setAuthor(articleToEdit.author || '');
-      setImageUrl(articleToEdit.image || '');
-      setEmbedCode(articleToEdit.embedCode || '');
-      setArticleImages(
-        articleToEdit.images && articleToEdit.images.length > 0
-          ? articleToEdit.images
-          : articleToEdit.image
-          ? [
-              {
-                id: 'img-main',
-                url: articleToEdit.image,
-                caption: articleToEdit.title,
-                position: 'top',
-              },
-            ]
-          : []
-      );
-      setExcerpt(articleToEdit.excerpt || '');
-      setContent(articleToEdit.content || '');
-      setStatus(articleToEdit.status || 'approved');
-    } else {
-      // Check if there is an un-submitted draft in sessionStorage
-      let restoredDraft: any = null;
-      try {
-        const saved = sessionStorage.getItem(DRAFT_STORAGE_KEY);
-        if (saved) {
-          restoredDraft = JSON.parse(saved);
-        }
-      } catch {
-        // Ignore
+      // If there's a draft that is newer or has unsaved edits, we can restore it
+      if (savedDraft && (savedDraft.title || savedDraft.content)) {
+        setSelectedSection(savedDraft.sectionKey || articleToEdit.sectionKey);
+        setTitle(savedDraft.title || articleToEdit.title || '');
+        setCategory(savedDraft.category || articleToEdit.category || '');
+        setAuthor(savedDraft.author || articleToEdit.author || '');
+        setImageUrl(savedDraft.imageUrl || articleToEdit.image || '');
+        setEmbedCode(savedDraft.embedCode || articleToEdit.embedCode || '');
+        setArticleImages(
+          savedDraft.articleImages && savedDraft.articleImages.length > 0
+            ? savedDraft.articleImages
+            : articleToEdit.images && articleToEdit.images.length > 0
+            ? articleToEdit.images
+            : articleToEdit.image
+            ? [{ id: 'img-main', url: articleToEdit.image, caption: articleToEdit.title, position: 'top' }]
+            : []
+        );
+        setExcerpt(savedDraft.excerpt || articleToEdit.excerpt || '');
+        setContent(savedDraft.content || articleToEdit.content || '');
+        setStatus(savedDraft.status || articleToEdit.status || 'approved');
+        setDraftRestored(true);
+      } else {
+        setSelectedSection(articleToEdit.sectionKey);
+        setTitle(articleToEdit.title || '');
+        setCategory(articleToEdit.category || '');
+        setAuthor(articleToEdit.author || '');
+        setImageUrl(articleToEdit.image || '');
+        setEmbedCode(articleToEdit.embedCode || '');
+        setArticleImages(
+          articleToEdit.images && articleToEdit.images.length > 0
+            ? articleToEdit.images
+            : articleToEdit.image
+            ? [{ id: 'img-main', url: articleToEdit.image, caption: articleToEdit.title, position: 'top' }]
+            : []
+        );
+        setExcerpt(articleToEdit.excerpt || '');
+        setContent(articleToEdit.content || '');
+        setStatus(articleToEdit.status || 'approved');
       }
-
-      if (restoredDraft && (restoredDraft.title || restoredDraft.content)) {
-        setSelectedSection(restoredDraft.sectionKey || sectionKey);
-        setTitle(restoredDraft.title || '');
-        setCategory(restoredDraft.category || categories[0] || 'Tin tức hoạt động');
+    } else {
+      // New article draft check
+      if (savedDraft && (savedDraft.title || savedDraft.content || savedDraft.excerpt)) {
+        setSelectedSection(savedDraft.sectionKey || sectionKey);
+        setTitle(savedDraft.title || '');
+        setCategory(savedDraft.category || categories[0] || 'Tin tức hoạt động');
         setAuthor(
-          restoredDraft.author ||
+          savedDraft.author ||
             (currentUser ? `${currentUser.fullName} (${currentUser.rankUnit})` : '')
         );
-        setImageUrl(restoredDraft.imageUrl || '');
-        setEmbedCode(restoredDraft.embedCode || '');
-        setArticleImages(restoredDraft.articleImages || []);
-        setExcerpt(restoredDraft.excerpt || '');
-        setContent(restoredDraft.content || '');
-        setStatus(restoredDraft.status || (currentUser?.role === 'admin' ? 'approved' : 'pending'));
+        setImageUrl(savedDraft.imageUrl || '');
+        setEmbedCode(savedDraft.embedCode || '');
+        setArticleImages(savedDraft.articleImages || []);
+        setExcerpt(savedDraft.excerpt || '');
+        setContent(savedDraft.content || '');
+        setStatus(savedDraft.status || (currentUser?.role === 'admin' ? 'approved' : 'pending'));
+        setDraftRestored(true);
       } else {
         setSelectedSection(sectionKey);
         const defaultCats =
@@ -180,13 +203,16 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     }
   }, [isOpen, articleToEdit]);
 
-  // Auto-save draft for new articles to prevent losing content on accidental tab switch or refresh
+  // Real-time Auto-save Draft to localStorage while typing
   useEffect(() => {
-    if (!isOpen || isEditing) return;
-    if (title || content || excerpt) {
+    if (!isOpen) return;
+    const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
+
+    // If there is any content, save to localStorage
+    if (title || content || excerpt || author || imageUrl || articleImages.length > 0 || embedCode) {
       try {
-        sessionStorage.setItem(
-          DRAFT_STORAGE_KEY,
+        localStorage.setItem(
+          draftKey,
           JSON.stringify({
             sectionKey: selectedSection,
             title,
@@ -198,13 +224,27 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
             content,
             embedCode,
             status,
+            savedAt: new Date().toISOString(),
           })
         );
-      } catch {
-        // Ignore
+      } catch (err) {
+        console.warn('LocalStorage draft save error', err);
       }
     }
-  }, [isOpen, isEditing, selectedSection, title, category, author, imageUrl, articleImages, excerpt, content, embedCode, status]);
+  }, [
+    isOpen,
+    articleToEdit,
+    selectedSection,
+    title,
+    category,
+    author,
+    imageUrl,
+    articleImages,
+    excerpt,
+    content,
+    embedCode,
+    status,
+  ]);
 
   // When section changes, ensure valid category
   const handleSectionChange = (newSec: SectionType) => {
@@ -402,13 +442,21 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         }
       }
 
-      // Success: clear session draft and close modal
-      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      // Success: clear saved localStorage draft and close modal
+      const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Ignore
+      }
       setIsSubmitting(false);
       onClose();
     } catch (err: any) {
       console.error('Error submitting article:', err);
-      setFormError(err?.message || 'Có lỗi xảy ra trong quá trình lưu dữ liệu. Bản soạn thảo của đồng chí đã được giữ nguyên để thử lại.');
+      setFormError(
+        err?.message ||
+          'Có lỗi xảy ra trong quá trình lưu dữ liệu vào hệ thống. Toàn bộ nội dung bản thảo đã được bảo toàn nguyên vẹn 100% để đồng chí bấm thử lại.'
+      );
       setIsSubmitting(false);
     }
   };
@@ -423,11 +471,45 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       if (res === false) {
         throw new Error('Xóa bài viết thất bại');
       }
+      const draftKey = getDraftKey(articleToEdit.id);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Ignore
+      }
       setIsDeleting(false);
       onClose();
     } catch (err: any) {
       setFormError(err?.message || 'Lỗi khi xóa bài viết');
       setIsDeleting(false);
+    }
+  };
+
+  const handleClearDraft = () => {
+    if (confirm('Đồng chí có chắc muốn làm trống biểu mẫu và xóa bản nháp đang lưu tạm?')) {
+      const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Ignore
+      }
+      if (articleToEdit) {
+        setTitle(articleToEdit.title || '');
+        setContent(articleToEdit.content || '');
+        setExcerpt(articleToEdit.excerpt || '');
+        setImageUrl(articleToEdit.image || '');
+        setArticleImages(articleToEdit.images || []);
+        setEmbedCode(articleToEdit.embedCode || '');
+      } else {
+        setTitle('');
+        setContent('');
+        setExcerpt('');
+        setImageUrl('');
+        setArticleImages([]);
+        setEmbedCode('');
+      }
+      setDraftRestored(false);
+      setFormError(null);
     }
   };
 
@@ -462,34 +544,26 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
           </button>
         </div>
 
-        {/* Draft Notice & Error Banner */}
-        {!isEditing && (
-          <div className="bg-amber-50 px-4 py-1.5 border-b border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Hệ thống tự động lưu trữ và bảo vệ bản thảo trong khi soạn thảo.</span>
+        {/* Draft Auto-Recovery & Protection Banner */}
+        <div className="bg-amber-50 px-4 py-2 border-b border-amber-200 text-[11px] text-amber-950 flex items-center justify-between flex-wrap gap-2">
+          <span className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="font-medium">
+              {draftRestored
+                ? 'Đã tự động khôi phục bản nháp chưa lưu trước đó từ thiết bị của đồng chí.'
+                : 'Cơ chế Auto-Draft tự động sao lưu dữ liệu gõ phím tức thì chống mất mát nội dung.'}
             </span>
-            {(title || content) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm('Làm trống bản thảo hiện tại?')) {
-                    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-                    setTitle('');
-                    setContent('');
-                    setExcerpt('');
-                    setImageUrl('');
-                    setArticleImages([]);
-                    setEmbedCode('');
-                  }
-                }}
-                className="text-amber-800 hover:underline font-bold cursor-pointer"
-              >
-                Làm mới biểu mẫu
-              </button>
-            )}
-          </div>
-        )}
+          </span>
+          {(title || content || excerpt) && (
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-red-700 hover:text-red-900 hover:underline font-bold cursor-pointer text-[10px] uppercase tracking-wider"
+            >
+              Làm mới biểu mẫu
+            </button>
+          )}
+        </div>
 
         {formError && (
           <div className="bg-red-50 border-b border-red-200 p-3 px-5 text-xs text-red-800 font-medium flex items-center gap-2">
