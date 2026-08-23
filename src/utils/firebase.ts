@@ -333,12 +333,57 @@ export const firestoreDb = {
           category: d.category || '',
           issuer: d.issuer || '',
           date: d.date || '',
-          type: d.type || 'Hành chính',
+          type: d.type || 'pdf',
+          description: d.description || undefined,
+          fileName: d.fileName || d.filename || undefined,
+          fileSize: d.fileSize || d.filesize || undefined,
+          fileUrl: d.fileUrl || d.file_url || undefined,
+          downloads: d.downloads || 0,
+          secretLevel: d.secretLevel || d.secret_level || 'normal',
         });
       });
       return list.sort((a, b) => b.id - a.id);
     } catch (err) {
       console.warn('Firestore fetchDocuments error:', err);
+      return null;
+    }
+  },
+
+  subscribeDocuments(onUpdate: (documents: DocumentItem[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'documents');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const list: DocumentItem[] = [];
+          snapshot.forEach((docSnap) => {
+            const d = docSnap.data() as any;
+            list.push({
+              id: Number(d.id ?? docSnap.id),
+              code: d.code || '',
+              title: d.title || '',
+              category: d.category || '',
+              issuer: d.issuer || '',
+              date: d.date || '',
+              type: d.type || 'pdf',
+              description: d.description || undefined,
+              fileName: d.fileName || d.filename || undefined,
+              fileSize: d.fileSize || d.filesize || undefined,
+              fileUrl: d.fileUrl || d.file_url || undefined,
+              downloads: d.downloads || 0,
+              secretLevel: d.secretLevel || d.secret_level || 'normal',
+            });
+          });
+          onUpdate(list.sort((a, b) => b.id - a.id));
+        },
+        (error) => {
+          console.warn('Firestore real-time documents listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeDocuments error:', err);
       return null;
     }
   },
@@ -403,6 +448,43 @@ export const firestoreDb = {
     }
   },
 
+  subscribeLectures(onUpdate: (lectures: LectureItem[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'lectures');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const list: LectureItem[] = [];
+          snapshot.forEach((docSnap) => {
+            const d = docSnap.data() as any;
+            list.push({
+              id: Number(d.id ?? docSnap.id),
+              title: d.title || '',
+              target: d.target || '',
+              author: d.author || '',
+              desc: d.desc || '',
+              date: d.date || '',
+              fileType: d.fileType || 'powerpoint',
+              fileName: d.fileName || '',
+              fileSize: d.fileSize || '',
+              fileUrl: d.fileUrl || '',
+              downloads: d.downloads || 0,
+            });
+          });
+          onUpdate(list.sort((a, b) => b.id - a.id));
+        },
+        (error) => {
+          console.warn('Firestore real-time lectures listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeLectures error:', err);
+      return null;
+    }
+  },
+
   async upsertLecture(lecture: LectureItem): Promise<boolean> {
     const db = getFirebaseDb();
     if (!db) return false;
@@ -446,6 +528,28 @@ export const firestoreDb = {
     }
   },
 
+  subscribeSiteConfig(onUpdate: (config: SiteConfig) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'site_config');
+      return onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            onUpdate(docSnap.data() as SiteConfig);
+          }
+        },
+        (error) => {
+          console.warn('Firestore real-time site_config listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeSiteConfig error:', err);
+      return null;
+    }
+  },
+
   async upsertSiteConfig(config: SiteConfig): Promise<boolean> {
     const db = getFirebaseDb();
     if (!db) return false;
@@ -476,6 +580,30 @@ export const firestoreDb = {
       return list;
     } catch (err) {
       console.warn('Firestore fetchMeetingRooms error:', err);
+      return null;
+    }
+  },
+
+  subscribeMeetingRooms(onUpdate: (rooms: MeetingRoomItem[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_rooms');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const list: MeetingRoomItem[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as MeetingRoomItem);
+          });
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('Firestore real-time meeting_rooms listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeMeetingRooms error:', err);
       return null;
     }
   },
@@ -520,6 +648,30 @@ export const firestoreDb = {
       return list.sort((a, b) => a.id - b.id);
     } catch (err) {
       console.warn('Firestore fetchMeetingDocuments error:', err);
+      return null;
+    }
+  },
+
+  subscribeMeetingDocuments(onUpdate: (docs: MeetingDocumentItem[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_documents');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const list: MeetingDocumentItem[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as MeetingDocumentItem);
+          });
+          onUpdate(list.sort((a, b) => a.id - b.id));
+        },
+        (error) => {
+          console.warn('Firestore real-time meeting_documents listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeMeetingDocuments error:', err);
       return null;
     }
   },

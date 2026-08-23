@@ -243,6 +243,12 @@ export const supabaseDb = {
         issuer: item.issuer,
         date: item.date,
         type: item.type,
+        description: item.description || undefined,
+        fileName: item.file_name || item.fileName || undefined,
+        fileSize: item.file_size || item.fileSize || undefined,
+        fileUrl: item.file_url || item.fileUrl || undefined,
+        downloads: item.downloads || 0,
+        secretLevel: item.secret_level || item.secretLevel || 'normal',
       }));
     } catch (err) {
       console.warn('Supabase fetchDocuments failed:', err);
@@ -263,6 +269,12 @@ export const supabaseDb = {
         issuer: doc.issuer,
         date: doc.date,
         type: doc.type,
+        description: doc.description || '',
+        file_name: doc.fileName || '',
+        file_size: doc.fileSize || '',
+        file_url: doc.fileUrl || '',
+        downloads: doc.downloads || 0,
+        secret_level: doc.secretLevel || 'normal',
       };
 
       const { error } = await supabase.from('documents').upsert(payload, { onConflict: 'id' });

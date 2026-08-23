@@ -62,6 +62,8 @@ import { UncleHoManagerModal } from './components/modals/UncleHoManagerModal';
 import { HomeAnnouncementManagerModal } from './components/modals/HomeAnnouncementManagerModal';
 import { TabIntroManagerModal } from './components/modals/TabIntroManagerModal';
 import { QuickActionManagerModal } from './components/modals/QuickActionManagerModal';
+import { AccessDeniedModal } from './components/modals/AccessDeniedModal';
+import { LayoutManagerModal } from './components/modals/LayoutManagerModal';
 
 // Home Widgets for 3-Column Layout
 import { UncleHoDailySection } from './components/UncleHoDailySection';
@@ -166,6 +168,15 @@ export function App() {
     isOpen: false,
     lectureToEdit: null,
   });
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+  const [accessDeniedModal, setAccessDeniedModal] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message?: string;
+    requiredRole?: string;
+  }>({
+    isOpen: false,
+  });
 
   // Global Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -179,7 +190,7 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Initial cloud sync: Automatically fetches latest articles, users, documents, settings from Firestore / Database for all visitors
+  // Initial cloud sync & real-time subscriptions from Firestore / Database for all visitors
   useEffect(() => {
     cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => setSiteConfig(data));
     cloudStorage.loadArticles(defaultArticles).then((data) => setArticles(data));
@@ -188,19 +199,66 @@ export function App() {
     cloudStorage.loadLectures(defaultLectures).then((data) => setLectures(data));
     cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => setUncleHoQuotes(data));
     cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => setUncleHoSettings(data));
+    cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => setMeetingRooms(data));
     cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => setMeetingDocuments(data));
     cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => setMeetingSettings(data));
     cloudStorage.loadMeetingVotes({}).then((data) => setMeetingVotes(data));
 
-    // Real-time listener for articles: guarantees any update in Firestore automatically syncs to all devices without refresh
-    const unsubscribe = cloudStorage.subscribeArticles((remoteArticles) => {
-      if (remoteArticles && remoteArticles.length > 0) {
-        setArticles(remoteArticles);
-      }
-    });
+    // Real-time listeners: guarantees any update in Firestore automatically syncs to all clients/devices without page refresh
+    const unsubs: Array<(() => void) | null> = [];
+
+    unsubs.push(
+      cloudStorage.subscribeArticles((remoteArticles) => {
+        if (remoteArticles && remoteArticles.length > 0) {
+          setArticles(remoteArticles);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeDocuments((remoteDocs) => {
+        if (remoteDocs && remoteDocs.length > 0) {
+          setDocuments(remoteDocs);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeLectures((remoteLectures) => {
+        if (remoteLectures && remoteLectures.length > 0) {
+          setLectures(remoteLectures);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeMeetingRooms((remoteRooms) => {
+        if (remoteRooms && remoteRooms.length > 0) {
+          setMeetingRooms(remoteRooms);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeMeetingDocuments((remoteMeetingDocs) => {
+        if (remoteMeetingDocs && remoteMeetingDocs.length > 0) {
+          setMeetingDocuments(remoteMeetingDocs);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeSiteConfig((remoteConfig) => {
+        if (remoteConfig) {
+          setSiteConfig(remoteConfig);
+        }
+      })
+    );
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubs.forEach((unsub) => {
+        if (unsub) unsub();
+      });
     };
   }, []);
 
@@ -317,17 +375,32 @@ export function App() {
 
   // Navigation Handlers
   const handleSelectPage = (page: PageView) => {
-    // Guards
+    // Access Control Guards
     if (page === 'meeting' && !currentUser?.canJoinPartyMeeting && currentUser?.role !== 'admin') {
-      alert('Đồng chí không có quyền truy cập Phòng họp Đảng ủy! Vui lòng liên hệ Quản trị viên để được phân quyền.');
+      setAccessDeniedModal({
+        isOpen: true,
+        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP PHÒNG HỌP ĐẢNG ỦY',
+        message: 'Đồng chí chưa được cấp quyền tham gia Phòng họp Đảng ủy. Vui lòng liên hệ Ban Tổ chức Đảng ủy hoặc Quản trị viên để được phân quyền!',
+        requiredRole: 'Đảng viên / Đại biểu chỉ định hoặc Quản trị viên',
+      });
       return;
     }
     if (page === 'doc' && !currentUser?.canViewDoc && currentUser?.role !== 'admin') {
-      alert('Đồng chí chưa được cấp quyền truy cập Kho Văn bản! Vui lòng liên hệ Quản trị viên.');
+      setAccessDeniedModal({
+        isOpen: true,
+        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP KHO VĂN BẢN QUÂN SỰ',
+        message: 'Khu vực lưu trữ văn kiện, chỉ thị mật nội bộ đơn vị. Đồng chí chưa được cấp quyền xem tài liệu. Vui lòng liên hệ Ban Biên tập để được cấp quyền!',
+        requiredRole: 'Cán bộ được cấp quyền hoặc Quản trị viên',
+      });
       return;
     }
     if ((page === 'approvals' || page === 'users') && currentUser?.role !== 'admin') {
-      alert('Khu vực này chỉ dành cho Quản trị viên (Admin - Ban Biên tập)!');
+      setAccessDeniedModal({
+        isOpen: true,
+        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP KHU VỰC QUẢN TRỊ NÀY',
+        message: 'Khu vực phê duyệt tin bài và quản trị tài khoản quân nhân chỉ dành riêng cho Quản trị viên (Admin - Ban Biên tập Sư đoàn 10)!',
+        requiredRole: 'Quản trị viên (Admin)',
+      });
       return;
     }
 
@@ -1038,25 +1111,45 @@ export function App() {
   };
 
   // Document Actions
-  const handleAddDoc = (doc: Omit<DocumentItem, 'id'>) => {
+  const handleAddDoc = async (doc: Omit<DocumentItem, 'id'>) => {
     const newDoc: DocumentItem = {
       id: Date.now(),
       ...doc,
     };
     setDocuments((prev) => [newDoc, ...prev]);
-    cloudStorage.saveDocument(newDoc);
-  };
-
-  const handleDeleteDoc = (id: number) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa văn bản này khỏi kho lưu trữ?')) {
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
-      cloudStorage.deleteDocument(id);
+    const res = await cloudStorage.saveDocument(newDoc);
+    if (res.success) {
+      showToast(
+        'success',
+        'Đã lưu văn bản vào Kho lưu trữ!',
+        `Văn bản [${newDoc.code}] "${newDoc.title}" đã được lưu trữ vĩnh viễn vào Cơ sở dữ liệu.`
+      );
+    } else {
+      showToast('error', 'Lỗi lưu văn bản', res.error || 'Vui lòng kiểm tra lại kết nối mạng.');
     }
   };
 
-  const handleUpdateDoc = (updated: DocumentItem) => {
+  const handleDeleteDoc = async (id: number) => {
+    if (confirm('Đồng chí có chắc chắn muốn xóa văn bản này khỏi kho lưu trữ?')) {
+      const targetDoc = documents.find((d) => d.id === id);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      const res = await cloudStorage.deleteDocument(id);
+      if (res.success) {
+        showToast('info', 'Đã xóa văn bản', `Đã xóa văn bản [${targetDoc?.code || id}] khỏi hệ thống.`);
+      } else {
+        showToast('error', 'Lỗi xóa văn bản', res.error);
+      }
+    }
+  };
+
+  const handleUpdateDoc = async (updated: DocumentItem) => {
     setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    cloudStorage.saveDocument(updated);
+    const res = await cloudStorage.saveDocument(updated);
+    if (res.success) {
+      showToast('success', 'Đã cập nhật văn bản', `Thông tin văn bản [${updated.code}] đã được lưu thay đổi.`);
+    } else {
+      showToast('error', 'Lỗi cập nhật văn bản', res.error);
+    }
   };
 
   // Lecture Actions
@@ -1074,25 +1167,59 @@ export function App() {
     });
   };
 
-  const handleAddLecture = (lecture: Omit<LectureItem, 'id'>) => {
+  const handleAddLecture = async (lecture: Omit<LectureItem, 'id'>) => {
     const newLec: LectureItem = {
       id: Date.now(),
       ...lecture,
     };
     setLectures((prev) => [newLec, ...prev]);
-    cloudStorage.saveLecture(newLec);
-  };
-
-  const handleDeleteLecture = (id: number) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa bài giảng này khỏi thư viện?')) {
-      setLectures((prev) => prev.filter((l) => l.id !== id));
-      cloudStorage.deleteLecture(id);
+    const res = await cloudStorage.saveLecture(newLec);
+    if (res.success) {
+      showToast(
+        'success',
+        'Đã thêm bài giảng điện tử!',
+        `Bài giảng "${newLec.title}" đã được lưu trữ vào Thư viện giáo án số.`
+      );
+    } else {
+      showToast('error', 'Lỗi lưu bài giảng', res.error || 'Vui lòng kiểm tra lại kết nối.');
     }
   };
 
-  const handleUpdateLecture = (updated: LectureItem) => {
+  const handleDeleteLecture = async (id: number) => {
+    if (confirm('Đồng chí có chắc chắn muốn xóa bài giảng này khỏi thư viện?')) {
+      const target = lectures.find((l) => l.id === id);
+      setLectures((prev) => prev.filter((l) => l.id !== id));
+      const res = await cloudStorage.deleteLecture(id);
+      if (res.success) {
+        showToast('info', 'Đã xóa bài giảng', `Đã xóa bài giảng "${target?.title || id}" khỏi thư viện.`);
+      } else {
+        showToast('error', 'Lỗi xóa bài giảng', res.error);
+      }
+    }
+  };
+
+  const handleUpdateLecture = async (updated: LectureItem) => {
     setLectures((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-    cloudStorage.saveLecture(updated);
+    const res = await cloudStorage.saveLecture(updated);
+    if (res.success) {
+      showToast('success', 'Đã cập nhật bài giảng', `Thông tin bài giảng "${updated.title}" đã được cập nhật.`);
+    } else {
+      showToast('error', 'Lỗi cập nhật bài giảng', res.error);
+    }
+  };
+
+  // Home Layout Settings Handler
+  const handleSaveLayoutSettings = (newLayout: import('./types').HomeLayoutSettings) => {
+    const updated: SiteConfig = {
+      ...siteConfig,
+      layoutSettings: newLayout,
+    };
+    handleSaveCustomizer(updated);
+    showToast(
+      'success',
+      'Đã lưu bố cục Trang chủ',
+      'Cấu hình bố cục hiển thị đã được đồng bộ lên Cơ sở dữ liệu và áp dụng toàn hệ thống.'
+    );
   };
 
   // Party Meeting Document Actions
@@ -1196,12 +1323,31 @@ export function App() {
       },
     };
     handleSaveCustomizer(updated);
+    showToast('success', 'Đã lưu danh mục văn bản', 'Danh mục văn bản đã được lưu và đồng bộ lên Cơ sở dữ liệu.');
   };
 
   const handleRenameDocCategory = (oldCat: string, newCat: string) => {
-    setDocuments((prev) =>
-      prev.map((d) => (d.category === oldCat ? { ...d, category: newCat } : d))
-    );
+    setDocuments((prev) => {
+      const updated = prev.map((d) => (d.category === oldCat ? { ...d, category: newCat } : d));
+      updated.forEach((d) => {
+        if (d.category === newCat) {
+          cloudStorage.saveDocument(d);
+        }
+      });
+      return updated;
+    });
+  };
+
+  const handleDeleteDocCategory = (catToDelete: string, fallbackCat: string) => {
+    setDocuments((prev) => {
+      const updated = prev.map((d) => (d.category === catToDelete ? { ...d, category: fallbackCat } : d));
+      updated.forEach((d) => {
+        if (d.category === fallbackCat) {
+          cloudStorage.saveDocument(d);
+        }
+      });
+      return updated;
+    });
   };
 
   // Customizer Handler with Category Renaming Cascade
@@ -1298,16 +1444,23 @@ export function App() {
       },
     };
     handleSaveCustomizer(updatedConfig);
+    showToast('success', 'Đã lưu danh mục chuyên mục', 'Cấu trúc danh mục mới đã được đồng bộ trực tiếp lên Cơ sở dữ liệu.');
   };
 
   const handleRenameSectionCategory = (sectionKey: SectionType, oldCat: string, newCat: string) => {
-    setArticles((prev) =>
-      prev.map((art) =>
+    setArticles((prev) => {
+      const updated = prev.map((art) =>
         art.sectionKey === sectionKey && art.category === oldCat
           ? { ...art, category: newCat }
           : art
-      )
-    );
+      );
+      updated.forEach((art) => {
+        if (art.sectionKey === sectionKey && art.category === newCat) {
+          cloudStorage.saveArticle(art);
+        }
+      });
+      return updated;
+    });
   };
 
   const handleDeleteSectionCategory = (
@@ -1315,13 +1468,19 @@ export function App() {
     catToDelete: string,
     fallbackCat: string
   ) => {
-    setArticles((prev) =>
-      prev.map((art) =>
+    setArticles((prev) => {
+      const updated = prev.map((art) =>
         art.sectionKey === sectionKey && art.category === catToDelete
           ? { ...art, category: fallbackCat }
           : art
-      )
-    );
+      );
+      updated.forEach((art) => {
+        if (art.sectionKey === sectionKey && art.category === fallbackCat) {
+          cloudStorage.saveArticle(art);
+        }
+      });
+      return updated;
+    });
   };
 
   // Lecture Categories Handlers
@@ -1337,18 +1496,31 @@ export function App() {
       },
     };
     handleSaveCustomizer(updatedConfig);
+    showToast('success', 'Đã lưu danh mục bài giảng số', 'Danh mục bài giảng số đã được đồng bộ lên Cơ sở dữ liệu.');
   };
 
   const handleRenameLectureCategory = (oldCat: string, newCat: string) => {
-    setLectures((prev) =>
-      prev.map((l) => (l.category === oldCat ? { ...l, category: newCat } : l))
-    );
+    setLectures((prev) => {
+      const updated = prev.map((l) => (l.category === oldCat ? { ...l, category: newCat } : l));
+      updated.forEach((l) => {
+        if (l.category === newCat) {
+          cloudStorage.saveLecture(l);
+        }
+      });
+      return updated;
+    });
   };
 
   const handleDeleteLectureCategory = (catToDelete: string, fallbackCat: string) => {
-    setLectures((prev) =>
-      prev.map((l) => (l.category === catToDelete ? { ...l, category: fallbackCat } : l))
-    );
+    setLectures((prev) => {
+      const updated = prev.map((l) => (l.category === catToDelete ? { ...l, category: fallbackCat } : l));
+      updated.forEach((l) => {
+        if (l.category === fallbackCat) {
+          cloudStorage.saveLecture(l);
+        }
+      });
+      return updated;
+    });
   };
 
   // Uncle Ho Quotes & Settings Handlers
@@ -1504,6 +1676,7 @@ export function App() {
                 onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
                 onSaveQuickActions={handleSaveQuickActions}
                 onSaveHomeCategoryColumns={handleSaveHomeCategoryColumns}
+                onSaveLayoutSettings={handleSaveLayoutSettings}
                 onSelectSpotlightArticle={handleSelectSpotlightArticle}
                 onOpenAuthModal={(tab) => setAuthModal({ isOpen: true, tab })}
                 onOpenProfileModal={() => setProfileModalOpen(true)}
@@ -1613,6 +1786,7 @@ export function App() {
                 onGoHome={() => handleSelectPage('home')}
                 onSaveCategories={handleSaveDocCategories}
                 onRenameCategory={handleRenameDocCategory}
+                onDeleteCategory={handleDeleteDocCategory}
                 onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
               />
             )}
@@ -1788,6 +1962,33 @@ export function App() {
           onSave={handleSaveQuickActions}
         />
       )}
+
+      {/* Layout Manager Modal */}
+      {isLayoutModalOpen && (
+        <LayoutManagerModal
+          isOpen={isLayoutModalOpen}
+          siteConfig={siteConfig}
+          onClose={() => setIsLayoutModalOpen(false)}
+          onSaveLayout={handleSaveLayoutSettings}
+        />
+      )}
+
+      {/* Access Denied Warning Modal */}
+      <AccessDeniedModal
+        isOpen={accessDeniedModal.isOpen}
+        title={accessDeniedModal.title}
+        message={accessDeniedModal.message}
+        requiredRole={accessDeniedModal.requiredRole}
+        onClose={() => setAccessDeniedModal({ isOpen: false })}
+        onOpenLogin={() => {
+          setAccessDeniedModal({ isOpen: false });
+          setAuthModal({ isOpen: true, tab: 'login' });
+        }}
+        onGoHome={() => {
+          setAccessDeniedModal({ isOpen: false });
+          setCurrentPage('home');
+        }}
+      />
 
       {/* 7. Real-time Toast Notification Feedback */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

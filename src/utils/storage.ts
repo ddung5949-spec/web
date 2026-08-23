@@ -225,21 +225,50 @@ export const cloudStorage = {
     return safeStore.get('mangyang_documents', fallback);
   },
 
-  async saveDocument(doc: DocumentItem): Promise<void> {
+  subscribeDocuments(onUpdate: (documents: DocumentItem[]) => void): (() => void) | null {
     if (isFirebaseConfigured()) {
-      await firestoreDb.upsertDocument(doc);
+      const unsubscribe = firestoreDb.subscribeDocuments(onUpdate);
+      if (unsubscribe) return unsubscribe;
     }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.upsertDocument(doc);
+    return null;
+  },
+
+  async saveDocument(doc: DocumentItem): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (isFirebaseConfigured()) {
+        await firestoreDb.upsertDocument(doc);
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.upsertDocument(doc);
+      }
+      const currentList = safeStore.get<DocumentItem[]>('mangyang_documents', []);
+      const exists = currentList.some((d) => d.id === doc.id);
+      const updatedList = exists
+        ? currentList.map((d) => (d.id === doc.id ? doc : d))
+        : [doc, ...currentList];
+      safeStore.set('mangyang_documents', updatedList);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error saving document:', e);
+      return { success: false, error: e?.message || 'Lỗi khi lưu văn bản' };
     }
   },
 
-  async deleteDocument(docId: number): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.deleteDocument(docId);
-    }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.deleteDocument(docId);
+  async deleteDocument(docId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (isFirebaseConfigured()) {
+        await firestoreDb.deleteDocument(docId);
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.deleteDocument(docId);
+      }
+      const currentList = safeStore.get<DocumentItem[]>('mangyang_documents', []);
+      const filtered = currentList.filter((d) => d.id !== docId);
+      safeStore.set('mangyang_documents', filtered);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error deleting document:', e);
+      return { success: false, error: e?.message || 'Lỗi khi xóa văn bản' };
     }
   },
 
@@ -268,21 +297,50 @@ export const cloudStorage = {
     return safeStore.get('mangyang_lectures', fallback);
   },
 
-  async saveLecture(lecture: LectureItem): Promise<void> {
+  subscribeLectures(onUpdate: (lectures: LectureItem[]) => void): (() => void) | null {
     if (isFirebaseConfigured()) {
-      await firestoreDb.upsertLecture(lecture);
+      const unsubscribe = firestoreDb.subscribeLectures(onUpdate);
+      if (unsubscribe) return unsubscribe;
     }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.upsertLecture(lecture);
+    return null;
+  },
+
+  async saveLecture(lecture: LectureItem): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (isFirebaseConfigured()) {
+        await firestoreDb.upsertLecture(lecture);
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.upsertLecture(lecture);
+      }
+      const currentList = safeStore.get<LectureItem[]>('mangyang_lectures', []);
+      const exists = currentList.some((l) => l.id === lecture.id);
+      const updatedList = exists
+        ? currentList.map((l) => (l.id === lecture.id ? lecture : l))
+        : [lecture, ...currentList];
+      safeStore.set('mangyang_lectures', updatedList);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error saving lecture:', e);
+      return { success: false, error: e?.message || 'Lỗi khi lưu bài giảng' };
     }
   },
 
-  async deleteLecture(lectureId: number): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.deleteLecture(lectureId);
-    }
-    if (isSupabaseConfigured()) {
-      await supabaseDb.deleteLecture(lectureId);
+  async deleteLecture(lectureId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (isFirebaseConfigured()) {
+        await firestoreDb.deleteLecture(lectureId);
+      }
+      if (isSupabaseConfigured()) {
+        await supabaseDb.deleteLecture(lectureId);
+      }
+      const currentList = safeStore.get<LectureItem[]>('mangyang_lectures', []);
+      const filtered = currentList.filter((l) => l.id !== lectureId);
+      safeStore.set('mangyang_lectures', filtered);
+      return { success: true };
+    } catch (e: any) {
+      console.error('Error deleting lecture:', e);
+      return { success: false, error: e?.message || 'Lỗi khi xóa bài giảng' };
     }
   },
 
@@ -335,6 +393,14 @@ export const cloudStorage = {
       }
     }
     return safeStore.get('mangyang_meeting_docs', fallback);
+  },
+
+  subscribeMeetingDocuments(onUpdate: (docs: MeetingDocumentItem[]) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsubscribe = firestoreDb.subscribeMeetingDocuments(onUpdate);
+      if (unsubscribe) return unsubscribe;
+    }
+    return null;
   },
 
   async saveMeetingDocument(doc: MeetingDocumentItem): Promise<void> {
@@ -393,6 +459,14 @@ export const cloudStorage = {
     return safeStore.get('mangyang_meeting_rooms', fallback);
   },
 
+  subscribeMeetingRooms(onUpdate: (rooms: MeetingRoomItem[]) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsubscribe = firestoreDb.subscribeMeetingRooms(onUpdate);
+      if (unsubscribe) return unsubscribe;
+    }
+    return null;
+  },
+
   async saveMeetingRooms(rooms: MeetingRoomItem[]): Promise<void> {
     safeStore.set('mangyang_meeting_rooms', rooms.slice(0, 30));
     if (isFirebaseConfigured()) {
@@ -449,6 +523,14 @@ export const cloudStorage = {
       }
     }
     return safeStore.get('mangyang_site_config', fallback);
+  },
+
+  subscribeSiteConfig(onUpdate: (config: SiteConfig) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsubscribe = firestoreDb.subscribeSiteConfig(onUpdate);
+      if (unsubscribe) return unsubscribe;
+    }
+    return null;
   },
 
   async saveSiteConfig(config: SiteConfig): Promise<void> {

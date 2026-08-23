@@ -569,7 +569,15 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
         <CategoryManagerModal
           isOpen={isCategoryModalOpen}
           sectionTitle={title}
+          themeColor="#0f766e"
           categories={availableCategories}
+          itemCountByCategory={(() => {
+            const map: Record<string, number> = {};
+            availableCategories.forEach((cat: string) => {
+              map[cat] = lectures.filter((l) => l.category === cat).length;
+            });
+            return map;
+          })()}
           onClose={() => setIsCategoryModalOpen(false)}
           onSave={(newCats) => {
             if (onSaveCategories) onSaveCategories(newCats);

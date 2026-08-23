@@ -116,7 +116,7 @@ export interface DocumentItem {
   category?: string;
   issuer: string;
   date: string;
-  type: 'pdf' | 'docx' | 'doc' | 'xlsx' | 'pptx';
+  type: 'pdf' | 'docx' | 'doc' | 'xlsx' | 'xls' | 'pptx' | 'ppt' | 'zip' | 'rar' | string;
   description?: string;
   fileName?: string;
   fileSize?: string;
@@ -132,7 +132,7 @@ export interface LectureItem {
   author: string;
   desc: string;
   date: string;
-  fileType?: 'word' | 'powerpoint' | 'pdf' | 'excel' | string;
+  fileType?: 'word' | 'powerpoint' | 'pdf' | 'excel' | 'zip' | 'rar' | string;
   fileName?: string;
   fileSize?: string;
   fileUrl?: string;
@@ -291,6 +291,7 @@ export interface HomeCategoryColumn {
   iconName?: 'flag' | 'crosshair' | 'heart' | 'book' | 'shield' | 'award' | 'star' | 'code' | 'video' | 'globe' | string;
   pinnedArticleIds?: number[];
   enabled?: boolean;
+  order?: number;
   colSpan?: '1' | '2' | '3' | 'full'; // Kích thước chiều rộng chuyên mục (1 cột, 2 cột, Toàn chiều rộng)
   heightMode?: 'auto' | 'compact' | 'expanded'; // Chiều cao tự động theo nội dung tin tức
 }
@@ -389,6 +390,19 @@ export interface SiteConfig {
   footerShowBackToTop?: boolean;
   footerShowCustomLinks?: boolean;
   footerCustomLinks?: FooterCustomLink[];
+  layoutSettings?: HomeLayoutSettings;
+}
+
+export interface HomeLayoutSettings {
+  showUncleHoSection?: boolean;
+  showAnnouncementsWidget?: boolean;
+  showFeaturedSlider?: boolean;
+  showSpotlightSection?: boolean;
+  showLatestNewsWidget?: boolean;
+  showQuickActionsWidget?: boolean;
+  showCategoryColumns?: boolean;
+  showQuickLibrarySection?: boolean;
+  topColumnsOrder?: ('left' | 'middle' | 'right')[];
 }
 
 export interface UncleHoQuote {

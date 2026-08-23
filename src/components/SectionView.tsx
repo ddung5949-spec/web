@@ -502,7 +502,6 @@ export const SectionView: React.FC<SectionViewProps> = ({
           onClose={() => setIsCategoryModalOpen(false)}
           onSave={(newCategories) => {
             onSaveCategories(newCategories);
-            setIsCategoryModalOpen(false);
           }}
           onRenameCategory={onRenameCategory}
           onDeleteCategory={onDeleteCategory}

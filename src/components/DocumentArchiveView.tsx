@@ -55,6 +55,7 @@ interface DocumentArchiveViewProps {
   onGoHome?: () => void;
   onSaveCategories?: (newCats: string[]) => void;
   onRenameCategory?: (oldCat: string, newCat: string) => void;
+  onDeleteCategory?: (catToDelete: string, fallbackCat: string) => void;
   onOpenTabIntroModal?: (tabKey: string) => void;
 }
 
@@ -81,6 +82,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   onGoHome,
   onSaveCategories,
   onRenameCategory,
+  onDeleteCategory,
   onOpenTabIntroModal,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
@@ -117,25 +119,39 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
       });
     }
 
+    const ext =
+      doc.type === 'docx' || doc.type === 'doc'
+        ? 'docx'
+        : doc.type === 'xlsx' || doc.type === 'xls'
+        ? 'xlsx'
+        : doc.type === 'pptx' || doc.type === 'ppt'
+        ? 'pptx'
+        : doc.type === 'zip' || doc.type === 'rar'
+        ? 'zip'
+        : 'pdf';
+
     const defaultFileName =
       doc.fileName ||
-      `${doc.code.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_')}_${doc.title.slice(0, 20)}.${
-        doc.type === 'docx' || doc.type === 'doc'
-          ? 'docx'
-          : doc.type === 'xlsx'
-          ? 'xlsx'
-          : doc.type === 'pptx'
-          ? 'pptx'
-          : 'pdf'
-      }`;
+      `${doc.code.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_')}_${doc.title.slice(0, 25)}.${ext}`;
 
-    if (doc.fileUrl && doc.fileUrl.startsWith('data:')) {
-      const link = document.createElement('a');
-      link.href = doc.fileUrl;
-      link.download = defaultFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (doc.fileUrl) {
+      if (doc.fileUrl.startsWith('data:') || doc.fileUrl.startsWith('blob:')) {
+        const link = document.createElement('a');
+        link.href = doc.fileUrl;
+        link.download = defaultFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Direct remote storage URL
+        const link = document.createElement('a');
+        link.href = doc.fileUrl;
+        link.target = '_blank';
+        link.download = defaultFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } else {
       const blobContent = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nBỘ TƯ LỆNH SƯ ĐOÀN 10 - ĐOÀN MANG YANG\n${doc.issuer.toUpperCase()}\n--------------------\n\nSố/Ký hiệu: ${doc.code}\nNgày ban hành: ${doc.date}\nTiểu mục: ${doc.category || 'Văn bản hành chính quân sự'}\n\nTRÍCH YẾU NỘI DUNG:\n${doc.title}\n\nNỘI DUNG TÓM TẮT & HƯỚNG DẪN:\n${doc.description || 'Văn bản quy định nội bộ phục vụ công tác lãnh đạo, chỉ huy và duy trì nền nếp chính quy trong toàn đơn vị.'}\n\n(Tài liệu lưu trữ tại Kho Văn bản số - Sư đoàn 10 Anh hùng)`;
       const blob = new Blob([blobContent], { type: 'text/plain;charset=utf-8' });
@@ -935,6 +951,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
           onRenameCategory={(oldCat, newCat) => {
             if (onRenameCategory) {
               onRenameCategory(oldCat, newCat);
+            }
+          }}
+          onDeleteCategory={(catToDelete, fallbackCat) => {
+            if (onDeleteCategory) {
+              onDeleteCategory(catToDelete, fallbackCat);
             }
           }}
         />

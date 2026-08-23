@@ -3,10 +3,12 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  CheckCircle2,
   Edit2,
   FolderArchive,
   FolderPlus,
   Layers,
+  Loader2,
   Plus,
   Save,
   Tag,
@@ -23,7 +25,8 @@ export interface CategoryManagerModalProps {
   categories: string[];
   itemCountByCategory?: Record<string, number>;
   fallbackCategory?: string;
-  onSaveCategories: (categories: string[]) => void;
+  onSaveCategories?: (categories: string[]) => void | Promise<void>;
+  onSave?: (categories: string[]) => void | Promise<void>;
   onRenameCategory?: (oldCat: string, newCat: string) => void;
   onDeleteCategory?: (catToDelete: string, fallbackCat: string) => void;
 }
@@ -38,6 +41,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   itemCountByCategory = {},
   fallbackCategory = 'Chưa phân loại',
   onSaveCategories,
+  onSave,
   onRenameCategory,
   onDeleteCategory,
 }) => {
@@ -45,13 +49,33 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [newCatName, setNewCatName] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
   // Sync state when opened with updated categories
   React.useEffect(() => {
     setCatList(categories);
+    setSaveSuccessMessage(null);
   }, [categories, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleManualSave = async (updatedList = catList) => {
+    setIsSaving(true);
+    setSaveSuccessMessage(null);
+    try {
+      if (onSaveCategories) await onSaveCategories(updatedList);
+      if (onSave) await onSave(updatedList);
+      setIsSaving(false);
+      setSaveSuccessMessage('Đã lưu cấu trúc danh mục thành công vào Cơ sở dữ liệu!');
+      setTimeout(() => {
+        setSaveSuccessMessage(null);
+      }, 3500);
+    } catch (e) {
+      setIsSaving(false);
+      console.error('Error saving categories:', e);
+    }
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +87,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     }
     const updated = [...catList, trimmed];
     setCatList(updated);
-    onSaveCategories(updated);
+    handleManualSave(updated);
     setNewCatName('');
   };
 
@@ -91,7 +115,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       const updated = [...catList];
       updated[index] = trimmed;
       setCatList(updated);
-      onSaveCategories(updated);
+      handleManualSave(updated);
       if (onRenameCategory) {
         onRenameCategory(oldName, trimmed);
       }
@@ -115,7 +139,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     ) {
       const updated = catList.filter((_, idx) => idx !== index);
       setCatList(updated);
-      onSaveCategories(updated);
+      handleManualSave(updated);
       if (onDeleteCategory) {
         onDeleteCategory(catToDelete, fallbackCategory);
       }
@@ -129,7 +153,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     updated[index - 1] = updated[index];
     updated[index] = temp;
     setCatList(updated);
-    onSaveCategories(updated);
+    handleManualSave(updated);
   };
 
   const handleMoveDown = (index: number) => {
@@ -139,7 +163,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     updated[index + 1] = updated[index];
     updated[index] = temp;
     setCatList(updated);
-    onSaveCategories(updated);
+    handleManualSave(updated);
   };
 
   return (
@@ -159,7 +183,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 Quản lý danh mục • {sectionTitle}
               </h3>
               <p className="text-[11px] text-white/80">
-                {sectionSubtitle || 'Thêm, sửa đổi tên phân loại hoặc sắp xếp thứ tự danh mục'}
+                {sectionSubtitle || 'Thêm mới, đổi tên hoặc xóa các danh mục phân loại'}
               </p>
             </div>
           </div>
@@ -174,6 +198,14 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
         {/* Content Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Notification / Success status */}
+          {saveSuccessMessage && (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{saveSuccessMessage}</span>
+            </div>
+          )}
+
           {/* Add Category Form */}
           <form onSubmit={handleAdd} className="flex gap-2">
             <div className="relative flex-1">
@@ -188,9 +220,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             </div>
             <button
               type="submit"
-              disabled={!newCatName.trim()}
+              disabled={!newCatName.trim() || isSaving}
               style={{ backgroundColor: themeColor }}
-              className="px-3.5 py-2 text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-2 text-white font-bold text-xs rounded-xl hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Thêm mới</span>
@@ -200,8 +232,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           {/* List of Categories */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold text-gray-600 px-1">
-              <span>Danh sách phân loại hiện tại ({catList.length})</span>
-              <span className="text-[10px] text-gray-400">Số lượng mục</span>
+              <span>Danh sách danh mục hiện tại ({catList.length})</span>
+              <span className="text-[10px] text-gray-400">Số bài / tài liệu</span>
             </div>
 
             {catList.length === 0 ? (
@@ -236,7 +268,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                             type="button"
                             onClick={() => handleSaveEdit(index)}
                             className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer"
-                            title="Lưu thay đổi"
+                            title="Lưu đổi tên"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
@@ -315,18 +347,37 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
-          <span>* Các thay đổi về danh mục sẽ tự động cập nhật vào các bài viết & tài liệu liên quan.</span>
+        {/* Footer with Explicit "Lưu thay đổi danh mục" Button */}
+        <div className="p-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-3 text-xs">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors cursor-pointer"
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors cursor-pointer"
           >
             Đóng
+          </button>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => handleManualSave()}
+            style={{ backgroundColor: themeColor }}
+            className="px-5 py-2 text-white font-extrabold rounded-xl hover:opacity-90 shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Đang lưu lên CSDL...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Lưu thay đổi danh mục</span>
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   );
 };
+
