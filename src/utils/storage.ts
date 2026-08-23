@@ -558,6 +558,14 @@ export const cloudStorage = {
     return safeStore.get('mangyang_uncle_ho_quotes', fallback);
   },
 
+  subscribeUncleHoQuotes(onUpdate: (quotes: UncleHoQuote[]) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsubscribe = firestoreDb.subscribeUncleHoQuotes(onUpdate);
+      if (unsubscribe) return unsubscribe;
+    }
+    return null;
+  },
+
   async saveUncleHoQuotes(quotes: UncleHoQuote[]): Promise<void> {
     safeStore.set('mangyang_uncle_ho_quotes', quotes);
     if (isFirebaseConfigured()) {
@@ -576,6 +584,14 @@ export const cloudStorage = {
       }
     }
     return safeStore.get('mangyang_uncle_ho_settings', fallback);
+  },
+
+  subscribeUncleHoSettings(onUpdate: (settings: UncleHoSettings) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsubscribe = firestoreDb.subscribeUncleHoSettings(onUpdate);
+      if (unsubscribe) return unsubscribe;
+    }
+    return null;
   },
 
   async saveUncleHoSettings(settings: UncleHoSettings): Promise<void> {

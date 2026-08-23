@@ -255,6 +255,22 @@ export function App() {
       })
     );
 
+    unsubs.push(
+      cloudStorage.subscribeUncleHoQuotes((remoteQuotes) => {
+        if (remoteQuotes && remoteQuotes.length > 0) {
+          setUncleHoQuotes(remoteQuotes);
+        }
+      })
+    );
+
+    unsubs.push(
+      cloudStorage.subscribeUncleHoSettings((remoteSettings) => {
+        if (remoteSettings) {
+          setUncleHoSettings(remoteSettings);
+        }
+      })
+    );
+
     return () => {
       unsubs.forEach((unsub) => {
         if (unsub) unsub();

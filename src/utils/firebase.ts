@@ -720,6 +720,31 @@ export const firestoreDb = {
     }
   },
 
+  subscribeUncleHoQuotes(onUpdate: (quotes: UncleHoQuote[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_quotes');
+      return onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data?.quotes && Array.isArray(data.quotes)) {
+              onUpdate(data.quotes as UncleHoQuote[]);
+            }
+          }
+        },
+        (error) => {
+          console.warn('Firestore real-time uncle_ho_quotes listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeUncleHoQuotes error:', err);
+      return null;
+    }
+  },
+
   async upsertUncleHoQuotes(quotes: UncleHoQuote[]): Promise<boolean> {
     const db = getFirebaseDb();
     if (!db) return false;
@@ -743,6 +768,28 @@ export const firestoreDb = {
       return (docSnap.data() as UncleHoSettings) || null;
     } catch (err) {
       console.warn('Firestore fetchUncleHoSettings error:', err);
+      return null;
+    }
+  },
+
+  subscribeUncleHoSettings(onUpdate: (settings: UncleHoSettings) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docRef = doc(db, 'configs', 'uncle_ho_settings');
+      return onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            onUpdate(docSnap.data() as UncleHoSettings);
+          }
+        },
+        (error) => {
+          console.warn('Firestore real-time uncle_ho_settings listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeUncleHoSettings error:', err);
       return null;
     }
   },
