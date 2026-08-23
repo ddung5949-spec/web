@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Calendar,
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -8,13 +9,17 @@ import {
   Image as ImageIcon,
   Maximize2,
   Quote,
+  RefreshCw,
   Save,
   Settings2,
   Sparkles,
   Star,
+  Trash2,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings, User } from '../types';
+import { compressImageFile, validateImageFile } from '../utils/imageUtils';
 
 interface UncleHoDailySectionProps {
   quotes: UncleHoQuote[];
@@ -59,8 +64,10 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   // Quick edit modal state for admin
   const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
   const [editQuoteText, setEditQuoteText] = useState('');
-  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editImage, setEditImage] = useState<string>('');
   const [editYear, setEditYear] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Find active quote
   const currentQuote: UncleHoQuote =
@@ -83,9 +90,35 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   // Open Quick Edit
   const handleOpenQuickEdit = () => {
     setEditQuoteText(currentQuote.quote);
-    setEditImageUrl(currentQuote.images?.[0] || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop');
+    setEditImage(
+      currentQuote.images?.[0] ||
+        'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
+    );
     setEditYear(currentQuote.yearRecorded || '1945');
     setIsQuickEditOpen(true);
+  };
+
+  // Handle direct file upload for quick edit
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      alert(validation.error || 'Tệp hình ảnh không hợp lệ.');
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const compressedDataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+      setEditImage(compressedDataUrl);
+    } catch (err: any) {
+      alert(err?.message || 'Không thể xử lý tệp ảnh. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingImage(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // Save Quick Edit
@@ -100,7 +133,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       ...currentQuote,
       quote: editQuoteText.trim(),
       yearRecorded: editYear.trim() || undefined,
-      images: editImageUrl.trim() ? [editImageUrl.trim()] : currentQuote.images,
+      images: editImage ? [editImage] : [],
     };
 
     let updatedList = [...quotes];
@@ -298,26 +331,73 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                 />
               </div>
 
+              {/* Image Upload Box & Preview */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Link ảnh tư liệu Bác Hồ (1 hình)
+                  Ảnh tư liệu Bác Hồ đính kèm
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={editImageUrl}
-                    onChange={(e) => setEditImageUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-red-600 outline-hidden"
-                  />
-                  {editImageUrl && (
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
+
+                {editImage ? (
+                  <div className="relative rounded-xl border border-gray-300 overflow-hidden bg-gray-900 group">
                     <img
-                      src={editImageUrl}
-                      alt="Xem trước"
-                      className="w-9 h-9 rounded-lg object-cover border border-gray-300 shrink-0"
+                      src={editImage}
+                      alt="Ảnh tư liệu Bác Hồ xem trước"
+                      className="w-full h-36 object-cover"
                     />
-                  )}
-                </div>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingImage}
+                        className="px-3 py-1.5 bg-white text-gray-900 rounded-lg text-xs font-bold shadow-md hover:bg-gray-100 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                        <span>Đổi ảnh khác</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditImage('')}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold shadow-md hover:bg-red-700 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Xóa ảnh</span>
+                      </button>
+                    </div>
+
+                    {/* Top right quick delete button always visible */}
+                    <button
+                      type="button"
+                      onClick={() => setEditImage('')}
+                      className="absolute top-2 right-2 p-1.5 bg-red-600/90 hover:bg-red-700 text-white rounded-full shadow-md transition-transform hover:scale-110 cursor-pointer"
+                      title="Xóa ảnh này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 hover:border-red-600 hover:bg-red-50/50 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-red-100 text-red-700 flex items-center justify-center">
+                      <UploadCloud className="w-5 h-5" />
+                    </div>
+                    <div className="text-xs font-bold text-gray-800">
+                      Tải tệp ảnh tư liệu lên từ thiết bị
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      Hỗ trợ: .png, .jpg, .jpeg, .webp (Tối đa 15MB)
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

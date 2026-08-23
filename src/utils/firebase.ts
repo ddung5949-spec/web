@@ -105,6 +105,28 @@ export function getFirebaseAuth(): Auth | null {
   }
 }
 
+// Helper to recursively strip undefined properties before sending to Firestore
+export function cleanForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => cleanForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
+
 export const isFirebaseConfigured = (): boolean => {
   return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 };
@@ -123,12 +145,12 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'users');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: User[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data() as any;
         list.push({
-          id: d.id ?? Number(docSnap.id),
+          id: Number(d.id ?? docSnap.id),
           username: d.username,
           password: d.password,
           fullName: d.fullName,
@@ -157,7 +179,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'users', String(user.id));
-      await setDoc(docRef, { ...user }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...user }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertUser error:', err);
@@ -187,12 +209,12 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'articles');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: Article[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data() as any;
         list.push({
-          id: d.id ?? Number(docSnap.id),
+          id: Number(d.id ?? docSnap.id),
           title: d.title || '',
           category: d.category || '',
           author: d.author || '',
@@ -222,12 +244,11 @@ export const firestoreDb = {
       return onSnapshot(
         colRef,
         (snapshot) => {
-          if (snapshot.empty) return;
           const list: Article[] = [];
           snapshot.forEach((docSnap) => {
             const d = docSnap.data() as any;
             list.push({
-              id: d.id ?? Number(docSnap.id),
+              id: Number(d.id ?? docSnap.id),
               title: d.title || '',
               category: d.category || '',
               author: d.author || '',
@@ -260,7 +281,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'articles', String(article.id));
-      await setDoc(docRef, { ...article }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...article }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertArticle error:', err);
@@ -301,12 +322,12 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'documents');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: DocumentItem[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data() as any;
         list.push({
-          id: d.id ?? Number(docSnap.id),
+          id: Number(d.id ?? docSnap.id),
           code: d.code || '',
           title: d.title || '',
           category: d.category || '',
@@ -327,7 +348,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'documents', String(documentItem.id));
-      await setDoc(docRef, { ...documentItem }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...documentItem }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertDocument error:', err);
@@ -357,12 +378,12 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'lectures');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: LectureItem[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data() as any;
         list.push({
-          id: d.id ?? Number(docSnap.id),
+          id: Number(d.id ?? docSnap.id),
           title: d.title || '',
           target: d.target || '',
           author: d.author || '',
@@ -387,7 +408,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'lectures', String(lecture.id));
-      await setDoc(docRef, { ...lecture }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...lecture }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertLecture error:', err);
@@ -430,7 +451,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'configs', 'site_config');
-      await setDoc(docRef, { ...config }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...config }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertSiteConfig error:', err);
@@ -447,7 +468,7 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'meeting_rooms');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: MeetingRoomItem[] = [];
       snapshot.forEach((docSnap) => {
         list.push(docSnap.data() as MeetingRoomItem);
@@ -464,7 +485,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'meeting_rooms', room.id);
-      await setDoc(docRef, { ...room }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...room }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertMeetingRoom error:', err);
@@ -491,7 +512,7 @@ export const firestoreDb = {
     try {
       const colRef = collection(db, 'meeting_documents');
       const snapshot = await getDocs(colRef);
-      if (snapshot.empty) return null;
+      if (snapshot.empty) return [];
       const list: MeetingDocumentItem[] = [];
       snapshot.forEach((docSnap) => {
         list.push(docSnap.data() as MeetingDocumentItem);
@@ -508,7 +529,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'meeting_documents', String(docItem.id));
-      await setDoc(docRef, { ...docItem }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...docItem }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertMeetingDocument error:', err);
@@ -540,7 +561,7 @@ export const firestoreDb = {
       const docSnap = await getDoc(docRef);
       if (!docSnap.exists()) return null;
       const data = docSnap.data();
-      return (data.quotes as UncleHoQuote[]) || null;
+      return (data?.quotes as UncleHoQuote[]) || [];
     } catch (err) {
       console.warn('Firestore fetchUncleHoQuotes error:', err);
       return null;
@@ -552,7 +573,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'configs', 'uncle_ho_quotes');
-      await setDoc(docRef, { quotes }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ quotes, updatedAt: Date.now() }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertUncleHoQuotes error:', err);
@@ -579,7 +600,7 @@ export const firestoreDb = {
     if (!db) return false;
     try {
       const docRef = doc(db, 'configs', 'uncle_ho_settings');
-      await setDoc(docRef, { ...settings }, { merge: true });
+      await setDoc(docRef, cleanForFirestore({ ...settings, updatedAt: Date.now() }), { merge: true });
       return true;
     } catch (err) {
       console.warn('Firestore upsertUncleHoSettings error:', err);

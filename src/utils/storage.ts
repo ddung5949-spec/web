@@ -55,22 +55,38 @@ export const cloudStorage = {
   async loadArticles(fallback: Article[]): Promise<Article[]> {
     // 1. Try Firebase Firestore
     if (isFirebaseConfigured()) {
-      const remote = await firestoreDb.fetchArticles();
-      if (remote && remote.length > 0) {
-        safeStore.set('mangyang_articles', remote);
-        return remote;
-      } else if (remote && remote.length === 0 && fallback.length > 0) {
-        fallback.forEach((art) => firestoreDb.upsertArticle(art));
+      try {
+        const remote = await firestoreDb.fetchArticles();
+        if (remote && remote.length > 0) {
+          safeStore.set('mangyang_articles', remote);
+          return remote;
+        } else if (remote && remote.length === 0 && fallback.length > 0) {
+          for (const art of fallback) {
+            await firestoreDb.upsertArticle(art);
+          }
+          safeStore.set('mangyang_articles', fallback);
+          return fallback;
+        }
+      } catch (e) {
+        console.warn('Firestore loadArticles error:', e);
       }
     }
     // 2. Fallback to Supabase if configured
     if (isSupabaseConfigured()) {
-      const remote = await supabaseDb.fetchArticles();
-      if (remote && remote.length > 0) {
-        safeStore.set('mangyang_articles', remote);
-        return remote;
-      } else if (remote && remote.length === 0 && fallback.length > 0) {
-        fallback.forEach((art) => supabaseDb.upsertArticle(art));
+      try {
+        const remote = await supabaseDb.fetchArticles();
+        if (remote && remote.length > 0) {
+          safeStore.set('mangyang_articles', remote);
+          return remote;
+        } else if (remote && remote.length === 0 && fallback.length > 0) {
+          for (const art of fallback) {
+            await supabaseDb.upsertArticle(art);
+          }
+          safeStore.set('mangyang_articles', fallback);
+          return fallback;
+        }
+      } catch (e) {
+        console.warn('Supabase loadArticles error:', e);
       }
     }
     return safeStore.get('mangyang_articles', fallback);

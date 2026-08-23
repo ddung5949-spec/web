@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Calendar,
+  Camera,
   Check,
   Clock,
   Edit3,
@@ -18,9 +19,11 @@ import {
   Star,
   Trash2,
   Upload,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings } from '../../types';
+import { compressImageFile, validateImageFile } from '../../utils/imageUtils';
 
 interface UncleHoManagerModalProps {
   isOpen: boolean;
@@ -54,13 +57,15 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   const [formContext, setFormContext] = useState('');
   const [formLesson, setFormLesson] = useState('');
   const [formImages, setFormImages] = useState<string[]>([]);
-  const [newImageUrl, setNewImageUrl] = useState('');
+  const [isProcessingUpload, setIsProcessingUpload] = useState(false);
+  const formFileInputRef = useRef<HTMLInputElement>(null);
 
   // Folder upload batch state
   const [uploadedFolderImages, setUploadedFolderImages] = useState<{ name: string; url: string }[]>([]);
   const [folderBatchName, setFolderBatchName] = useState('Thư mục ảnh tư liệu Bác Hồ');
   const [folderTargetDate, setFolderTargetDate] = useState('19/08');
   const [searchQuoteTerm, setSearchQuoteTerm] = useState('');
+  const [isProcessingFolder, setIsProcessingFolder] = useState(false);
 
   // Handle Save Settings
   const handleSaveSettingsSubmit = (e: React.FormEvent) => {
@@ -69,32 +74,71 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
     alert('Đã cập nhật cấu hình tự động đăng "Lời Bác dạy ngày này năm xưa" thành công!');
   };
 
-  // Handle Folder Upload via input
-  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Form Image File Upload (Single / Multiple)
+  const handleFormImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newImgs: { name: string; url: string }[] = [];
-    const fileList: File[] = Array.from(files);
-    fileList.forEach((file: File) => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (event.target?.result) {
+    try {
+      setIsProcessingUpload(true);
+      const fileList: File[] = Array.from(files);
+      const newCompressedUrls: string[] = [];
+
+      for (const file of fileList) {
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+          alert(validation.error || `Tệp ${file.name} không hợp lệ.`);
+          continue;
+        }
+        const dataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+        newCompressedUrls.push(dataUrl);
+      }
+
+      if (newCompressedUrls.length > 0) {
+        setFormImages((prev) => [...prev, ...newCompressedUrls]);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Không thể xử lý hình ảnh. Vui lòng thử lại.');
+    } finally {
+      setIsProcessingUpload(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  // Handle Folder Upload via input
+  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsProcessingFolder(true);
+      const newImgs: { name: string; url: string }[] = [];
+      const fileList: File[] = Array.from(files);
+
+      for (const file of fileList) {
+        if (file.type.startsWith('image/') || file.name.match(/\.(png|jpe?g|webp)$/i)) {
+          try {
+            const dataUrl = await compressImageFile(file, 1280, 1280, 0.80);
             newImgs.push({
               name: file.name,
-              url: event.target.result as string,
+              url: dataUrl,
             });
-            if (newImgs.length === fileList.length) {
-              setUploadedFolderImages((prev) => [...prev, ...newImgs]);
-            }
+          } catch {
+            // Ignore unreadable image
           }
-        };
-        reader.readAsDataURL(file);
+        }
       }
-    });
 
-    alert(`Đã nhận ${files.length} tệp ảnh từ thư mục. Đồng chí có thể gán vào các bài đăng bên dưới.`);
+      if (newImgs.length > 0) {
+        setUploadedFolderImages((prev) => [...prev, ...newImgs]);
+        alert(`Đã tối ưu hóa và nạp thành công ${newImgs.length} ảnh tư liệu từ thư mục.`);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Lỗi khi đọc thư mục hình ảnh.');
+    } finally {
+      setIsProcessingFolder(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // Apply uploaded folder images to target date
@@ -502,19 +546,29 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
                   </div>
 
                   {/* Grid of uploaded images */}
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-48 overflow-y-auto p-1 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 max-h-56 overflow-y-auto p-2 bg-gray-50 rounded-xl border border-gray-200">
                     {uploadedFolderImages.map((img, idx) => (
-                      <div key={idx} className="relative rounded border border-gray-200 overflow-hidden group aspect-square bg-black">
+                      <div key={idx} className="relative rounded-lg border border-gray-300 overflow-hidden group aspect-square bg-gray-900 shadow-xs">
                         <img
                           src={img.url}
                           alt={img.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1">
-                          <span className="text-[9px] text-white font-medium truncate">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute bottom-1 left-1 right-1">
+                          <span className="text-[9px] text-white/90 font-medium truncate block">
                             {img.name}
                           </span>
                         </div>
+                        {/* Delete button on top-right */}
+                        <button
+                          type="button"
+                          onClick={() => setUploadedFolderImages((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md transition-transform hover:scale-110 cursor-pointer"
+                          title="Xóa ảnh này khỏi danh sách"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -702,44 +756,76 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
                 />
               </div>
 
-              {/* Photos List */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-gray-700">
-                  Ảnh tư liệu đính kèm ({formImages.length} ảnh):
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    placeholder="Dán đường dẫn ảnh URL (https://...)"
-                    className="flex-1 text-xs p-2 border border-gray-300 rounded"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (newImageUrl.trim()) {
-                        setFormImages((prev) => [...prev, newImageUrl.trim()]);
-                        setNewImageUrl('');
-                      }
-                    }}
-                    className="bg-gray-800 text-white font-bold text-xs px-3 py-2 rounded shrink-0 cursor-pointer"
-                  >
-                    Thêm ảnh
-                  </button>
+              {/* Photos List with File Upload & Previews */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Ảnh tư liệu lịch sử đính kèm ({formImages.length} ảnh):
+                  </label>
+                  {formImages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFormImages([])}
+                      className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Xóa tất cả ảnh đã chọn
+                    </button>
+                  )}
                 </div>
 
+                {/* File Upload Trigger Box */}
+                <input
+                  ref={formFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  multiple
+                  onChange={handleFormImageUpload}
+                  className="hidden"
+                />
+
+                <div
+                  onClick={() => formFileInputRef.current?.click()}
+                  className="border-2 border-dashed border-gray-300 hover:border-red-600 hover:bg-red-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5"
+                >
+                  <div className="w-9 h-9 rounded-full bg-red-100 text-red-700 flex items-center justify-center">
+                    <UploadCloud className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs font-bold text-gray-800">
+                    Bấm để tải tệp ảnh lên từ máy tính / điện thoại
+                  </div>
+                  <div className="text-[10px] text-gray-500">
+                    Hỗ trợ định dạng: .png, .jpg, .jpeg, .webp (Có thể chọn nhiều ảnh cùng lúc)
+                  </div>
+                </div>
+
+                {/* Previews Grid */}
                 {formImages.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-x-auto p-2 bg-gray-50 rounded border border-gray-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
                     {formImages.map((url, idx) => (
-                      <div key={idx} className="relative w-16 h-12 rounded overflow-hidden border border-gray-300 shrink-0 group">
-                        <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      <div
+                        key={idx}
+                        className="relative rounded-xl border border-gray-300 overflow-hidden bg-gray-900 shadow-xs aspect-4/3 group"
+                      >
+                        <img
+                          src={url}
+                          alt={`Tư liệu Bác Hồ ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
+
+                        {/* Sequence badge */}
+                        <div className="absolute bottom-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                          {idx === 0 ? 'Ảnh đại diện' : `Ảnh phụ ${idx + 1}`}
+                        </div>
+
+                        {/* Red Delete Button on Top Right */}
                         <button
                           type="button"
                           onClick={() => setFormImages((prev) => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-0 right-0 bg-red-600 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className="absolute top-1.5 right-1.5 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md transition-transform hover:scale-110 cursor-pointer"
+                          title="Xóa ảnh này"
                         >
-                          <X className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
