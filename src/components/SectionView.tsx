@@ -123,7 +123,7 @@ export const SectionView: React.FC<SectionViewProps> = ({
     return articles.filter(
       (a) =>
         (a.sectionKey === sectionKey || (!a.sectionKey && sectionKey === 'ctd')) &&
-        (!a.status || a.status === 'approved')
+        (!a.status || a.status === 'approved' || a.status !== 'pending')
     );
   }, [articles, sectionKey]);
 

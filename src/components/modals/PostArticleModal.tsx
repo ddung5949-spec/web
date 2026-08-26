@@ -76,7 +76,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   const [excerpt, setExcerpt] = useState('');
   const [content, setContent] = useState('');
   const [embedCode, setEmbedCode] = useState('');
-  const [status, setStatus] = useState<'approved' | 'pending'>('pending');
+  const [status, setStatus] = useState<'approved' | 'pending'>('approved');
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -178,7 +178,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setArticleImages(savedDraft.articleImages || []);
         setExcerpt(savedDraft.excerpt || '');
         setContent(savedDraft.content || '');
-        setStatus(savedDraft.status || (currentUser?.role === 'admin' ? 'approved' : 'pending'));
+        setStatus(savedDraft.status || 'approved');
         setDraftRestored(true);
       } else {
         setSelectedSection(sectionKey);
@@ -198,7 +198,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setArticleImages([]);
         setExcerpt('');
         setContent('');
-        setStatus(currentUser?.role === 'admin' ? 'approved' : 'pending');
+        setStatus('approved');
       }
     }
   }, [isOpen, articleToEdit]);

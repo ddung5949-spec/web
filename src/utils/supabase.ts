@@ -155,24 +155,28 @@ export const supabaseDb = {
     // Helper to map DB row to Article with robust sectionKey and category detection
     const mapRowToArticle = (item: any): Article => {
       let secKey: SectionType = 'ctd';
-      const rawSec = item.section_key || item.sectionKey || item.tab_type || item.tabType;
-      if (rawSec === 'hl' || rawSec === 'huan_luyen') secKey = 'hl';
-      else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho') secKey = 'bac';
-      else if (rawSec === 'ctd') secKey = 'ctd';
+      const rawSec = (item.section_key || item.sectionKey || item.tab_type || item.tabType || '').toString().toLowerCase().trim();
+      if (rawSec === 'hl' || rawSec === 'huan_luyen' || rawSec === 'huanluyen') secKey = 'hl';
+      else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho' || rawSec === 'hoctapbac') secKey = 'bac';
+      else if (rawSec === 'ctd' || rawSec === 'ctct') secKey = 'ctd';
       else {
         // Fallback guess from category name if missing
         const cat = (item.category || '').toLowerCase();
-        if (cat.includes('huấn luyện') || cat.includes('sẵn sàng') || cat.includes('thao trường') || cat.includes('khí tài')) {
+        if (cat.includes('huấn luyện') || cat.includes('sẵn sàng') || cat.includes('thao trường') || cat.includes('khí tài') || cat.includes('quân sự')) {
           secKey = 'hl';
-        } else if (cat.includes('bác') || cat.includes('hồ chí minh') || cat.includes('tư tưởng')) {
+        } else if (cat.includes('bác') || cat.includes('hồ chí minh') || cat.includes('tư tưởng') || cat.includes('lời bác')) {
           secKey = 'bac';
         } else {
           secKey = 'ctd';
         }
       }
 
+      // Any article without explicit pending/draft status is treated as approved and immediately visible
+      const rawStatus = (item.status || '').toString().toLowerCase().trim();
+      const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
+
       return {
-        id: Number(item.id),
+        id: Number(item.id || Date.now()),
         title: item.title || '',
         category: (item.category || 'Tin tức hoạt động').trim(),
         author: item.author || 'Cán bộ - Chiến sĩ',
@@ -183,21 +187,40 @@ export const supabaseDb = {
         summary: item.summary || item.excerpt || '',
         content: item.content || '',
         embedCode: item.embed_code || item.embedCode || undefined,
-        status: (item.status === 'pending' || item.status === 'draft') ? 'pending' : 'approved',
+        status: status,
         views: Number(item.views || 0),
         sectionKey: secKey,
       };
     };
 
     try {
-      const { data: articlesData, error: articlesError } = await supabase
+      // Fetch all articles publicly from Supabase
+      let articlesData: any[] | null = null;
+
+      // 1. Try order by created_at descending
+      const resCreatedAt = await supabase
         .from('articles')
         .select('*')
-        .order('id', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      if (articlesError) {
-        console.warn('Supabase fetchArticles from articles table error:', articlesError.message);
-        return null;
+      if (!resCreatedAt.error && resCreatedAt.data) {
+        articlesData = resCreatedAt.data;
+      } else {
+        // 2. Fallback: order by id descending
+        const resId = await supabase
+          .from('articles')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (!resId.error && resId.data) {
+          articlesData = resId.data;
+        } else {
+          // 3. Fallback: select without ordering
+          const resAll = await supabase.from('articles').select('*');
+          if (!resAll.error && resAll.data) {
+            articlesData = resAll.data;
+          }
+        }
       }
 
       if (articlesData) {
@@ -235,7 +258,7 @@ export const supabaseDb = {
     try {
       const { error } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
       if (error) {
-        // If error might be due to non-existent tab_type column, try upserting without tab_type
+        // If error is due to non-existent tab_type column, try upserting without tab_type
         if (error.message && error.message.includes('tab_type')) {
           delete payload.tab_type;
           const { error: retryError } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
@@ -837,7 +860,7 @@ export const supabaseDb = {
   },
 
   // -------------------------------------------------------------
-  // 10. REALTIME DATABASE-FIRST SUBSCRIPTION (supabase.channel('public:db-changes'))
+  // 10. REALTIME DATABASE-FIRST SUBSCRIPTION (supabase.channel('schema-db-changes'))
   // -------------------------------------------------------------
   subscribeAllChanges(callbacks: {
     onArticlesChange?: (articles: Article[]) => void;
@@ -854,9 +877,10 @@ export const supabaseDb = {
 
     try {
       const channel = supabase
-        .channel('public:db-changes')
-        // 1. Articles
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, async () => {
+        .channel('schema-db-changes')
+        // 1. Articles (Instant Realtime Auto-Fetch for all users)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, async (payload) => {
+          console.log('[Supabase Realtime] Articles changed:', payload);
           if (callbacks.onArticlesChange) {
             const fresh = await supabaseDb.fetchArticles();
             if (fresh !== null) callbacks.onArticlesChange(fresh);

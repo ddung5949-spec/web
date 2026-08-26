@@ -78,7 +78,7 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
 
   // Compute ticker items based on configured mode
   const tickerItems = useMemo<TickerItem[]>(() => {
-    const approvedArticles = articles.filter((a) => a.status === 'approved');
+    const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
     const items: TickerItem[] = [];
 
     // 1. Manual announcements from custom list or legacy tickerText

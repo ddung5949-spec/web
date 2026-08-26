@@ -1061,7 +1061,7 @@ export function App() {
         excerpt: data.excerpt.trim(),
         content: data.content.trim(),
         embedCode: data.embedCode?.trim() || undefined,
-        status: data.status || (isAdmin ? 'approved' : 'pending'),
+        status: data.status || 'approved',
         views: 1,
         sectionKey: data.sectionKey || 'ctd',
       };
@@ -1073,6 +1073,11 @@ export function App() {
       const res = await cloudStorage.saveArticle(newArt);
 
       if (res.success) {
+        // Background refresh to guarantee sync across database
+        cloudStorage.loadArticles(defaultArticles).then((fresh) => {
+          if (fresh && fresh.length > 0) setArticles(fresh);
+        });
+
         if (newArt.status === 'approved') {
           showToast(
             'success',
@@ -1664,7 +1669,7 @@ export function App() {
     await cloudStorage.saveUncleHoSettings(newSettings);
   };
 
-  const approvedArticles = articles.filter((a) => a.status === 'approved');
+  const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
 
   const defaultHomeAnnouncements: HomeAnnouncement[] = [
     {

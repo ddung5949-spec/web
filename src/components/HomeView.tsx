@@ -118,7 +118,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onOpenCustomizer = () => {},
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const approvedArticles = articles.filter((a) => a.status === 'approved');
+  const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
 
   // Modals state for Admin
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
@@ -467,11 +467,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 ? []
                 : approvedArticles
                     .filter((a) => {
-                      const matchSection = a.sectionKey === col.sectionKey;
+                      const matchSection = !col.sectionKey || a.sectionKey === col.sectionKey || (!a.sectionKey && col.sectionKey === 'ctd');
                       const matchCategory =
                         !col.categoryFilter ||
                         col.categoryFilter === 'all' ||
-                        a.category === col.categoryFilter;
+                        !a.category ||
+                        a.category.trim().toLowerCase() === col.categoryFilter.trim().toLowerCase();
                       return matchSection && matchCategory;
                     })
                     .slice(0, col.articleLimit || 4);
