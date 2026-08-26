@@ -13,6 +13,9 @@ import {
   UncleHoQuote,
   UncleHoSettings,
   User,
+  RoomPresenceItem,
+  CollabDocData,
+  RoomBroadcastAction,
 } from '../types';
 
 // Synchronous local storage caching
@@ -498,6 +501,59 @@ export const cloudStorage = {
       await firestoreDb.deleteMeetingRoom(roomId);
     }
     return updated;
+  },
+
+  // =========================================================================
+  // 8.1. REAL-TIME COLLABORATIVE PRESENCE & LIVE SYNC
+  // =========================================================================
+  subscribeRoomPresence(roomId: string, onUpdate: (presenceList: RoomPresenceItem[]) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsub = firestoreDb.subscribeRoomPresence(roomId, onUpdate);
+      if (unsub) return unsub;
+    }
+    return null;
+  },
+
+  async updateRoomPresence(presence: RoomPresenceItem): Promise<void> {
+    if (isFirebaseConfigured()) {
+      await firestoreDb.updateRoomPresence(presence);
+    }
+  },
+
+  async removeRoomPresence(roomId: string, userId: number): Promise<void> {
+    if (isFirebaseConfigured()) {
+      await firestoreDb.removeRoomPresence(roomId, userId);
+    }
+  },
+
+  subscribeCollabDoc(roomId: string, docId: number, onUpdate: (docData: CollabDocData) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsub = firestoreDb.subscribeCollabDoc(roomId, docId, onUpdate);
+      if (unsub) return unsub;
+    }
+    return null;
+  },
+
+  async saveCollabDoc(roomId: string, docId: number, docData: Partial<CollabDocData>): Promise<void> {
+    const key = `collab_doc_${roomId}_${docId}`;
+    safeStore.set(key, docData);
+    if (isFirebaseConfigured()) {
+      await firestoreDb.upsertCollabDoc(roomId, docId, docData);
+    }
+  },
+
+  subscribeRoomActions(roomId: string, onUpdate: (actions: RoomBroadcastAction[]) => void): (() => void) | null {
+    if (isFirebaseConfigured()) {
+      const unsub = firestoreDb.subscribeRoomActions(roomId, onUpdate);
+      if (unsub) return unsub;
+    }
+    return null;
+  },
+
+  async broadcastRoomAction(action: RoomBroadcastAction): Promise<void> {
+    if (isFirebaseConfigured()) {
+      await firestoreDb.broadcastRoomAction(action);
+    }
   },
 
   // =========================================================================

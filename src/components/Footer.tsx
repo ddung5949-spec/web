@@ -71,7 +71,7 @@ export const Footer: React.FC<FooterProps> = ({
       >
         {/* Nút Admin chỉnh sửa nhanh chân trang */}
         {isAdmin && onUpdateSiteConfig && (
-          <div className="max-w-7xl mx-auto px-4 pt-2 flex justify-end">
+          <div className="w-full px-3 sm:px-6 lg:px-8 pt-2 flex justify-end">
             <button
               type="button"
               onClick={() => setIsFooterModalOpen(true)}
@@ -86,7 +86,7 @@ export const Footer: React.FC<FooterProps> = ({
 
         {/* Phần thông tin đơn vị phía trên (thu nhỏ chiều cao, bố cục linh hoạt) */}
         <div
-          className={`max-w-7xl mx-auto px-4 py-2.5 ${
+          className={`w-full px-3 sm:px-6 lg:px-8 py-2.5 ${
             layout === 'centered'
               ? 'flex flex-col items-center justify-center text-center'
               : layout === 'compact'

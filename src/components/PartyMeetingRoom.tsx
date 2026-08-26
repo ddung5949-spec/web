@@ -9,12 +9,14 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Columns,
   Download,
   Edit3,
   Eye,
   EyeOff,
   FileCheck,
   FileCode,
+  FileEdit,
   FilePlus,
   FileText,
   FileUp,
@@ -42,7 +44,6 @@ import {
   Unlock,
   Users,
   Vote,
-  Volume2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -56,7 +57,7 @@ import {
   User,
   VoteChoice,
 } from '../types';
-import { AIVoiceReader } from './AIVoiceReader';
+import { RealtimeCollabDocumentWorkspace } from './RealtimeCollabDocumentWorkspace';
 
 interface PartyMeetingRoomProps {
   currentUser: User | null;
@@ -348,6 +349,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   });
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [docCategoryFilter, setDocCategoryFilter] = useState('ALL');
+  const [activeRoomTab, setActiveRoomTab] = useState<'workspace' | 'collab_studio'>('workspace');
 
   // Reset active doc when entering another room
   useEffect(() => {
@@ -1528,8 +1530,72 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
         </div>
       </div>
 
-      {/* 3. THREE-COLUMN WORKSPACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* 2.5 TAB NAVIGATION FOR ACTIVE MEETING ROOM */}
+      <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveRoomTab('workspace')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              activeRoomTab === 'workspace'
+                ? 'bg-[#831843] text-white ring-2 ring-pink-300'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+            }`}
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>1. BÀN HỌP & BIỂU QUYẾT (3 CỘT)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveRoomTab('collab_studio')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              activeRoomTab === 'collab_studio'
+                ? 'bg-gradient-to-r from-[#831843] to-purple-800 text-white ring-2 ring-amber-400'
+                : 'bg-white hover:bg-pink-50 text-pink-900 border border-pink-200'
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <FileEdit className="w-3.5 h-3.5 text-amber-300" />
+            <span>2. SOẠN THẢO CỘNG TÁC REAL-TIME (GOOGLE DOCS)</span>
+          </button>
+        </div>
+
+        {activeRoomTab === 'collab_studio' && (
+          <div className="text-[11px] text-gray-500 font-medium">
+            Đang mở: <strong className="text-pink-900">{activeDocument?.title}</strong>
+          </div>
+        )}
+      </div>
+
+      {activeRoomTab === 'collab_studio' && activeDocument ? (
+        <RealtimeCollabDocumentWorkspace
+          currentRoom={currentRoom}
+          activeDocument={activeDocument}
+          currentUser={currentUser}
+          allUsers={allUsers}
+          onSaveDocument={(updatedDoc) => {
+            onSaveMeetingDocument(updatedDoc);
+            if (onSaveMeetingRoom) {
+              const updatedDocs = currentRoomDocs.map((d) =>
+                d.id === updatedDoc.id ? updatedDoc : d
+              );
+              onSaveMeetingRoom({
+                ...currentRoom,
+                documents: updatedDocs,
+              });
+            }
+          }}
+          onUpdateRoom={onSaveMeetingRoom}
+          onBackToDocsList={() => setActiveRoomTab('workspace')}
+        />
+      ) : (
+        <>
+          {/* 3. THREE-COLUMN WORKSPACE */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* =========================================================================
             COLUMN 1 (LEFT - 3 COLS): KHO VĂN BẢN HỌP CỦA PHÒNG
            ========================================================================= */}
@@ -1804,6 +1870,16 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                   </button>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setActiveRoomTab('collab_studio')}
+                  className="px-2.5 py-1.5 bg-gradient-to-r from-[#831843] to-purple-800 hover:from-[#701a75] hover:to-purple-900 text-white font-black rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Mở chế độ cộng tác trực tiếp đa người dùng kiểu Google Docs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  <span>✍️ Mở Soạn thảo Cộng tác Trực tiếp</span>
+                </button>
+
                 {canUpload && (
                   <button
                     type="button"
@@ -1817,25 +1893,6 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                 )}
               </div>
             </div>
-
-            {/* AI Voice Reader for Active Document */}
-            {activeDocument && (
-              <div className="p-3 bg-amber-50/40 border-b border-amber-100">
-                <AIVoiceReader
-                  title={`AI Đọc văn kiện: ${activeDocument.title}`}
-                  textToRead={`${activeDocument.title}. ${
-                    typeof document !== 'undefined'
-                      ? (() => {
-                          const d = document.createElement('div');
-                          d.innerHTML = activeDocument.contentHtml || '';
-                          return d.textContent || d.innerText || '';
-                        })()
-                      : activeDocument.contentHtml || ''
-                  }`}
-                  sourceType="document"
-                />
-              </div>
-            )}
 
             {/* Document Content Editable Area */}
             <div className="p-5 bg-white min-h-[420px] max-h-[580px] overflow-y-auto">
@@ -2211,6 +2268,8 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* MODAL: ADD DOCUMENT */}
       {isAddDocModalOpen && (

@@ -991,51 +991,65 @@ export function App() {
     sectionKey: SectionType;
     status?: 'approved' | 'pending';
   }): Promise<boolean> => {
-    const isAdmin = currentUser?.role === 'admin';
-    const now = new Date();
-    const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
-      now.getMonth() + 1
-    ).padStart(2, '0')}/${now.getFullYear()}`;
+    try {
+      const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'commander' || currentUser?.role === 'editor';
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
+        now.getMonth() + 1
+      ).padStart(2, '0')}/${now.getFullYear()}`;
 
-    const newArt: Article = {
-      id: Date.now(),
-      title: data.title,
-      category: data.category,
-      author: data.author,
-      date: dateStr,
-      image: data.image,
-      images: data.images,
-      excerpt: data.excerpt,
-      content: data.content,
-      embedCode: data.embedCode,
-      status: data.status || (isAdmin ? 'approved' : 'pending'),
-      views: 1,
-      sectionKey: data.sectionKey,
-    };
+      const newArt: Article = {
+        id: Date.now(),
+        title: data.title.trim(),
+        category: data.category || 'Tin tức hoạt động',
+        author: data.author.trim() || (currentUser ? `${currentUser.fullName} (${currentUser.rankUnit || currentUser.rank || 'Đơn vị'})` : 'Cán bộ - Chiến sĩ'),
+        date: dateStr,
+        image: data.image || '',
+        images: data.images && data.images.length > 0 ? data.images : undefined,
+        excerpt: data.excerpt.trim(),
+        content: data.content.trim(),
+        embedCode: data.embedCode?.trim() || undefined,
+        status: data.status || (isAdmin ? 'approved' : 'pending'),
+        views: 1,
+        sectionKey: data.sectionKey || 'ctd',
+      };
 
-    setArticles((prev) => [newArt, ...prev]);
-    const res = await cloudStorage.saveArticle(newArt);
+      // Immediately update local state so the UI reflects the post instantly
+      setArticles((prev) => [newArt, ...prev.filter((a) => a.id !== newArt.id)]);
 
-    if (res.success) {
-      if (newArt.status === 'approved') {
-        showToast(
-          'success',
-          'Xuất bản tin bài thành công!',
-          'Bài viết đã được lưu trực tiếp vào Cơ sở dữ liệu và hiển thị trực tuyến.'
-        );
+      // Save to Cloud Firestore & Supabase & Local persistent cache
+      const res = await cloudStorage.saveArticle(newArt);
+
+      if (res.success) {
+        if (newArt.status === 'approved') {
+          showToast(
+            'success',
+            'Xuất bản tin bài thành công!',
+            'Bài viết đã được lưu trực tiếp vào Cơ sở dữ liệu và hiển thị trực tuyến.'
+          );
+        } else {
+          showToast(
+            'info',
+            'Đã gửi dự thảo tin bài',
+            'Dự thảo đã được lưu vào hệ thống và chuyển đến Ban Biên tập để chờ phê duyệt.'
+          );
+        }
+        return true;
       } else {
+        console.error('cloudStorage.saveArticle error:', res.error);
         showToast(
-          'info',
-          'Đã gửi dự thảo tin bài',
-          'Dự thảo đã được lưu vào hệ thống và chuyển đến Ban Biên tập để chờ phê duyệt.'
+          'error',
+          'Lỗi lưu bài viết vào Cơ sở dữ liệu',
+          res.error || 'Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.'
         );
+        return false;
       }
-      return true;
-    } else {
+    } catch (err: any) {
+      console.error('Unhandled error in handlePostArticle:', err);
       showToast(
         'error',
-        'Lỗi lưu bài viết vào Cơ sở dữ liệu',
-        res.error || 'Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.'
+        'Có lỗi xảy ra khi tạo bài viết',
+        err?.message || 'Không thể hoàn tất việc đăng bài. Vui lòng kiểm tra lại thông tin.'
       );
       return false;
     }
@@ -1670,7 +1684,7 @@ export function App() {
       />
 
       {/* 4. Main Body Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 py-5">
+      <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-5">
         <div className="w-full">
           {/* Main Content Area */}
           <div className="w-full min-w-0">

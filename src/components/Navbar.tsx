@@ -122,7 +122,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       className="sticky top-0 z-50 shadow-md select-none border-b border-black/15"
       style={{ backgroundColor: armyGreenColor }}
     >
-      <div className="max-w-7xl mx-auto px-1 sm:px-2 relative flex items-center">
+      <div className="w-full px-2 sm:px-6 lg:px-8 relative flex items-center">
         {/* Left Scroll Button (When overflowed) */}
         {canScrollLeft && (
           <button

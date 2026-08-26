@@ -33,6 +33,9 @@ import {
   UncleHoQuote,
   UncleHoSettings,
   User,
+  RoomPresenceItem,
+  CollabDocData,
+  RoomBroadcastAction,
 } from '../types';
 
 // Load config from firebase-applet-config.json or environment variables
@@ -698,6 +701,156 @@ export const firestoreDb = {
       return true;
     } catch (err) {
       console.warn('Firestore deleteMeetingDocument error:', err);
+      return false;
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 6.2. REAL-TIME COLLABORATIVE PRESENCE & LIVE EDITING SYNC
+  // -------------------------------------------------------------
+  subscribeRoomPresence(roomId: string, onUpdate: (presenceList: RoomPresenceItem[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_presence');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const now = Date.now();
+          const list: RoomPresenceItem[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as RoomPresenceItem;
+            // Filter by roomId and active within the last 60 seconds
+            if (data && data.roomId === roomId && now - (data.lastActive || 0) < 60000) {
+              list.push(data);
+            }
+          });
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('Firestore real-time meeting_presence listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeRoomPresence error:', err);
+      return null;
+    }
+  },
+
+  async updateRoomPresence(presence: RoomPresenceItem): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docKey = `${presence.roomId}_${presence.userId}`;
+      const docRef = doc(db, 'meeting_presence', docKey);
+      await setDoc(docRef, cleanForFirestore({ ...presence, id: docKey }), { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore updateRoomPresence error:', err);
+      return false;
+    }
+  },
+
+  async removeRoomPresence(roomId: string, userId: number): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docKey = `${roomId}_${userId}`;
+      const docRef = doc(db, 'meeting_presence', docKey);
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn('Firestore removeRoomPresence error:', err);
+      return false;
+    }
+  },
+
+  subscribeCollabDoc(roomId: string, docId: number, onUpdate: (docData: CollabDocData) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const docKey = `${roomId}_${docId}`;
+      const docRef = doc(db, 'meeting_collab_docs', docKey);
+      return onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            onUpdate(docSnap.data() as CollabDocData);
+          }
+        },
+        (error) => {
+          console.warn('Firestore real-time meeting_collab_docs listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeCollabDoc error:', err);
+      return null;
+    }
+  },
+
+  async upsertCollabDoc(roomId: string, docId: number, docData: Partial<CollabDocData>): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const docKey = `${roomId}_${docId}`;
+      const docRef = doc(db, 'meeting_collab_docs', docKey);
+      await setDoc(
+        docRef,
+        cleanForFirestore({
+          ...docData,
+          roomId,
+          docId,
+          lastSavedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+      return true;
+    } catch (err) {
+      console.warn('Firestore upsertCollabDoc error:', err);
+      return false;
+    }
+  },
+
+  subscribeRoomActions(roomId: string, onUpdate: (actions: RoomBroadcastAction[]) => void): Unsubscribe | null {
+    const db = getFirebaseDb();
+    if (!db) return null;
+    try {
+      const colRef = collection(db, 'meeting_actions');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const now = Date.now();
+          const list: RoomBroadcastAction[] = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as RoomBroadcastAction;
+            // Recent actions in room within 2 minutes
+            if (data && data.roomId === roomId && now - (data.timestamp || 0) < 120000) {
+              list.push(data);
+            }
+          });
+          list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('Firestore real-time meeting_actions listener error:', error);
+        }
+      );
+    } catch (err) {
+      console.warn('Firestore subscribeRoomActions error:', err);
+      return null;
+    }
+  },
+
+  async broadcastRoomAction(action: RoomBroadcastAction): Promise<boolean> {
+    const db = getFirebaseDb();
+    if (!db) return false;
+    try {
+      const actionKey = `${action.roomId}_${action.timestamp}_${action.userId}`;
+      const docRef = doc(db, 'meeting_actions', actionKey);
+      await setDoc(docRef, cleanForFirestore({ ...action, id: actionKey }), { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Firestore broadcastRoomAction error:', err);
       return false;
     }
   },

@@ -442,13 +442,21 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         }
       }
 
-      // Success: clear saved localStorage draft and close modal
+      // Success: clear saved localStorage draft, reset form fields and close modal
       const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
       try {
         localStorage.removeItem(draftKey);
       } catch {
         // Ignore
       }
+      setTitle('');
+      setExcerpt('');
+      setContent('');
+      setImageUrl('');
+      setArticleImages([]);
+      setEmbedCode('');
+      setFormError(null);
+      setDraftRestored(false);
       setIsSubmitting(false);
       onClose();
     } catch (err: any) {

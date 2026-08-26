@@ -164,6 +164,76 @@ export interface MeetingDocumentItem {
   uploadedBy: string;
   date: string;
   isSecret?: boolean;
+  sections?: CollabSectionBlock[];
+  version?: number;
+  lastSavedAt?: string;
+  lastSavedBy?: string;
+  history?: CollabHistoryItem[];
+}
+
+export interface RoomPresenceItem {
+  id: string; // `${roomId}_${userId}`
+  roomId: string;
+  userId: number;
+  userName: string;
+  userAvatar?: string;
+  rankUnit?: string;
+  color: string; // Color assigned for cursor and badge
+  activeDocId?: number;
+  activeSectionId?: string;
+  cursorSnippet?: string; // e.g. "Đoạn 2: Phương hướng"
+  isTyping?: boolean;
+  lastActive: number; // timestamp in ms
+}
+
+export interface CollabSectionBlock {
+  id: string; // e.g. "sec-1", "sec-2"
+  title: string; // e.g. "I. ĐÁNH GIÁ TÌNH HÌNH & KẾT QUẢ ĐẠT ĐƯỢC"
+  content: string; // HTML / Rich content of this section
+  lockedBy?: {
+    userId: number;
+    userName: string;
+    userColor: string;
+    timestamp: number;
+  } | null;
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+}
+
+export interface CollabHistoryItem {
+  id: string;
+  version: number;
+  timestamp: string;
+  authorName: string;
+  authorRankUnit?: string;
+  summary: string;
+  contentHtml: string;
+  sections?: CollabSectionBlock[];
+}
+
+export interface CollabDocData {
+  roomId: string;
+  docId: number;
+  title: string;
+  code?: string;
+  category?: string;
+  contentHtml: string;
+  sections?: CollabSectionBlock[];
+  version: number;
+  lastSavedAt: string;
+  lastSavedBy: string;
+  history?: CollabHistoryItem[];
+}
+
+export interface RoomBroadcastAction {
+  id: string;
+  roomId: string;
+  userId: number;
+  userName: string;
+  userColor?: string;
+  type: 'join' | 'edit_start' | 'edit_section' | 'save' | 'vote' | 'speech_request';
+  message: string;
+  timestamp: number;
 }
 
 export interface MeetingRoomSettings {

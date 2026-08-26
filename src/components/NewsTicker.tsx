@@ -202,7 +202,7 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
 
   return (
     <div className="bg-white border-b border-gray-200 py-1.5 shadow-xs select-none relative z-30">
-      <div className="max-w-7xl mx-auto px-4 flex items-center overflow-hidden">
+      <div className="w-full px-3 sm:px-6 lg:px-8 flex items-center overflow-hidden">
         {/* Left Badge Indicator */}
         <div
           onClick={onTickerClick}
