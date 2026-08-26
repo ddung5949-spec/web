@@ -1,4 +1,3 @@
-import { safeStore as baseStore } from './storage';
 import { supabaseDb, isSupabaseConfigured } from './supabase';
 import { firestoreDb, isFirebaseConfigured } from './firebase';
 import {
@@ -96,11 +95,18 @@ export const cloudStorage = {
   },
 
   subscribeArticles(onUpdate: (articles: Article[]) => void): (() => void) | null {
+    const unsubs: Array<(() => void) | null> = [];
     if (isFirebaseConfigured()) {
-      const unsubscribe = firestoreDb.subscribeArticles(onUpdate);
-      if (unsubscribe) return unsubscribe;
+      unsubs.push(firestoreDb.subscribeArticles(onUpdate));
     }
-    return null;
+    if (isSupabaseConfigured()) {
+      unsubs.push(supabaseDb.subscribeArticles(onUpdate));
+    }
+    return () => {
+      unsubs.forEach((unsub) => {
+        if (unsub) unsub();
+      });
+    };
   },
 
   async saveArticle(article: Article): Promise<{ success: boolean; error?: string }> {
@@ -229,11 +235,18 @@ export const cloudStorage = {
   },
 
   subscribeDocuments(onUpdate: (documents: DocumentItem[]) => void): (() => void) | null {
+    const unsubs: Array<(() => void) | null> = [];
     if (isFirebaseConfigured()) {
-      const unsubscribe = firestoreDb.subscribeDocuments(onUpdate);
-      if (unsubscribe) return unsubscribe;
+      unsubs.push(firestoreDb.subscribeDocuments(onUpdate));
     }
-    return null;
+    if (isSupabaseConfigured()) {
+      unsubs.push(supabaseDb.subscribeDocuments(onUpdate));
+    }
+    return () => {
+      unsubs.forEach((unsub) => {
+        if (unsub) unsub();
+      });
+    };
   },
 
   async saveDocument(doc: DocumentItem): Promise<{ success: boolean; error?: string }> {
@@ -301,11 +314,18 @@ export const cloudStorage = {
   },
 
   subscribeLectures(onUpdate: (lectures: LectureItem[]) => void): (() => void) | null {
+    const unsubs: Array<(() => void) | null> = [];
     if (isFirebaseConfigured()) {
-      const unsubscribe = firestoreDb.subscribeLectures(onUpdate);
-      if (unsubscribe) return unsubscribe;
+      unsubs.push(firestoreDb.subscribeLectures(onUpdate));
     }
-    return null;
+    if (isSupabaseConfigured()) {
+      unsubs.push(supabaseDb.subscribeLectures(onUpdate));
+    }
+    return () => {
+      unsubs.forEach((unsub) => {
+        if (unsub) unsub();
+      });
+    };
   },
 
   async saveLecture(lecture: LectureItem): Promise<{ success: boolean; error?: string }> {

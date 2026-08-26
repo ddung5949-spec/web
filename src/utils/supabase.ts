@@ -614,4 +614,80 @@ export const supabaseDb = {
       return false;
     }
   },
+
+  // -------------------------------------------------------------
+  // 9. REALTIME SUBSCRIPTIONS
+  // -------------------------------------------------------------
+  subscribeArticles(onUpdate: (articles: Article[]) => void): (() => void) | null {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const channel = supabase
+        .channel('realtime_articles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, async () => {
+          const fresh = await supabaseDb.fetchArticles();
+          if (fresh && fresh.length > 0) {
+            onUpdate(fresh);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.warn('Supabase subscribeArticles failed:', e);
+      return null;
+    }
+  },
+
+  subscribeDocuments(onUpdate: (docs: DocumentItem[]) => void): (() => void) | null {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const channel = supabase
+        .channel('realtime_documents')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, async () => {
+          const fresh = await supabaseDb.fetchDocuments();
+          if (fresh && fresh.length > 0) {
+            onUpdate(fresh);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.warn('Supabase subscribeDocuments failed:', e);
+      return null;
+    }
+  },
+
+  subscribeLectures(onUpdate: (lectures: LectureItem[]) => void): (() => void) | null {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const channel = supabase
+        .channel('realtime_lectures')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lectures' }, async () => {
+          const fresh = await supabaseDb.fetchLectures();
+          if (fresh && fresh.length > 0) {
+            onUpdate(fresh);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.warn('Supabase subscribeLectures failed:', e);
+      return null;
+    }
+  },
 };
+

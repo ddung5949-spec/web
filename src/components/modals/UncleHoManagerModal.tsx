@@ -725,7 +725,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
                   onChange={(e) => setFormQuote(e.target.value)}
                   rows={2}
                   placeholder="Nhập trích dẫn nguyên văn lời Bác dạy..."
-                  className="w-full text-xs p-2 border border-gray-300 rounded font-serif italic text-gray-900"
+                  className="w-full text-xs p-2 border border-gray-300 rounded font-sans italic text-gray-900"
                   required
                 />
               </div>

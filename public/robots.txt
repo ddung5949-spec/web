@@ -1,0 +1,7 @@
+# Robots.txt for TRUYỀN THÔNG ĐOÀN MANG YANG - TRUNG ĐOÀN 95, SƯ ĐOÀN 2
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://doanmangyang95.vn/sitemap.xml

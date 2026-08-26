@@ -489,7 +489,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
         <div className="relative bg-amber-50/95 border border-amber-300/80 rounded-xl p-3 shadow-xs space-y-1.5">
           <Quote className="w-4 h-4 text-amber-500/40 absolute top-2 left-2 -scale-x-100 pointer-events-none" />
           <div className="relative z-10 px-2">
-            <p className="text-xs sm:text-[13px] font-bold text-red-950 leading-relaxed italic font-serif tracking-wide text-center">
+            <p className="text-xs sm:text-[13px] font-bold text-red-950 leading-relaxed italic font-sans tracking-wide text-center">
               “{currentQuote.quote}”
             </p>
           </div>

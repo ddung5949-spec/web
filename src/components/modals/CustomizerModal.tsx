@@ -5,10 +5,14 @@ import {
   Check,
   Clock,
   Crosshair,
+  Database,
+  Download,
   Edit2,
   ExternalLink,
   FolderLock,
   Globe,
+  HardDriveDownload,
+  HardDriveUpload,
   Heart,
   ImageIcon,
   Info,
@@ -27,6 +31,7 @@ import {
   RotateCcw,
   Save,
   Shield,
+  ShieldCheck,
   Sliders,
   Sparkles,
   Tag,
@@ -45,6 +50,7 @@ import {
 } from '../../types';
 import { defaultSiteConfig } from '../../data/initialData';
 import { UnitLogo } from '../UnitLogo';
+import { safeStore, cloudStorage } from '../../utils/storage';
 
 interface CustomizerModalProps {
   isOpen: boolean;
@@ -57,7 +63,7 @@ interface CustomizerModalProps {
   ) => void;
 }
 
-type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'footer';
+type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'footer' | 'backup';
 
 export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   isOpen,
@@ -68,6 +74,11 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('logo');
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Backup & Restore states
+  const [backupStatusMsg, setBackupStatusMsg] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Form states
   const [title, setTitle] = useState(siteConfig?.title || defaultSiteConfig.title);
@@ -155,7 +166,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [footerAccentColor, setFooterAccentColor] = useState(
     siteConfig?.footerAccentColor || defaultSiteConfig.footerAccentColor || '#fbbf24'
   );
-  const [footerLayout, setFooterLayout] = useState<'split' | 'centered' | 'compact'>(
+  const [footerLayout, setFooterLayout] = useState<'split' | 'centered' | 'compact' | 'columns'>(
     siteConfig?.footerLayout || 'split'
   );
   const [footerShowLogo, setFooterShowLogo] = useState(siteConfig?.footerShowLogo !== false);
@@ -587,6 +598,19 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           >
             <Info className="w-4 h-4 text-teal-700" />
             <span>6. Chân trang & Liên hệ</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('backup')}
+            className={`px-3.5 py-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'backup'
+                ? 'border-red-700 text-red-700 bg-white shadow-2xs font-extrabold'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+            }`}
+          >
+            <Database className="w-4 h-4 text-amber-600" />
+            <span>7. Sao lưu & Phục hồi Dữ liệu</span>
           </button>
         </div>
 
@@ -1854,6 +1878,183 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                       onChange={(e) => setFooterEmail(e.target.value)}
                       className="w-full p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-mono text-xs"
                     />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: SAO LƯU & KHÔI PHỤC DỮ LIỆU TOÀN DIỆN */}
+          {activeTab === 'backup' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-amber-900 to-red-950 text-white p-4 sm:p-5 rounded-xl border border-amber-600/40 shadow-sm flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-extrabold flex items-center gap-2 text-amber-300 uppercase tracking-wide">
+                    <ShieldCheck className="w-5 h-5 text-amber-400" />
+                    <span>Trung tâm Sao lưu & Khôi phục Dữ liệu Cấp Trung đoàn</span>
+                  </h3>
+                  <p className="text-xs text-amber-100/90 leading-relaxed max-w-2xl">
+                    Hỗ trợ xuất bản sao lưu toàn diện (Bài viết, Văn bản, Bài giảng điện tử, Lời Bác Hồ dạy, Hồ sơ cán bộ, Cấu hình giao diện) về máy tính an toàn, hoặc khôi phục dữ liệu tức thì khi cần thiết.
+                  </p>
+                </div>
+              </div>
+
+              {backupStatusMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg text-xs font-bold flex items-center justify-between">
+                  <span>{backupStatusMsg}</span>
+                  <button
+                    type="button"
+                    onClick={() => setBackupStatusMsg(null)}
+                    className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. EXPORT BACKUP */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-2xs space-y-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-red-700 font-extrabold text-sm pb-2 border-b border-gray-100">
+                      <HardDriveDownload className="w-5 h-5 text-red-700" />
+                      <span>1. Xuất file sao lưu hệ thống (.JSON)</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Tải toàn bộ cơ sở dữ liệu hiện tại (bao gồm tất cả bài báo, tài liệu chỉ thị, bài giảng điện tử và cấu hình) thành một tệp tin JSON độc lập.
+                    </p>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-[11px] text-gray-600 space-y-1 font-mono">
+                      <div>• Bài viết báo chí & tin tức</div>
+                      <div>• Văn bản quy phạm & chỉ thị</div>
+                      <div>• Bài giảng chính trị & chuyên đề</div>
+                      <div>• Lời Bác Hồ dạy & tư liệu</div>
+                      <div>• Cấu hình giao diện & nhận diện</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const backupData = {
+                          version: '1.0',
+                          unit: 'Trung đoàn 95 - Sư đoàn 2',
+                          exportedAt: new Date().toISOString(),
+                          siteConfig: siteConfig || defaultSiteConfig,
+                          articles: safeStore.get('mangyang_articles', []),
+                          documents: safeStore.get('mangyang_documents', []),
+                          lectures: safeStore.get('mangyang_lectures', []),
+                          quotes: safeStore.get('mangyang_quotes', []),
+                          users: safeStore.get('mangyang_users', []),
+                          meetingRooms: safeStore.get('mangyang_meeting_rooms', []),
+                          meetingDocs: safeStore.get('mangyang_meeting_documents', []),
+                        };
+                        const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+                          type: 'application/json',
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const dateStr = new Date().toISOString().split('T')[0];
+                        a.download = `backup_mangyang95_${dateStr}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        setBackupStatusMsg('✅ Đã xuất và tải về file sao lưu hệ thống thành công!');
+                      } catch (err: any) {
+                        alert('Lỗi khi xuất bản sao lưu: ' + (err?.message || 'Không xác định'));
+                      }
+                    }}
+                    className="w-full py-2.5 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Tải file sao lưu (.JSON)</span>
+                  </button>
+                </div>
+
+                {/* 2. IMPORT RESTORE */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-2xs space-y-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm pb-2 border-b border-gray-100">
+                      <HardDriveUpload className="w-5 h-5 text-emerald-700" />
+                      <span>2. Khôi phục từ file sao lưu (.JSON)</span>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Nhập tệp dữ liệu đã sao lưu trước đó để khôi phục toàn bộ nội dung, bài viết và cấu hình của hệ thống.
+                    </p>
+                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+                      <span className="font-bold">Lưu ý an toàn:</span> Quá trình khôi phục sẽ đồng bộ lại cơ sở dữ liệu trên máy và đưa lên đám mây. Hãy đảm bảo tệp JSON có nguồn gốc tin cậy.
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="file"
+                      ref={restoreFileInputRef}
+                      accept=".json,application/json"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsRestoring(true);
+                        try {
+                          const text = await file.text();
+                          const data = JSON.parse(text);
+                          if (!data || typeof data !== 'object') {
+                            throw new Error('Định dạng tệp JSON không hợp lệ.');
+                          }
+
+                          let restoredCount = 0;
+                          if (Array.isArray(data.articles)) {
+                            safeStore.set('mangyang_articles', data.articles);
+                            data.articles.forEach((art: any) => cloudStorage.saveArticle(art));
+                            restoredCount += data.articles.length;
+                          }
+                          if (Array.isArray(data.documents)) {
+                            safeStore.set('mangyang_documents', data.documents);
+                            data.documents.forEach((doc: any) => cloudStorage.saveDocument(doc));
+                            restoredCount += data.documents.length;
+                          }
+                          if (Array.isArray(data.lectures)) {
+                            safeStore.set('mangyang_lectures', data.lectures);
+                            data.lectures.forEach((lec: any) => cloudStorage.saveLecture(lec));
+                            restoredCount += data.lectures.length;
+                          }
+                          if (Array.isArray(data.quotes)) {
+                            safeStore.set('mangyang_quotes', data.quotes);
+                          }
+                          if (Array.isArray(data.users)) {
+                            safeStore.set('mangyang_users', data.users);
+                          }
+                          if (data.siteConfig) {
+                            cloudStorage.saveSiteConfig(data.siteConfig);
+                          }
+
+                          setBackupStatusMsg(`✅ Khôi phục thành công! Đã nạp lại ${restoredCount} mục dữ liệu.`);
+                          setTimeout(() => {
+                            window.location.reload();
+                          }, 1200);
+                        } catch (err: any) {
+                          alert('Lỗi khi khôi phục dữ liệu: ' + (err?.message || 'Tệp sao lưu không đúng định dạng'));
+                        } finally {
+                          setIsRestoring(false);
+                          if (restoreFileInputRef.current) {
+                            restoreFileInputRef.current.value = '';
+                          }
+                        }
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      disabled={isRestoring}
+                      onClick={() => restoreFileInputRef.current?.click()}
+                      className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      <span>{isRestoring ? 'Đang khôi phục dữ liệu...' : 'Chọn file JSON để khôi phục'}</span>
+                    </button>
                   </div>
                 </div>
               </div>

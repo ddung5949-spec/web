@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { Article, ArticleImage, PageView, SectionType, User } from '../types';
 import { AIVoiceReader } from './AIVoiceReader';
+import { updatePageSEO } from '../utils/seo';
+import { sanitizeHtml } from '../utils/sanitizer';
 
 interface ArticleDetailViewProps {
   article: Article;
@@ -53,6 +55,14 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic SEO update when article mounts
+  useEffect(() => {
+    updatePageSEO(article);
+    return () => {
+      updatePageSEO(null);
+    };
+  }, [article]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -89,8 +99,12 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
         return 'Huấn luyện - SSCĐ';
       case 'bac':
         return 'Học tập theo Bác';
+      case 'qs':
+        return 'Quân sự - Quốc phòng';
+      case 'hkt':
+        return 'Hậu cần - Kỹ thuật';
       default:
-        return 'Tin tức Sư đoàn';
+        return 'Tin tức Hoạt động';
     }
   };
 
@@ -202,7 +216,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
       </div>
 
       {/* 2. Main Title */}
-      <h1 className="font-['Merriweather',serif] text-xl sm:text-2xl md:text-3xl font-black text-gray-900 leading-tight">
+      <h1 className="font-sans text-xl sm:text-2xl md:text-3xl font-black text-gray-900 leading-tight">
         {article.title}
       </h1>
 
@@ -255,7 +269,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
           </div>
           <div
             className="overflow-hidden rounded-lg bg-black flex justify-center items-center"
-            dangerouslySetInnerHTML={{ __html: article.embedCode }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.embedCode) }}
           />
         </div>
       )}

@@ -65,10 +65,12 @@ export interface User {
   isOnline?: boolean;
   registeredAt?: string; // Thời điểm đăng ký tài khoản mới
   isNewRegistration?: boolean; // Cảnh báo thông báo tài khoản mới cho admin
-  registrationStatus?: 'pending_approval' | 'approved' | 'rejected'; // Trạng thái phê duyệt
-  canViewDoc: boolean;
-  canUploadDoc: boolean;
-  canJoinPartyMeeting: boolean;
+  registrationStatus?: 'pending_approval' | 'approved' | 'rejected' | 'pending'; // Trạng thái phê duyệt
+  canViewDoc?: boolean;
+  canUploadDoc?: boolean;
+  canUploadDocs?: boolean;
+  canViewSecretDocs?: boolean;
+  canJoinPartyMeeting?: boolean;
   canUploadMeetingDoc?: boolean;
   canDeleteMeetingDoc?: boolean;
   canViewCollaborativeEdits?: boolean;
@@ -102,6 +104,7 @@ export interface Article {
   image: string;
   images?: ArticleImage[];
   excerpt: string;
+  summary?: string;
   content: string;
   embedCode?: string; // Mã nhúng video/iframe/audio/bản tin từ trang khác
   status: 'approved' | 'pending';
@@ -128,6 +131,7 @@ export interface DocumentItem {
 export interface LectureItem {
   id: number;
   title: string;
+  category?: string;
   target: string;
   author: string;
   desc: string;
@@ -325,7 +329,7 @@ export interface QuickActionCard {
   id: string;
   title: string;
   subtitle?: string;
-  iconName: 'exam' | 'doc' | 'video' | 'meeting' | 'link' | 'award' | 'book';
+  iconName: 'exam' | 'doc' | 'video' | 'meeting' | 'link' | 'award' | 'book' | 'lecture' | 'users' | 'shield' | 'star' | 'flag' | string;
   type: 'internal' | 'external';
   targetPage?: PageView;
   externalUrl?: string;
@@ -439,6 +443,7 @@ export interface SiteConfig {
   tickerPrefix?: string;
   homeAnnouncements?: HomeAnnouncement[];
   quickActionCards?: QuickActionCard[];
+  homeQuickActions?: QuickActionCard[];
   homeCategoryColumns?: HomeCategoryColumn[];
   spotlightArticleId?: number;
   spotlightArticleIds?: number[];
