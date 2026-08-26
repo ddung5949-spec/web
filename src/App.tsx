@@ -190,91 +190,103 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Initial cloud sync & real-time subscriptions from Firestore / Database for all visitors
+  // Global sync and loading state
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+
+  // Initial Database-First fetch & Realtime subscription
   useEffect(() => {
-    cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => setSiteConfig(data));
-    cloudStorage.loadArticles(defaultArticles).then((data) => setArticles(data));
-    cloudStorage.loadUsers(defaultUsers).then((data) => setUsers(data));
-    cloudStorage.loadDocuments(defaultDocuments).then((data) => setDocuments(data));
-    cloudStorage.loadLectures(defaultLectures).then((data) => setLectures(data));
-    cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => setUncleHoQuotes(data));
-    cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => setUncleHoSettings(data));
-    cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => setMeetingRooms(data));
-    cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => setMeetingDocuments(data));
-    cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => setMeetingSettings(data));
-    cloudStorage.loadMeetingVotes({}).then((data) => setMeetingVotes(data));
+    let isMounted = true;
+    setIsLoadingData(true);
 
-    // Real-time listeners: guarantees any update in Firestore automatically syncs to all clients/devices without page refresh
-    const unsubs: Array<(() => void) | null> = [];
-
-    unsubs.push(
-      cloudStorage.subscribeArticles((remoteArticles) => {
-        if (remoteArticles && remoteArticles.length > 0) {
-          setArticles(remoteArticles);
-        }
+    Promise.all([
+      cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
+        if (isMounted && data) setSiteConfig(data);
+      }),
+      cloudStorage.loadArticles(defaultArticles).then((data) => {
+        if (isMounted && data) setArticles(data);
+      }),
+      cloudStorage.loadUsers(defaultUsers).then((data) => {
+        if (isMounted && data) setUsers(data);
+      }),
+      cloudStorage.loadDocuments(defaultDocuments).then((data) => {
+        if (isMounted && data) setDocuments(data);
+      }),
+      cloudStorage.loadLectures(defaultLectures).then((data) => {
+        if (isMounted && data) setLectures(data);
+      }),
+      cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => {
+        if (isMounted && data) setUncleHoQuotes(data);
+      }),
+      cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => {
+        if (isMounted && data) setUncleHoSettings(data);
+      }),
+      cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => {
+        if (isMounted && data) setMeetingRooms(data);
+      }),
+      cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => {
+        if (isMounted && data) setMeetingDocuments(data);
+      }),
+      cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => {
+        if (isMounted && data) setMeetingSettings(data);
+      }),
+      cloudStorage.loadMeetingVotes({}).then((data) => {
+        if (isMounted && data) setMeetingVotes(data);
+      }),
+    ])
+      .catch((err) => {
+        console.warn('Initial data load warning:', err);
       })
-    );
+      .finally(() => {
+        if (isMounted) setIsLoadingData(false);
+      });
 
-    unsubs.push(
-      cloudStorage.subscribeDocuments((remoteDocs) => {
-        if (remoteDocs && remoteDocs.length > 0) {
-          setDocuments(remoteDocs);
+    // Realtime Database-First subscription (Supabase postgres_changes + Firestore)
+    const unsub = cloudStorage.subscribeAll({
+      onArticlesChange: (freshArticles) => {
+        if (isMounted && freshArticles) {
+          setArticles(freshArticles);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeLectures((remoteLectures) => {
-        if (remoteLectures && remoteLectures.length > 0) {
-          setLectures(remoteLectures);
+      },
+      onDocumentsChange: (freshDocs) => {
+        if (isMounted && freshDocs) {
+          setDocuments(freshDocs);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeMeetingRooms((remoteRooms) => {
-        if (remoteRooms && remoteRooms.length > 0) {
-          setMeetingRooms(remoteRooms);
+      },
+      onLecturesChange: (freshLectures) => {
+        if (isMounted && freshLectures) {
+          setLectures(freshLectures);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeMeetingDocuments((remoteMeetingDocs) => {
-        if (remoteMeetingDocs && remoteMeetingDocs.length > 0) {
-          setMeetingDocuments(remoteMeetingDocs);
+      },
+      onMeetingRoomsChange: (freshRooms) => {
+        if (isMounted && freshRooms) {
+          setMeetingRooms(freshRooms);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeSiteConfig((remoteConfig) => {
-        if (remoteConfig) {
-          setSiteConfig(remoteConfig);
+      },
+      onMeetingDocumentsChange: (freshMeetingDocs) => {
+        if (isMounted && freshMeetingDocs) {
+          setMeetingDocuments(freshMeetingDocs);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeUncleHoQuotes((remoteQuotes) => {
-        if (remoteQuotes && remoteQuotes.length > 0) {
-          setUncleHoQuotes(remoteQuotes);
+      },
+      onMeetingSettingsChange: (freshSettings) => {
+        if (isMounted && freshSettings) {
+          setMeetingSettings(freshSettings);
         }
-      })
-    );
-
-    unsubs.push(
-      cloudStorage.subscribeUncleHoSettings((remoteSettings) => {
-        if (remoteSettings) {
-          setUncleHoSettings(remoteSettings);
+      },
+      onSiteConfigChange: (freshConfig) => {
+        if (isMounted && freshConfig) {
+          setSiteConfig(freshConfig);
         }
-      })
-    );
+      },
+      onUsersChange: (freshUsers) => {
+        if (isMounted && freshUsers) {
+          setUsers(freshUsers);
+        }
+      },
+    });
 
     return () => {
-      unsubs.forEach((unsub) => {
-        if (unsub) unsub();
-      });
+      isMounted = false;
+      if (unsub) unsub();
     };
   }, []);
 
@@ -841,7 +853,7 @@ export function App() {
   };
 
   // User Management & RBAC Handlers
-  const handleTogglePermission = (
+  const handleTogglePermission = async (
     userId: number,
     field:
       | 'canViewDoc'
@@ -853,11 +865,12 @@ export function App() {
       | 'canViewCollaborativeEdits',
     checked: boolean
   ) => {
+    let targetUser: User | null = null;
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
           const updated = { ...u, [field]: checked };
-          cloudStorage.saveUser(updated);
+          targetUser = updated;
           if (currentUser && currentUser.id === userId) {
             setCurrentUser(updated);
           }
@@ -866,19 +879,31 @@ export function App() {
         return u;
       })
     );
-  };
-
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
-    );
-    cloudStorage.saveUser(updatedUser);
-    if (currentUser && currentUser.id === updatedUser.id) {
-      setCurrentUser(updatedUser);
+    if (targetUser) {
+      const res = await cloudStorage.saveUser(targetUser);
+      if (!res.success) {
+        showToast('error', 'Lỗi lưu phân quyền', res.error);
+      }
     }
   };
 
-  const handleChangeUserRole = (userId: number, newRole: UserRole) => {
+  const handleUpdateUser = async (updatedUser: User) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
+    );
+    if (currentUser && currentUser.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
+    }
+    const res = await cloudStorage.saveUser(updatedUser);
+    if (res.success) {
+      showToast('success', 'Đã cập nhật hồ sơ quân nhân', `Thông tin đồng chí ${updatedUser.fullName} đã được lưu vào Cơ sở dữ liệu.`);
+    } else {
+      showToast('error', 'Lỗi lưu thông tin quân nhân', res.error);
+    }
+  };
+
+  const handleChangeUserRole = async (userId: number, newRole: UserRole) => {
+    let targetUser: User | null = null;
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
@@ -897,7 +922,7 @@ export function App() {
                 }
               : {}),
           };
-          cloudStorage.saveUser(updated);
+          targetUser = updated;
           if (currentUser && currentUser.id === userId) {
             setCurrentUser(updated);
           }
@@ -906,14 +931,23 @@ export function App() {
         return u;
       })
     );
+    if (targetUser) {
+      const res = await cloudStorage.saveUser(targetUser);
+      if (res.success) {
+        showToast('success', 'Đã cập nhật vai trò', `Phân quyền người dùng đã được cập nhật thành công.`);
+      } else {
+        showToast('error', 'Lỗi cập nhật vai trò', res.error);
+      }
+    }
   };
 
-  const handleChangeUserPassword = (userId: number, newPass: string) => {
+  const handleChangeUserPassword = async (userId: number, newPass: string) => {
+    let targetUser: User | null = null;
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
           const updated = { ...u, password: newPass };
-          cloudStorage.saveUser(updated);
+          targetUser = updated;
           if (currentUser && currentUser.id === userId) {
             setCurrentUser(updated);
           }
@@ -922,23 +956,41 @@ export function App() {
         return u;
       })
     );
+    if (targetUser) {
+      const res = await cloudStorage.saveUser(targetUser);
+      if (res.success) {
+        showToast('success', 'Đã đổi mật khẩu', 'Mật khẩu tài khoản đã được cập nhật.');
+      } else {
+        showToast('error', 'Lỗi đổi mật khẩu', res.error);
+      }
+    }
   };
 
-  const handleCreateUser = (newUser: User) => {
+  const handleCreateUser = async (newUser: User) => {
     setUsers((prev) => [newUser, ...prev]);
-    cloudStorage.saveUser(newUser);
+    const res = await cloudStorage.saveUser(newUser);
+    if (res.success) {
+      showToast('success', 'Đã tạo tài khoản quân nhân mới', `Tài khoản ${newUser.username} (${newUser.fullName}) đã sẵn sàng hoạt động.`);
+    } else {
+      showToast('error', 'Lỗi tạo tài khoản', res.error);
+    }
   };
 
-  const handleDeleteUser = (userId: number) => {
+  const handleDeleteUser = async (userId: number) => {
     if (confirm('Đồng chí có chắc chắn muốn xóa tài khoản quân nhân này khỏi hệ thống?')) {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-      cloudStorage.deleteUser(userId);
       // Remove votes if any
       setMeetingVotes((prev) => {
         const copy = { ...prev };
         delete copy[userId];
         return copy;
       });
+      const res = await cloudStorage.deleteUser(userId);
+      if (res.success) {
+        showToast('info', 'Đã xóa tài khoản', 'Tài khoản quân nhân đã được xóa khỏi Cơ sở dữ liệu.');
+      } else {
+        showToast('error', 'Lỗi xóa tài khoản', res.error);
+      }
     }
   };
 
@@ -1253,24 +1305,39 @@ export function App() {
   };
 
   // Party Meeting Document Actions
-  const handleSaveMeetingDocument = (doc: MeetingDocumentItem) => {
+  const handleSaveMeetingDocument = async (doc: MeetingDocumentItem) => {
     const exists = meetingDocuments.some((d) => d.id === doc.id);
     if (exists) {
       setMeetingDocuments((prev) => prev.map((d) => (d.id === doc.id ? doc : d)));
     } else {
       setMeetingDocuments((prev) => [doc, ...prev]);
     }
-    cloudStorage.saveMeetingDocument(doc);
+    const res = await cloudStorage.saveMeetingDocument(doc);
+    if (res.success) {
+      showToast('success', 'Đã lưu tài liệu phòng họp', `Tài liệu "${doc.title}" đã được lưu trữ vào Cơ sở dữ liệu phòng họp.`);
+    } else {
+      showToast('error', 'Lỗi lưu tài liệu họp', res.error);
+    }
   };
 
-  const handleDeleteMeetingDocument = (docId: number) => {
+  const handleDeleteMeetingDocument = async (docId: number) => {
     setMeetingDocuments((prev) => prev.filter((d) => d.id !== docId));
-    cloudStorage.deleteMeetingDocument(docId);
+    const res = await cloudStorage.deleteMeetingDocument(docId);
+    if (res.success) {
+      showToast('info', 'Đã xóa tài liệu phòng họp', 'Tài liệu đã được gỡ bỏ khỏi Cơ sở dữ liệu.');
+    } else {
+      showToast('error', 'Lỗi xóa tài liệu họp', res.error);
+    }
   };
 
-  const handleSaveMeetingSettings = (settings: MeetingRoomSettings) => {
+  const handleSaveMeetingSettings = async (settings: MeetingRoomSettings) => {
     setMeetingSettings(settings);
-    cloudStorage.saveMeetingSettings(settings);
+    const res = await cloudStorage.saveMeetingSettings(settings);
+    if (res.success) {
+      showToast('success', 'Đã cập nhật cấu hình phòng họp', 'Thiết lập mật khẩu và thông tin kỳ họp đã được đồng bộ lên Cơ sở dữ liệu.');
+    } else {
+      showToast('error', 'Lỗi lưu cấu hình phòng họp', res.error);
+    }
   };
 
   const handleCastVote = (vote: MeetingVote) => {
@@ -1281,7 +1348,7 @@ export function App() {
       [vote.userId]: vote,
     }));
     cloudStorage.saveMeetingVote(vote);
-    alert(`Đồng chí ${vote.voterName} đã biểu quyết: [${vote.choice.toUpperCase()}] thành công!`);
+    showToast('success', 'Biểu quyết thành công', `Đồng chí ${vote.voterName} đã biểu quyết: [${vote.choice.toUpperCase()}].`);
   };
 
   const handleResetVotes = (docId?: number) => {
@@ -1295,16 +1362,17 @@ export function App() {
         });
         return copy;
       });
-      alert('Đã khởi tạo lại phiên biểu quyết cho văn bản này!');
+      showToast('info', 'Khởi tạo lại biểu quyết', 'Đã làm mới phiên biểu quyết cho văn bản này.');
     } else {
       setMeetingVotes({});
       cloudStorage.resetMeetingVotes();
-      alert('Đã khởi tạo lại toàn bộ phiên biểu quyết trong kỳ họp Đảng ủy!');
+      showToast('info', 'Khởi tạo lại toàn bộ', 'Đã làm mới toàn bộ kết quả biểu quyết trong kỳ họp Đảng ủy.');
     }
   };
 
   // Party Meeting Multi-Room Handlers
-  const handleSaveMeetingRoom = (room: MeetingRoomItem) => {
+  const handleSaveMeetingRoom = async (room: MeetingRoomItem) => {
+    let updatedRooms: MeetingRoomItem[] = [];
     setMeetingRooms((prev) => {
       const idx = prev.findIndex((r) => r.id === room.id);
       let updated: MeetingRoomItem[];
@@ -1318,20 +1386,34 @@ export function App() {
         }
         updated = [room, ...prev];
       }
-      updated = updated.slice(0, 30);
-      safeStore.set('mangyang_meeting_rooms', updated);
-      cloudStorage.saveMeetingRoom(room);
-      return updated;
+      updatedRooms = updated.slice(0, 30);
+      safeStore.set('mangyang_meeting_rooms', updatedRooms);
+      return updatedRooms;
     });
+
+    const res = await cloudStorage.saveMeetingRoom(room, updatedRooms);
+    if (res.success) {
+      showToast('success', 'Đã lưu phòng họp trực tuyến', `Phòng họp "${room.title}" đã được lưu lên Cơ sở dữ liệu.`);
+    } else {
+      showToast('error', 'Lỗi lưu phòng họp', res.error);
+    }
   };
 
-  const handleDeleteMeetingRoom = (roomId: string) => {
+  const handleDeleteMeetingRoom = async (roomId: string) => {
+    let updatedRooms: MeetingRoomItem[] = [];
     setMeetingRooms((prev) => {
       const updated = prev.filter((r) => r.id !== roomId);
+      updatedRooms = updated;
       safeStore.set('mangyang_meeting_rooms', updated);
-      cloudStorage.deleteMeetingRoom(roomId);
       return updated;
     });
+
+    const res = await cloudStorage.deleteMeetingRoom(roomId, updatedRooms);
+    if (res.success) {
+      showToast('info', 'Đã xóa phòng họp', 'Phòng họp đã được gỡ bỏ khỏi Cơ sở dữ liệu.');
+    } else {
+      showToast('error', 'Lỗi xóa phòng họp', res.error);
+    }
   };
 
   const handleSaveMeetingRooms = (rooms: MeetingRoomItem[]) => {
@@ -1381,12 +1463,15 @@ export function App() {
   };
 
   // Customizer Handler with Category Renaming Cascade
-  const handleSaveCustomizer = (
+  const handleSaveCustomizer = async (
     newConfig: SiteConfig,
     categoryRenames?: { sectionKey: SectionType; oldName: string; newName: string }[]
   ) => {
     setSiteConfig(newConfig);
-    cloudStorage.saveSiteConfig(newConfig);
+    const res = await cloudStorage.saveSiteConfig(newConfig);
+    if (!res.success) {
+      showToast('error', 'Lỗi lưu cấu hình hệ thống', res.error);
+    }
 
     if (categoryRenames && categoryRenames.length > 0) {
       setArticles((prevArticles) => {
@@ -1421,48 +1506,63 @@ export function App() {
   };
 
   // Home Announcements Save Handler
-  const handleSaveAnnouncements = (updatedList: HomeAnnouncement[]) => {
+  const handleSaveAnnouncements = async (updatedList: HomeAnnouncement[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       homeAnnouncements: updatedList,
     };
     setSiteConfig(updatedConfig);
-    cloudStorage.saveSiteConfig(updatedConfig);
+    const res = await cloudStorage.saveSiteConfig(updatedConfig);
+    if (res.success) {
+      showToast('success', 'Đã lưu danh sách thông báo', 'Nội dung thông báo đã được lưu lên Cơ sở dữ liệu.');
+    } else {
+      showToast('error', 'Lỗi lưu thông báo', res.error);
+    }
   };
 
   // Quick Action Cards Save Handler
-  const handleSaveQuickActions = (cards: QuickActionCard[]) => {
+  const handleSaveQuickActions = async (cards: QuickActionCard[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       quickActionCards: cards,
       homeQuickActions: cards,
     };
     setSiteConfig(updatedConfig);
-    cloudStorage.saveSiteConfig(updatedConfig);
+    const res = await cloudStorage.saveSiteConfig(updatedConfig);
+    if (res.success) {
+      showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
+    } else {
+      showToast('error', 'Lỗi lưu tiện ích', res.error);
+    }
   };
 
   // Spotlight Article Select Handler
-  const handleSelectSpotlightArticle = (articleId: number) => {
+  const handleSelectSpotlightArticle = async (articleId: number) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       spotlightArticleId: articleId,
     };
     setSiteConfig(updatedConfig);
-    cloudStorage.saveSiteConfig(updatedConfig);
+    await cloudStorage.saveSiteConfig(updatedConfig);
   };
 
   // Home Category Columns Save Handler
-  const handleSaveHomeCategoryColumns = (columns: HomeCategoryColumn[]) => {
+  const handleSaveHomeCategoryColumns = async (columns: HomeCategoryColumn[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       homeCategoryColumns: columns,
     };
     setSiteConfig(updatedConfig);
-    cloudStorage.saveSiteConfig(updatedConfig);
+    const res = await cloudStorage.saveSiteConfig(updatedConfig);
+    if (res.success) {
+      showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
+    } else {
+      showToast('error', 'Lỗi lưu cột chuyên mục', res.error);
+    }
   };
 
   // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ)
-  const handleSaveSectionCategories = (sectionKey: SectionType, newCats: string[]) => {
+  const handleSaveSectionCategories = async (sectionKey: SectionType, newCats: string[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       sections: {
@@ -1473,7 +1573,7 @@ export function App() {
         },
       },
     };
-    handleSaveCustomizer(updatedConfig);
+    await handleSaveCustomizer(updatedConfig);
     showToast('success', 'Đã lưu danh mục chuyên mục', 'Cấu trúc danh mục mới đã được đồng bộ trực tiếp lên Cơ sở dữ liệu.');
   };
 
@@ -1514,7 +1614,7 @@ export function App() {
   };
 
   // Lecture Categories Handlers
-  const handleSaveLectureCategories = (newCats: string[]) => {
+  const handleSaveLectureCategories = async (newCats: string[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       sections: {
@@ -1525,7 +1625,7 @@ export function App() {
         },
       },
     };
-    handleSaveCustomizer(updatedConfig);
+    await handleSaveCustomizer(updatedConfig);
     showToast('success', 'Đã lưu danh mục bài giảng số', 'Danh mục bài giảng số đã được đồng bộ lên Cơ sở dữ liệu.');
   };
 
@@ -1554,14 +1654,14 @@ export function App() {
   };
 
   // Uncle Ho Quotes & Settings Handlers
-  const handleSaveUncleHoQuotes = (newQuotes: UncleHoQuote[]) => {
+  const handleSaveUncleHoQuotes = async (newQuotes: UncleHoQuote[]) => {
     setUncleHoQuotes(newQuotes);
-    cloudStorage.saveUncleHoQuotes(newQuotes);
+    await cloudStorage.saveUncleHoQuotes(newQuotes);
   };
 
-  const handleSaveUncleHoSettings = (newSettings: UncleHoSettings) => {
+  const handleSaveUncleHoSettings = async (newSettings: UncleHoSettings) => {
     setUncleHoSettings(newSettings);
-    cloudStorage.saveUncleHoSettings(newSettings);
+    await cloudStorage.saveUncleHoSettings(newSettings);
   };
 
   const approvedArticles = articles.filter((a) => a.status === 'approved');
