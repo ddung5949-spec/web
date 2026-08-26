@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Article, DocumentItem, LectureItem, MeetingDocumentItem, MeetingRoomItem, MeetingRoomSettings, MeetingVote, SiteConfig, User } from '../types';
+import { Article, DocumentItem, LectureItem, MeetingDocumentItem, MeetingRoomItem, MeetingRoomSettings, MeetingVote, SectionType, SiteConfig, User } from '../types';
 
 // Read Supabase credentials from client-side Vite environment variables with project defaults
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
@@ -146,56 +146,65 @@ export const supabaseDb = {
   },
 
   // -------------------------------------------------------------
-  // 2. BÀI VIẾT & TIN TỨC (Bảng: posts hoặc articles)
+  // 2. BÀI VIẾT & TIN TỨC (Bảng DUY NHẤT: articles)
   // -------------------------------------------------------------
   async fetchArticles(): Promise<Article[] | null> {
     const supabase = getSupabase();
     if (!supabase) return null;
 
-    // Helper to map DB row to Article
-    const mapRowToArticle = (item: any): Article => ({
-      id: Number(item.id),
-      title: item.title || '',
-      category: item.category || 'Tin tức hoạt động',
-      author: item.author || 'Cán bộ - Chiến sĩ',
-      date: item.date || item.created_at ? new Date(item.date || item.created_at).toLocaleDateString('vi-VN') : '26/08/2026',
-      image: item.image || item.thumbnail || '',
-      images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
-      excerpt: item.excerpt || item.summary || '',
-      summary: item.summary || item.excerpt || '',
-      content: item.content || '',
-      embedCode: item.embed_code || item.embedCode || undefined,
-      status: (item.status === 'pending' || item.status === 'draft') ? 'pending' : 'approved',
-      views: Number(item.views || 0),
-      sectionKey: item.section_key || item.sectionKey || 'ctd',
-    });
-
-    // Attempt 1: Fetch from 'posts'
-    try {
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('*')
-        .order('id', { ascending: false });
-
-      if (!postsError && postsData) {
-        return postsData.map(mapRowToArticle);
+    // Helper to map DB row to Article with robust sectionKey and category detection
+    const mapRowToArticle = (item: any): Article => {
+      let secKey: SectionType = 'ctd';
+      const rawSec = item.section_key || item.sectionKey || item.tab_type || item.tabType;
+      if (rawSec === 'hl' || rawSec === 'huan_luyen') secKey = 'hl';
+      else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho') secKey = 'bac';
+      else if (rawSec === 'ctd') secKey = 'ctd';
+      else {
+        // Fallback guess from category name if missing
+        const cat = (item.category || '').toLowerCase();
+        if (cat.includes('huấn luyện') || cat.includes('sẵn sàng') || cat.includes('thao trường') || cat.includes('khí tài')) {
+          secKey = 'hl';
+        } else if (cat.includes('bác') || cat.includes('hồ chí minh') || cat.includes('tư tưởng')) {
+          secKey = 'bac';
+        } else {
+          secKey = 'ctd';
+        }
       }
-    } catch (e) {
-      // ignore and try articles
-    }
 
-    // Attempt 2: Fetch from 'articles'
+      return {
+        id: Number(item.id),
+        title: item.title || '',
+        category: (item.category || 'Tin tức hoạt động').trim(),
+        author: item.author || 'Cán bộ - Chiến sĩ',
+        date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '26/08/2026'),
+        image: item.image || item.thumbnail || '',
+        images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
+        excerpt: item.excerpt || item.summary || '',
+        summary: item.summary || item.excerpt || '',
+        content: item.content || '',
+        embedCode: item.embed_code || item.embedCode || undefined,
+        status: (item.status === 'pending' || item.status === 'draft') ? 'pending' : 'approved',
+        views: Number(item.views || 0),
+        sectionKey: secKey,
+      };
+    };
+
     try {
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
         .select('*')
         .order('id', { ascending: false });
 
-      if (!articlesError && articlesData) {
+      if (articlesError) {
+        console.warn('Supabase fetchArticles from articles table error:', articlesError.message);
+        return null;
+      }
+
+      if (articlesData) {
         return articlesData.map(mapRowToArticle);
       }
     } catch (e) {
-      console.warn('Supabase fetchArticles from articles failed:', e);
+      console.warn('Supabase fetchArticles failed:', e);
     }
 
     return null;
@@ -206,10 +215,10 @@ export const supabaseDb = {
     if (!supabase) return { success: false, error: 'Chưa kết nối Supabase Client' };
 
     const payload: any = {
-      id: article.id,
-      title: article.title,
-      category: article.category,
-      author: article.author,
+      id: Number(article.id),
+      title: article.title.trim(),
+      category: article.category?.trim() || 'Tin tức hoạt động',
+      author: article.author.trim(),
       date: article.date,
       image: article.image || '',
       images: article.images ? JSON.stringify(article.images) : null,
@@ -217,73 +226,50 @@ export const supabaseDb = {
       summary: article.summary || article.excerpt || '',
       content: article.content,
       embed_code: article.embedCode || null,
-      status: article.status,
-      views: article.views || 0,
-      section_key: article.sectionKey,
+      status: article.status || 'approved',
+      views: Number(article.views || 0),
+      section_key: article.sectionKey || 'ctd',
+      tab_type: article.sectionKey || 'ctd',
     };
 
-    let lastError: any = null;
-    let saved = false;
-
-    // Save to 'posts' table
     try {
-      const { error: postErr } = await supabase.from('posts').upsert(payload, { onConflict: 'id' });
-      if (!postErr) {
-        saved = true;
-      } else {
-        lastError = postErr;
+      const { error } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
+      if (error) {
+        // If error might be due to non-existent tab_type column, try upserting without tab_type
+        if (error.message && error.message.includes('tab_type')) {
+          delete payload.tab_type;
+          const { error: retryError } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
+          if (retryError) {
+            console.error('Supabase upsertArticle retry error:', retryError);
+            return { success: false, error: retryError.message };
+          }
+          return { success: true };
+        }
+        console.error('Supabase upsertArticle error:', error);
+        return { success: false, error: error.message };
       }
-    } catch (e: any) {
-      lastError = e;
-    }
-
-    // Also attempt 'articles' table for cross-compatibility
-    try {
-      const { error: artErr } = await supabase.from('articles').upsert(payload, { onConflict: 'id' });
-      if (!artErr) {
-        saved = true;
-      } else if (!saved) {
-        lastError = artErr;
-      }
-    } catch (e: any) {
-      if (!saved) lastError = e;
-    }
-
-    if (saved) {
       return { success: true };
+    } catch (err: any) {
+      console.error('Supabase upsertArticle failed:', err);
+      return { success: false, error: err?.message || 'Không thể lưu bài viết vào bảng articles' };
     }
-
-    console.error('Supabase upsertArticle failed:', lastError);
-    return { success: false, error: lastError?.message || 'Không thể lưu bài viết vào Supabase' };
   },
 
   async deleteArticle(articleId: number): Promise<{ success: boolean; error?: string }> {
     const supabase = getSupabase();
     if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
 
-    let deleted = false;
-    let lastError: any = null;
-
     try {
-      const { error: pErr } = await supabase.from('posts').delete().eq('id', articleId);
-      if (!pErr) deleted = true;
-      else lastError = pErr;
-    } catch (e: any) {
-      lastError = e;
-    }
-
-    try {
-      const { error: aErr } = await supabase.from('articles').delete().eq('id', articleId);
-      if (!aErr) deleted = true;
-      else if (!deleted) lastError = aErr;
-    } catch (e: any) {
-      if (!deleted) lastError = e;
-    }
-
-    if (deleted) {
+      const { error } = await supabase.from('articles').delete().eq('id', articleId);
+      if (error) {
+        console.error('Supabase deleteArticle error:', error);
+        return { success: false, error: error.message };
+      }
       return { success: true };
+    } catch (err: any) {
+      console.error('Supabase deleteArticle failed:', err);
+      return { success: false, error: err?.message || 'Lỗi khi xóa bài viết từ bảng articles' };
     }
-    return { success: false, error: lastError?.message || 'Lỗi khi xóa bài viết từ Supabase' };
   },
 
   async incrementArticleViews(articleId: number, currentViews: number): Promise<void> {
@@ -291,7 +277,6 @@ export const supabaseDb = {
     if (!supabase) return;
 
     try {
-      await supabase.from('posts').update({ views: currentViews + 1 }).eq('id', articleId);
       await supabase.from('articles').update({ views: currentViews + 1 }).eq('id', articleId);
     } catch (err) {
       console.warn('Supabase incrementArticleViews failed:', err);
@@ -870,13 +855,7 @@ export const supabaseDb = {
     try {
       const channel = supabase
         .channel('public:db-changes')
-        // 1. Posts & Articles
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, async () => {
-          if (callbacks.onArticlesChange) {
-            const fresh = await supabaseDb.fetchArticles();
-            if (fresh !== null) callbacks.onArticlesChange(fresh);
-          }
-        })
+        // 1. Articles
         .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, async () => {
           if (callbacks.onArticlesChange) {
             const fresh = await supabaseDb.fetchArticles();

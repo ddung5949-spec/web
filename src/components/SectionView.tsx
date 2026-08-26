@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowRight,
   BarChart2,
@@ -118,30 +118,50 @@ export const SectionView: React.FC<SectionViewProps> = ({
   const sectionSubtitle = customSec?.subTitle || customSec?.desc || baseConfig.subTitle;
 
   const Icon = baseConfig.icon;
-  const availableCategories = (customSec && (customSec as any).categories?.length > 0)
-    ? (customSec as any).categories
-    : categoryOptions[sectionKey] || [];
 
-  const rawSectionArticles = articles.filter(
-    (a) => a.sectionKey === sectionKey && a.status === 'approved'
-  );
+  const rawSectionArticles = useMemo(() => {
+    return articles.filter(
+      (a) =>
+        (a.sectionKey === sectionKey || (!a.sectionKey && sectionKey === 'ctd')) &&
+        (!a.status || a.status === 'approved')
+    );
+  }, [articles, sectionKey]);
 
-  const totalViews = rawSectionArticles.reduce((sum, a) => sum + (a.views || 0), 0);
+  const availableCategories = useMemo(() => {
+    const baseCats: string[] = (customSec && (customSec as any).categories?.length > 0)
+      ? (customSec as any).categories
+      : categoryOptions[sectionKey] || [];
 
-  const filteredArticles = rawSectionArticles
-    .filter((a) => {
-      const matchCat = selectedCategory === 'all' || a.category === selectedCategory;
-      const matchQuery =
-        !searchQuery.trim() ||
-        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (a.summary && a.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (a.author && a.author.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchCat && matchQuery;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'views') return (b.views || 0) - (a.views || 0);
-      return b.id - a.id;
-    });
+    const extraCats = rawSectionArticles
+      .map((a) => a.category?.trim())
+      .filter((cat): cat is string => Boolean(cat && !baseCats.some((b) => b.toLowerCase() === cat.toLowerCase())));
+
+    return Array.from(new Set([...baseCats, ...extraCats]));
+  }, [customSec, sectionKey, rawSectionArticles]);
+
+  const totalViews = useMemo(() => {
+    return rawSectionArticles.reduce((sum, a) => sum + (a.views || 0), 0);
+  }, [rawSectionArticles]);
+
+  const filteredArticles = useMemo(() => {
+    return rawSectionArticles
+      .filter((a) => {
+        const matchCat =
+          selectedCategory === 'all' ||
+          a.category === selectedCategory ||
+          (a.category && selectedCategory && a.category.trim().toLowerCase() === selectedCategory.trim().toLowerCase());
+        const matchQuery =
+          !searchQuery.trim() ||
+          a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (a.summary && a.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (a.author && a.author.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchCat && matchQuery;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'views') return (b.views || 0) - (a.views || 0);
+        return b.id - a.id;
+      });
+  }, [rawSectionArticles, selectedCategory, searchQuery, sortBy]);
 
   return (
     <div className="space-y-4">
@@ -267,8 +287,10 @@ export const SectionView: React.FC<SectionViewProps> = ({
               </button>
 
               {availableCategories.map((cat) => {
-                const count = rawSectionArticles.filter((a) => a.category === cat).length;
-                const isSelected = selectedCategory === cat;
+                const count = rawSectionArticles.filter(
+                  (a) => a.category === cat || (a.category && a.category.trim().toLowerCase() === cat.trim().toLowerCase())
+                ).length;
+                const isSelected = selectedCategory === cat || selectedCategory.trim().toLowerCase() === cat.trim().toLowerCase();
                 return (
                   <button
                     key={cat}
@@ -495,7 +517,9 @@ export const SectionView: React.FC<SectionViewProps> = ({
           itemCountByCategory={(() => {
             const map: Record<string, number> = {};
             availableCategories.forEach((cat: string) => {
-              map[cat] = rawSectionArticles.filter((a) => a.category === cat).length;
+              map[cat] = rawSectionArticles.filter(
+                (a) => a.category === cat || (a.category && a.category.trim().toLowerCase() === cat.trim().toLowerCase())
+              ).length;
             });
             return map;
           })()}
