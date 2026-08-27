@@ -152,85 +152,132 @@ export const supabaseDb = {
     const supabase = getSupabase();
     if (!supabase) return null;
 
-    // Helper to map DB row to Article with robust sectionKey and category detection
-    const mapRowToArticle = (item: any): Article => {
-      let secKey: SectionType = 'ctd';
-      const rawSec = (item.section_key || item.sectionKey || item.tab_type || item.tabType || '').toString().toLowerCase().trim();
-      if (rawSec === 'hl' || rawSec === 'huan_luyen' || rawSec === 'huanluyen') secKey = 'hl';
-      else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho' || rawSec === 'hoctapbac') secKey = 'bac';
-      else if (rawSec === 'ctd' || rawSec === 'ctct') secKey = 'ctd';
-      else {
-        // Fallback guess from category name if missing
-        const cat = (item.category || '').toLowerCase();
-        if (cat.includes('huấn luyện') || cat.includes('sẵn sàng') || cat.includes('thao trường') || cat.includes('khí tài') || cat.includes('quân sự')) {
-          secKey = 'hl';
-        } else if (cat.includes('bác') || cat.includes('hồ chí minh') || cat.includes('tư tưởng') || cat.includes('lời bác')) {
-          secKey = 'bac';
-        } else {
-          secKey = 'ctd';
-        }
-      }
-
-      // Any article without explicit pending/draft status is treated as approved and immediately visible
-      const rawStatus = (item.status || '').toString().toLowerCase().trim();
-      const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
-
-      return {
-        id: Number(item.id || Date.now()),
-        title: item.title || '',
-        category: (item.category || 'Tin tức hoạt động').trim(),
-        author: item.author || 'Cán bộ - Chiến sĩ',
-        date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '26/08/2026'),
-        image: item.image || item.thumbnail || '',
-        images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
-        excerpt: item.excerpt || item.summary || '',
-        summary: item.summary || item.excerpt || '',
-        content: item.content || '',
-        embedCode: item.embed_code || item.embedCode || undefined,
-        status: status,
-        views: Number(item.views || 0),
-        sectionKey: secKey,
-      };
-    };
-
     try {
-      // Fetch all articles publicly from Supabase
-      let articlesData: any[] | null = null;
-
-      // 1. Try order by created_at descending
-      const resCreatedAt = await supabase
+      // 1. ĐƠN GIẢN HÓA VÀ NỚI LỎNG CÂU LỆNH TRUY VẤN (BỎ HẾT ĐIỀU KIỆN CHẶN CỨNG)
+      let { data, error } = await supabase
         .from('articles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!resCreatedAt.error && resCreatedAt.data) {
-        articlesData = resCreatedAt.data;
-      } else {
-        // 2. Fallback: order by id descending
+      // Fallback nếu cột created_at không tồn tại hoặc lỗi sắp xếp
+      if (error) {
+        console.warn('Truy vấn order created_at thất bại, thử sắp xếp theo id:', error.message);
         const resId = await supabase
           .from('articles')
           .select('*')
           .order('id', { ascending: false });
 
         if (!resId.error && resId.data) {
-          articlesData = resId.data;
+          data = resId.data;
+          error = null;
         } else {
-          // 3. Fallback: select without ordering
           const resAll = await supabase.from('articles').select('*');
-          if (!resAll.error && resAll.data) {
-            articlesData = resAll.data;
-          }
+          data = resAll.data;
+          error = resAll.error;
         }
       }
 
-      if (articlesData) {
-        return articlesData.map(mapRowToArticle);
-      }
-    } catch (e) {
-      console.warn('Supabase fetchArticles failed:', e);
-    }
+      // Log kiểm tra dữ liệu từ Supabase theo yêu cầu
+      console.log("Danh sách articles từ Supabase:", data, error);
 
-    return null;
+      if (error) {
+        console.error("Lỗi khi lấy dữ liệu articles từ Supabase:", error);
+        return null;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        return [];
+      }
+
+      // Map toàn bộ rows từ Supabase sang kiểu Article với phân loại tự động
+      return data.map((item: any): Article => {
+        // Phân loại sectionKey tự động dựa trên category và tab_type/section_key
+        let secKey: SectionType = 'ctd';
+        const rawSec = (item.section_key || item.sectionKey || item.tab_type || item.tabType || '').toString().toLowerCase().trim();
+        if (rawSec === 'hl' || rawSec === 'huan_luyen' || rawSec === 'huanluyen') {
+          secKey = 'hl';
+        } else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho' || rawSec === 'hoctapbac') {
+          secKey = 'bac';
+        } else if (rawSec === 'ctd' || rawSec === 'ctct') {
+          secKey = 'ctd';
+        } else {
+          // Tự động phân loại dựa trên category
+          const cat = (item.category || '').toLowerCase().trim();
+          if (
+            cat.includes('bác') ||
+            cat.includes('hồ chí minh') ||
+            cat.includes('tư tưởng') ||
+            cat.includes('lời bác') ||
+            cat.includes('gương sáng') ||
+            cat.includes('mẩu chuyện về bác') ||
+            cat.includes('thấm nhuần lời bác') ||
+            cat.includes('đạo đức hồ chí minh')
+          ) {
+            secKey = 'bac';
+          } else if (
+            cat.includes('huấn luyện') ||
+            cat.includes('sẵn sàng') ||
+            cat.includes('sscđ') ||
+            cat.includes('thao trường') ||
+            cat.includes('bắn súng') ||
+            cat.includes('kỹ chiến thuật') ||
+            cat.includes('điều lệnh') ||
+            cat.includes('thể lực') ||
+            cat.includes('khí tài') ||
+            cat.includes('diễn tập') ||
+            cat.includes('hậu cần') ||
+            cat.includes('kỹ thuật') ||
+            cat.includes('quân sự')
+          ) {
+            secKey = 'hl';
+          } else {
+            // "Công tác Tuyên huấn", "Công tác Tổ chức", "Công tác Cán bộ", "Thi đua Quyết thắng", "Bảo vệ an ninh", "Chính sách", "Dân vận", "Kiểm tra giám sát", "Tin tức hoạt động", "Xây dựng Đảng"...
+            secKey = 'ctd';
+          }
+        }
+
+        // Xử lý ID linh hoạt (hỗ trợ cả int8, timestamp, hoặc chuỗi số)
+        let parsedId = typeof item.id === 'number' ? item.id : Number(item.id);
+        if (isNaN(parsedId) || parsedId === 0) {
+          parsedId = Date.now() + Math.floor(Math.random() * 10000);
+        }
+
+        // Xử lý định dạng ngày tháng hiển thị chuẩn
+        let formattedDate = item.date;
+        if (!formattedDate && item.created_at) {
+          try {
+            formattedDate = new Date(item.created_at).toLocaleDateString('vi-VN');
+          } catch {
+            formattedDate = '26/08/2026';
+          }
+        }
+        if (!formattedDate) formattedDate = '26/08/2026';
+
+        // Trạng thái: Không chặn bài viết, mặc định approved để luôn hiển thị
+        const rawStatus = (item.status || '').toString().toLowerCase().trim();
+        const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
+
+        return {
+          id: parsedId,
+          title: item.title || 'Tin tức hoạt động',
+          category: (item.category || (secKey === 'bac' ? 'Lời Bác dạy' : secKey === 'hl' ? 'Huấn luyện - SSCĐ' : 'Tin tức hoạt động')).trim(),
+          author: item.author || 'Cán bộ - Chiến sĩ',
+          date: formattedDate,
+          image: item.image || item.thumbnail || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop',
+          images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
+          excerpt: item.excerpt || item.summary || item.title || '',
+          summary: item.summary || item.excerpt || '',
+          content: item.content || item.summary || item.excerpt || item.title || '',
+          embedCode: item.embed_code || item.embedCode || undefined,
+          status: status,
+          views: Number(item.views || 0),
+          sectionKey: secKey,
+        };
+      });
+    } catch (e) {
+      console.error('Lỗi khi fetchArticles từ Supabase:', e);
+      return null;
+    }
   },
 
   async upsertArticle(article: Article): Promise<{ success: boolean; error?: string }> {

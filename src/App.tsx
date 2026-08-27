@@ -445,7 +445,7 @@ export function App() {
     const updatedArticle = { ...article, views: updatedViews };
 
     setArticles((prev) =>
-      prev.map((a) => (a.id === article.id ? updatedArticle : a))
+      prev.map((a) => (String(a.id) === String(article.id) ? updatedArticle : a))
     );
     cloudStorage.saveArticle(updatedArticle);
 
@@ -1067,7 +1067,7 @@ export function App() {
       };
 
       // Immediately update local state so the UI reflects the post instantly
-      setArticles((prev) => [newArt, ...prev.filter((a) => a.id !== newArt.id)]);
+      setArticles((prev) => [newArt, ...prev.filter((a) => String(a.id) !== String(newArt.id))]);
 
       // Save to Cloud Firestore & Supabase & Local persistent cache
       const res = await cloudStorage.saveArticle(newArt);
@@ -1113,9 +1113,9 @@ export function App() {
   };
 
   const handleUpdateArticle = async (updated: Article): Promise<boolean> => {
-    setArticles((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    setArticles((prev) => prev.map((a) => (String(a.id) === String(updated.id) ? updated : a)));
 
-    if (selectedArticle?.id === updated.id) {
+    if (selectedArticle && String(selectedArticle.id) === String(updated.id)) {
       setSelectedArticle(updated);
     }
 
@@ -1141,7 +1141,7 @@ export function App() {
     let updatedArticle: Article | null = null;
     setArticles((prev) =>
       prev.map((a) => {
-        if (a.id === articleId) {
+        if (String(a.id) === String(articleId)) {
           updatedArticle = { ...a, status: 'approved' as const };
           return updatedArticle;
         }
@@ -1165,7 +1165,7 @@ export function App() {
 
   const handleRejectArticle = async (articleId: number) => {
     if (confirm('Từ chối và gỡ bỏ dự thảo bài viết này khỏi hệ thống?')) {
-      setArticles((prev) => prev.filter((a) => a.id !== articleId));
+      setArticles((prev) => prev.filter((a) => String(a.id) !== String(articleId)));
       const res = await cloudStorage.deleteArticle(articleId);
       if (res.success) {
         showToast('info', 'Đã từ chối dự thảo', 'Dự thảo tin bài đã được xóa khỏi danh sách chờ duyệt.');
@@ -1177,8 +1177,8 @@ export function App() {
 
   const handleDeleteArticle = async (articleId: number): Promise<boolean> => {
     if (confirm('Đồng chí có chắc chắn muốn xóa bài viết này vĩnh viễn?')) {
-      setArticles((prev) => prev.filter((a) => a.id !== articleId));
-      if (selectedArticle?.id === articleId) {
+      setArticles((prev) => prev.filter((a) => String(a.id) !== String(articleId)));
+      if (selectedArticle && String(selectedArticle.id) === String(articleId)) {
         setCurrentPage('home');
       }
       const res = await cloudStorage.deleteArticle(articleId);

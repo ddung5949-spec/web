@@ -109,7 +109,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
   };
 
   const relatedArticles = allArticles
-    .filter((a) => a.id !== article.id && (!a.status || a.status === 'approved' || a.status !== 'pending'))
+    .filter((a) => String(a.id) !== String(article.id) && (!a.status || a.status === 'approved' || a.status !== 'pending'))
     .slice(0, 3);
 
   const handleDelete = () => {

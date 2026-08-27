@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { Article, PageView, SectionType, SiteConfig, User } from '../types';
 import { ArticleCard } from './ArticleCard';
+import { ArticleList } from './ArticleList';
+import { resolveArticleSection } from './TabContent';
 import { categoryOptions } from '../data/initialData';
 import { CategoryManagerModal } from './modals/CategoryManagerModal';
 
@@ -120,11 +122,10 @@ export const SectionView: React.FC<SectionViewProps> = ({
   const Icon = baseConfig.icon;
 
   const rawSectionArticles = useMemo(() => {
-    return articles.filter(
-      (a) =>
-        (a.sectionKey === sectionKey || (!a.sectionKey && sectionKey === 'ctd')) &&
-        (!a.status || a.status === 'approved' || a.status !== 'pending')
-    );
+    return articles.filter((a) => {
+      const resolved = resolveArticleSection(a.category, a.sectionKey);
+      return resolved === sectionKey;
+    });
   }, [articles, sectionKey]);
 
   const availableCategories = useMemo(() => {
@@ -154,12 +155,13 @@ export const SectionView: React.FC<SectionViewProps> = ({
           !searchQuery.trim() ||
           a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (a.summary && a.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (a.excerpt && a.excerpt.toLowerCase().includes(searchQuery.toLowerCase())) ||
           (a.author && a.author.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchCat && matchQuery;
       })
       .sort((a, b) => {
         if (sortBy === 'views') return (b.views || 0) - (a.views || 0);
-        return b.id - a.id;
+        return Number(b.id) - Number(a.id);
       });
   }, [rawSectionArticles, selectedCategory, searchQuery, sortBy]);
 
@@ -464,47 +466,21 @@ export const SectionView: React.FC<SectionViewProps> = ({
           )}
 
           {/* Article List / Grid */}
-          <div className="space-y-3">
-            {filteredArticles.length > 0 ? (
-              filteredArticles.map((article) => (
-                <ArticleCard
-                  key={article.id}
-                  article={article}
-                  onClick={() => onOpenArticle(article)}
-                  canEdit={isAdmin}
-                  onEdit={() => onEditArticle && onEditArticle(article)}
-                  canDelete={isAdmin}
-                  onDelete={() => onDeleteArticle(article.id)}
-                />
-              ))
-            ) : (
-              <div className="bg-white p-10 text-center text-gray-500 rounded-xl border border-gray-200 space-y-3 shadow-2xs">
-                <BookOpen className="w-10 h-10 mx-auto text-gray-300" />
-                <p className="text-xs font-semibold">
-                  Không tìm thấy bài viết nào phù hợp với yêu cầu tìm kiếm.
-                </p>
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory('all');
-                      setSearchQuery('');
-                    }}
-                    className="text-xs text-red-700 font-bold underline hover:text-red-800 cursor-pointer"
-                  >
-                    Xem tất cả bài viết
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenPostModal(sectionKey)}
-                    className="text-xs text-emerald-700 font-bold hover:underline cursor-pointer"
-                  >
-                    Gửi bài viết mới ngay
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <ArticleList
+            articles={filteredArticles}
+            selectedCategory={selectedCategory}
+            searchQuery={searchQuery}
+            canEdit={isAdmin}
+            canDelete={isAdmin}
+            onOpenArticle={onOpenArticle}
+            onEditArticle={onEditArticle}
+            onDeleteArticle={onDeleteArticle}
+            onResetFilter={() => {
+              setSelectedCategory('all');
+              setSearchQuery('');
+            }}
+            onOpenPostModal={() => onOpenPostModal(sectionKey)}
+          />
         </div>
       </div>
 
