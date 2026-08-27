@@ -10,6 +10,7 @@ import {
   UserPen,
 } from 'lucide-react';
 import { Article, User } from '../types';
+import { defaultArticles } from '../data/initialData';
 
 interface HomeMiddleFeaturedSliderProps {
   articles: Article[];
@@ -29,7 +30,8 @@ export const HomeMiddleFeaturedSlider: React.FC<
   onDeleteArticle,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const featuredArticles = articles.slice(0, 5);
+  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
+  const featuredArticles = effectiveArticles.slice(0, 5);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 

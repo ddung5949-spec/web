@@ -268,7 +268,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     }
 
     try {
-      const compressedDataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+      const compressedDataUrl = await compressImageFile(file, 1200, 1200, 0.7);
       setImageUrl(compressedDataUrl);
       const newImg: ArticleImage = {
         id: `img-${Date.now()}`,
@@ -312,7 +312,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       if (!val.valid) continue;
 
       try {
-        const compressedDataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+        const compressedDataUrl = await compressImageFile(file, 1200, 1200, 0.7);
         const newImg: ArticleImage = {
           id: `img-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
           url: compressedDataUrl,

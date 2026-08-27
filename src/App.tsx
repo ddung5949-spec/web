@@ -85,9 +85,7 @@ export function App() {
     safeStore.get('mangyang_current_user', null)
   );
 
-  const [articles, setArticles] = useState<Article[]>(() =>
-    safeStore.get('mangyang_articles', defaultArticles)
-  );
+  const [articles, setArticles] = useState<Article[]>(defaultArticles);
 
   const [documents, setDocuments] = useState<DocumentItem[]>(() =>
     safeStore.get('mangyang_documents', defaultDocuments)
@@ -198,72 +196,113 @@ export function App() {
     let isMounted = true;
     setIsLoadingData(true);
 
-    Promise.all([
-      cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
-        if (isMounted && data) setSiteConfig(data);
-      }),
-      cloudStorage.loadArticles(defaultArticles).then((data) => {
-        if (isMounted && data) setArticles(data);
-      }),
-      cloudStorage.loadUsers(defaultUsers).then((data) => {
-        if (isMounted && data) setUsers(data);
-      }),
-      cloudStorage.loadDocuments(defaultDocuments).then((data) => {
-        if (isMounted && data) setDocuments(data);
-      }),
-      cloudStorage.loadLectures(defaultLectures).then((data) => {
-        if (isMounted && data) setLectures(data);
-      }),
-      cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => {
-        if (isMounted && data) setUncleHoQuotes(data);
-      }),
-      cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => {
-        if (isMounted && data) setUncleHoSettings(data);
-      }),
-      cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => {
-        if (isMounted && data) setMeetingRooms(data);
-      }),
-      cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => {
-        if (isMounted && data) setMeetingDocuments(data);
-      }),
-      cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => {
-        if (isMounted && data) setMeetingSettings(data);
-      }),
-      cloudStorage.loadMeetingVotes({}).then((data) => {
-        if (isMounted && data) setMeetingVotes(data);
-      }),
-    ])
-      .catch((err) => {
-        console.warn('Initial data load warning:', err);
+    // 1. TÁCH BIỆT HOÀN TOÀN HÀM TẢI BÀI VIẾT (FETCH ARTICLES ĐỘC LẬP TỪ SUPABASE)
+    cloudStorage
+      .loadArticles(defaultArticles)
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          console.log('[App] Articles loaded successfully:', data.length);
+          setArticles(data);
+        }
       })
-      .finally(() => {
-        if (isMounted) setIsLoadingData(false);
+      .catch((err) => {
+        console.warn('[App] Error loading articles:', err);
       });
 
-    // Realtime Database-First subscription (Supabase postgres_changes + Firestore)
+    // 2. Tải các cấu hình và dữ liệu khác độc lập (không chặn hay xóa lẫn nhau)
+    cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
+      if (isMounted && data) setSiteConfig(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadUsers(defaultUsers).then((data) => {
+      if (isMounted && data && data.length > 0) setUsers(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadDocuments(defaultDocuments).then((data) => {
+      if (isMounted && data && data.length > 0) setDocuments(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadLectures(defaultLectures).then((data) => {
+      if (isMounted && data && data.length > 0) setLectures(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => {
+      if (isMounted && data && data.length > 0) setUncleHoQuotes(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => {
+      if (isMounted && data) setUncleHoSettings(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => {
+      if (isMounted && data && data.length > 0) setMeetingRooms(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => {
+      if (isMounted && data && data.length > 0) setMeetingDocuments(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => {
+      if (isMounted && data) setMeetingSettings(data);
+    }).catch(console.warn);
+
+    cloudStorage.loadMeetingVotes({}).then((data) => {
+      if (isMounted && data) setMeetingVotes(data);
+    }).catch(console.warn);
+
+    // Xóa trạng thái loading sau thời gian khởi động
+    const loadingTimer = setTimeout(() => {
+      if (isMounted) setIsLoadingData(false);
+    }, 600);
+
+    // 3. Realtime Database-First subscription (Supabase postgres_changes)
     const unsub = cloudStorage.subscribeAll({
       onArticlesChange: (freshArticles) => {
-        if (isMounted && freshArticles) {
+        if (isMounted && freshArticles && freshArticles.length > 0) {
           setArticles(freshArticles);
         }
       },
+      onArticleInsert: (newArt) => {
+        if (isMounted && newArt) {
+          setArticles((prev) => {
+            const next = [newArt, ...prev.filter((a) => String(a.id) !== String(newArt.id))];
+            return next;
+          });
+        }
+      },
+      onArticleUpdate: (updatedArt) => {
+        if (isMounted && updatedArt) {
+          setArticles((prev) => {
+            const next = prev.map((a) => (String(a.id) === String(updatedArt.id) ? updatedArt : a));
+            return next;
+          });
+        }
+      },
+      onArticleDelete: (deletedId) => {
+        if (isMounted && deletedId) {
+          setArticles((prev) => {
+            const next = prev.filter((a) => String(a.id) !== String(deletedId));
+            return next;
+          });
+        }
+      },
       onDocumentsChange: (freshDocs) => {
-        if (isMounted && freshDocs) {
+        if (isMounted && freshDocs && freshDocs.length > 0) {
           setDocuments(freshDocs);
         }
       },
       onLecturesChange: (freshLectures) => {
-        if (isMounted && freshLectures) {
+        if (isMounted && freshLectures && freshLectures.length > 0) {
           setLectures(freshLectures);
         }
       },
       onMeetingRoomsChange: (freshRooms) => {
-        if (isMounted && freshRooms) {
+        if (isMounted && freshRooms && freshRooms.length > 0) {
           setMeetingRooms(freshRooms);
         }
       },
       onMeetingDocumentsChange: (freshMeetingDocs) => {
-        if (isMounted && freshMeetingDocs) {
+        if (isMounted && freshMeetingDocs && freshMeetingDocs.length > 0) {
           setMeetingDocuments(freshMeetingDocs);
         }
       },
@@ -278,7 +317,7 @@ export function App() {
         }
       },
       onUsersChange: (freshUsers) => {
-        if (isMounted && freshUsers) {
+        if (isMounted && freshUsers && freshUsers.length > 0) {
           setUsers(freshUsers);
         }
       },
@@ -286,6 +325,7 @@ export function App() {
 
     return () => {
       isMounted = false;
+      clearTimeout(loadingTimer);
       if (unsub) unsub();
     };
   }, []);

@@ -15,6 +15,7 @@ import {
   UserPen,
 } from 'lucide-react';
 import { Article, User } from '../types';
+import { defaultArticles } from '../data/initialData';
 import { SpotlightArticleSelectModal } from './modals/SpotlightArticleSelectModal';
 
 interface HomeSpotlightSectionProps {
@@ -37,15 +38,18 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   const isAdmin = currentUser?.role === 'admin';
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
 
+  // Safe articles pool with fallback
+  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
+
   // Find the primary spotlight article
   const primaryArticle =
-    articles.find((a) => a.id === spotlightArticleId) ||
-    articles[1] ||
-    articles[0];
+    (spotlightArticleId ? effectiveArticles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
+    effectiveArticles[0] ||
+    defaultArticles[0];
 
   // Secondary sub-featured articles
-  const subArticles = articles
-    .filter((a) => a.id !== primaryArticle?.id)
+  const subArticles = effectiveArticles
+    .filter((a) => String(a.id) !== String(primaryArticle?.id))
     .slice(0, 2);
 
   if (!primaryArticle) return null;

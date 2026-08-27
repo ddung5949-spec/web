@@ -47,6 +47,9 @@ export const getSupabase = (): SupabaseClient | null => {
    DATABASE-FIRST SUPABASE SERVICES (Tin bài, Văn bản, Bài giảng, Phòng họp...)
    ========================================================================= */
 
+// Module-level singleton reference for global realtime channel
+let activeSingletonChannel: any = null;
+
 export const supabaseDb = {
   // -------------------------------------------------------------
   // 1. HỒ SƠ QUÂN NHÂN & TÀI KHOẢN (Bảng: users)
@@ -148,6 +151,91 @@ export const supabaseDb = {
   // -------------------------------------------------------------
   // 2. BÀI VIẾT & TIN TỨC (Bảng DUY NHẤT: articles)
   // -------------------------------------------------------------
+  mapRowToArticle(item: any): Article {
+    // Phân loại sectionKey tự động dựa trên category và tab_type/section_key
+    let secKey: SectionType = 'ctd';
+    const rawSec = (item.section_key || item.sectionKey || item.tab_type || item.tabType || '').toString().toLowerCase().trim();
+    if (rawSec === 'hl' || rawSec === 'huan_luyen' || rawSec === 'huanluyen') {
+      secKey = 'hl';
+    } else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho' || rawSec === 'hoctapbac') {
+      secKey = 'bac';
+    } else if (rawSec === 'ctd' || rawSec === 'ctct') {
+      secKey = 'ctd';
+    } else {
+      // Tự động phân loại dựa trên category
+      const cat = (item.category || '').toLowerCase().trim();
+      if (
+        cat.includes('bác') ||
+        cat.includes('hồ chí minh') ||
+        cat.includes('tư tưởng') ||
+        cat.includes('lời bác') ||
+        cat.includes('gương sáng') ||
+        cat.includes('mẩu chuyện về bác') ||
+        cat.includes('thấm nhuần lời bác') ||
+        cat.includes('đạo đức hồ chí minh')
+      ) {
+        secKey = 'bac';
+      } else if (
+        cat.includes('huấn luyện') ||
+        cat.includes('sẵn sàng') ||
+        cat.includes('sscđ') ||
+        cat.includes('thao trường') ||
+        cat.includes('bắn súng') ||
+        cat.includes('kỹ chiến thuật') ||
+        cat.includes('điều lệnh') ||
+        cat.includes('thể lực') ||
+        cat.includes('khí tài') ||
+        cat.includes('diễn tập') ||
+        cat.includes('hậu cần') ||
+        cat.includes('kỹ thuật') ||
+        cat.includes('quân sự')
+      ) {
+        secKey = 'hl';
+      } else {
+        // "Công tác Tuyên huấn", "Công tác Tổ chức", "Công tác Cán bộ", "Thi đua Quyết thắng", "Bảo vệ an ninh", "Chính sách", "Dân vận", "Kiểm tra giám sát", "Tin tức hoạt động", "Xây dựng Đảng"...
+        secKey = 'ctd';
+      }
+    }
+
+    // Xử lý ID linh hoạt (hỗ trợ cả int8, timestamp, hoặc chuỗi số)
+    let parsedId = typeof item.id === 'number' ? item.id : Number(item.id);
+    if (isNaN(parsedId) || parsedId === 0) {
+      parsedId = Date.now() + Math.floor(Math.random() * 10000);
+    }
+
+    // Xử lý định dạng ngày tháng hiển thị chuẩn
+    let formattedDate = item.date;
+    if (!formattedDate && item.created_at) {
+      try {
+        formattedDate = new Date(item.created_at).toLocaleDateString('vi-VN');
+      } catch {
+        formattedDate = '26/08/2026';
+      }
+    }
+    if (!formattedDate) formattedDate = '26/08/2026';
+
+    // Trạng thái: Không chặn bài viết, mặc định approved để luôn hiển thị
+    const rawStatus = (item.status || '').toString().toLowerCase().trim();
+    const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
+
+    return {
+      id: parsedId,
+      title: item.title || 'Tin tức hoạt động',
+      category: (item.category || (secKey === 'bac' ? 'Lời Bác dạy' : secKey === 'hl' ? 'Huấn luyện - SSCĐ' : 'Tin tức hoạt động')).trim(),
+      author: item.author || 'Cán bộ - Chiến sĩ',
+      date: formattedDate,
+      image: item.image || item.thumbnail || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop',
+      images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
+      excerpt: item.excerpt || item.summary || item.title || '',
+      summary: item.summary || item.excerpt || '',
+      content: item.content || item.summary || item.excerpt || item.title || '',
+      embedCode: item.embed_code || item.embedCode || undefined,
+      status: status,
+      views: Number(item.views || 0),
+      sectionKey: secKey,
+    };
+  },
+
   async fetchArticles(): Promise<Article[] | null> {
     const supabase = getSupabase();
     if (!supabase) return null;
@@ -190,90 +278,7 @@ export const supabaseDb = {
       }
 
       // Map toàn bộ rows từ Supabase sang kiểu Article với phân loại tự động
-      return data.map((item: any): Article => {
-        // Phân loại sectionKey tự động dựa trên category và tab_type/section_key
-        let secKey: SectionType = 'ctd';
-        const rawSec = (item.section_key || item.sectionKey || item.tab_type || item.tabType || '').toString().toLowerCase().trim();
-        if (rawSec === 'hl' || rawSec === 'huan_luyen' || rawSec === 'huanluyen') {
-          secKey = 'hl';
-        } else if (rawSec === 'bac' || rawSec === 'hoc_tap_bac' || rawSec === 'bac_ho' || rawSec === 'hoctapbac') {
-          secKey = 'bac';
-        } else if (rawSec === 'ctd' || rawSec === 'ctct') {
-          secKey = 'ctd';
-        } else {
-          // Tự động phân loại dựa trên category
-          const cat = (item.category || '').toLowerCase().trim();
-          if (
-            cat.includes('bác') ||
-            cat.includes('hồ chí minh') ||
-            cat.includes('tư tưởng') ||
-            cat.includes('lời bác') ||
-            cat.includes('gương sáng') ||
-            cat.includes('mẩu chuyện về bác') ||
-            cat.includes('thấm nhuần lời bác') ||
-            cat.includes('đạo đức hồ chí minh')
-          ) {
-            secKey = 'bac';
-          } else if (
-            cat.includes('huấn luyện') ||
-            cat.includes('sẵn sàng') ||
-            cat.includes('sscđ') ||
-            cat.includes('thao trường') ||
-            cat.includes('bắn súng') ||
-            cat.includes('kỹ chiến thuật') ||
-            cat.includes('điều lệnh') ||
-            cat.includes('thể lực') ||
-            cat.includes('khí tài') ||
-            cat.includes('diễn tập') ||
-            cat.includes('hậu cần') ||
-            cat.includes('kỹ thuật') ||
-            cat.includes('quân sự')
-          ) {
-            secKey = 'hl';
-          } else {
-            // "Công tác Tuyên huấn", "Công tác Tổ chức", "Công tác Cán bộ", "Thi đua Quyết thắng", "Bảo vệ an ninh", "Chính sách", "Dân vận", "Kiểm tra giám sát", "Tin tức hoạt động", "Xây dựng Đảng"...
-            secKey = 'ctd';
-          }
-        }
-
-        // Xử lý ID linh hoạt (hỗ trợ cả int8, timestamp, hoặc chuỗi số)
-        let parsedId = typeof item.id === 'number' ? item.id : Number(item.id);
-        if (isNaN(parsedId) || parsedId === 0) {
-          parsedId = Date.now() + Math.floor(Math.random() * 10000);
-        }
-
-        // Xử lý định dạng ngày tháng hiển thị chuẩn
-        let formattedDate = item.date;
-        if (!formattedDate && item.created_at) {
-          try {
-            formattedDate = new Date(item.created_at).toLocaleDateString('vi-VN');
-          } catch {
-            formattedDate = '26/08/2026';
-          }
-        }
-        if (!formattedDate) formattedDate = '26/08/2026';
-
-        // Trạng thái: Không chặn bài viết, mặc định approved để luôn hiển thị
-        const rawStatus = (item.status || '').toString().toLowerCase().trim();
-        const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
-
-        return {
-          id: parsedId,
-          title: item.title || 'Tin tức hoạt động',
-          category: (item.category || (secKey === 'bac' ? 'Lời Bác dạy' : secKey === 'hl' ? 'Huấn luyện - SSCĐ' : 'Tin tức hoạt động')).trim(),
-          author: item.author || 'Cán bộ - Chiến sĩ',
-          date: formattedDate,
-          image: item.image || item.thumbnail || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop',
-          images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
-          excerpt: item.excerpt || item.summary || item.title || '',
-          summary: item.summary || item.excerpt || '',
-          content: item.content || item.summary || item.excerpt || item.title || '',
-          embedCode: item.embed_code || item.embedCode || undefined,
-          status: status,
-          views: Number(item.views || 0),
-          sectionKey: secKey,
-        };
-      });
+      return data.map((item: any): Article => supabaseDb.mapRowToArticle(item));
     } catch (e) {
       console.error('Lỗi khi fetchArticles từ Supabase:', e);
       return null;
@@ -907,10 +912,13 @@ export const supabaseDb = {
   },
 
   // -------------------------------------------------------------
-  // 10. REALTIME DATABASE-FIRST SUBSCRIPTION (supabase.channel('schema-db-changes'))
+  // 10. REALTIME DATABASE-FIRST SUBSCRIPTION (Singleton Channel: 'public:articles')
   // -------------------------------------------------------------
   subscribeAllChanges(callbacks: {
     onArticlesChange?: (articles: Article[]) => void;
+    onArticleInsert?: (article: Article) => void;
+    onArticleUpdate?: (article: Article) => void;
+    onArticleDelete?: (articleId: number) => void;
     onDocumentsChange?: (docs: DocumentItem[]) => void;
     onLecturesChange?: (lectures: LectureItem[]) => void;
     onMeetingSettingsChange?: (settings: MeetingRoomSettings) => void;
@@ -923,80 +931,162 @@ export const supabaseDb = {
     if (!supabase) return null;
 
     try {
+      // Clean up previous singleton channel if already present
+      if (activeSingletonChannel) {
+        try {
+          supabase.removeChannel(activeSingletonChannel);
+        } catch {
+          // ignore
+        }
+        activeSingletonChannel = null;
+      }
+
       const channel = supabase
-        .channel('schema-db-changes')
-        // 1. Articles (Instant Realtime Auto-Fetch for all users)
+        .channel('public:articles')
+        // 1. Articles (Instant Realtime Auto-Fetch and Event Handling for all users)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, async (payload) => {
-          console.log('[Supabase Realtime] Articles changed:', payload);
-          if (callbacks.onArticlesChange) {
-            const fresh = await supabaseDb.fetchArticles();
-            if (fresh !== null) callbacks.onArticlesChange(fresh);
+          try {
+            console.log('[Supabase Realtime] Articles event:', payload.eventType);
+
+            // Granular event handling for instant UI updates
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const newArt = supabaseDb.mapRowToArticle(payload.new);
+              if (callbacks.onArticleInsert) {
+                callbacks.onArticleInsert(newArt);
+              }
+            } else if (payload.eventType === 'UPDATE' && payload.new) {
+              const updatedArt = supabaseDb.mapRowToArticle(payload.new);
+              if (callbacks.onArticleUpdate) {
+                callbacks.onArticleUpdate(updatedArt);
+              }
+            } else if (payload.eventType === 'DELETE' && payload.old) {
+              const deletedId = Number(payload.old.id);
+              if (callbacks.onArticleDelete && !isNaN(deletedId)) {
+                callbacks.onArticleDelete(deletedId);
+              }
+            }
+
+            // Fetch full fresh list as backup, but only update if valid articles exist
+            if (callbacks.onArticlesChange) {
+              const fresh = await supabaseDb.fetchArticles();
+              if (fresh !== null && fresh.length > 0) {
+                callbacks.onArticlesChange(fresh);
+              }
+            }
+          } catch (e) {
+            console.warn('[Realtime Articles Handler] Error caught safely:', e);
           }
         })
         // 2. Documents
         .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, async () => {
-          if (callbacks.onDocumentsChange) {
-            const fresh = await supabaseDb.fetchDocuments();
-            if (fresh !== null) callbacks.onDocumentsChange(fresh);
+          try {
+            if (callbacks.onDocumentsChange) {
+              const fresh = await supabaseDb.fetchDocuments();
+              if (fresh !== null) callbacks.onDocumentsChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime Documents Handler] Error caught safely:', e);
           }
         })
         // 3. Lectures
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lectures' }, async () => {
-          if (callbacks.onLecturesChange) {
-            const fresh = await supabaseDb.fetchLectures();
-            if (fresh !== null) callbacks.onLecturesChange(fresh);
+          try {
+            if (callbacks.onLecturesChange) {
+              const fresh = await supabaseDb.fetchLectures();
+              if (fresh !== null) callbacks.onLecturesChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime Lectures Handler] Error caught safely:', e);
           }
         })
         // 4. Meeting Settings
         .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_settings' }, async () => {
-          if (callbacks.onMeetingSettingsChange) {
-            const fresh = await supabaseDb.fetchMeetingSettings();
-            if (fresh !== null) callbacks.onMeetingSettingsChange(fresh);
+          try {
+            if (callbacks.onMeetingSettingsChange) {
+              const fresh = await supabaseDb.fetchMeetingSettings();
+              if (fresh !== null) callbacks.onMeetingSettingsChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime MeetingSettings Handler] Error caught safely:', e);
           }
         })
         // 5. Meeting Documents
         .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_documents' }, async () => {
-          if (callbacks.onMeetingDocumentsChange) {
-            const fresh = await supabaseDb.fetchMeetingDocuments();
-            if (fresh !== null) callbacks.onMeetingDocumentsChange(fresh);
+          try {
+            if (callbacks.onMeetingDocumentsChange) {
+              const fresh = await supabaseDb.fetchMeetingDocuments();
+              if (fresh !== null) callbacks.onMeetingDocumentsChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime MeetingDocuments Handler] Error caught safely:', e);
           }
         })
         // 6. Meeting Rooms
         .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_rooms' }, async () => {
-          if (callbacks.onMeetingRoomsChange) {
-            const fresh = await supabaseDb.fetchMeetingRooms();
-            if (fresh !== null) callbacks.onMeetingRoomsChange(fresh);
+          try {
+            if (callbacks.onMeetingRoomsChange) {
+              const fresh = await supabaseDb.fetchMeetingRooms();
+              if (fresh !== null) callbacks.onMeetingRoomsChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime MeetingRooms Handler] Error caught safely:', e);
           }
         })
         // 7. Site Config & Categories
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_config' }, async () => {
-          if (callbacks.onSiteConfigChange) {
-            const fresh = await supabaseDb.fetchSiteConfig();
-            if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+          try {
+            if (callbacks.onSiteConfigChange) {
+              const fresh = await supabaseDb.fetchSiteConfig();
+              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime SiteConfig Handler] Error caught safely:', e);
           }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, async () => {
-          if (callbacks.onSiteConfigChange) {
-            const fresh = await supabaseDb.fetchSiteConfig();
-            if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+          try {
+            if (callbacks.onSiteConfigChange) {
+              const fresh = await supabaseDb.fetchSiteConfig();
+              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime Categories Handler] Error caught safely:', e);
           }
         })
         // 8. Users
         .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, async () => {
-          if (callbacks.onUsersChange) {
-            const fresh = await supabaseDb.fetchUsers();
-            if (fresh !== null) callbacks.onUsersChange(fresh);
+          try {
+            if (callbacks.onUsersChange) {
+              const fresh = await supabaseDb.fetchUsers();
+              if (fresh !== null) callbacks.onUsersChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime Users Handler] Error caught safely:', e);
           }
         })
-        .subscribe((status) => {
-          console.log('[Supabase Realtime Channel status]:', status);
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Realtime connected successfully');
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // Safe logging without reconnect storm
+            if (err) {
+              console.warn(`[Supabase Realtime] Notice (${status}):`, err.message || err);
+            }
+          }
         });
+
+      activeSingletonChannel = channel;
 
       return () => {
         try {
-          supabase.removeChannel(channel);
-        } catch (e) {
-          // ignore
+          if (activeSingletonChannel === channel) {
+            supabase.removeChannel(channel);
+            activeSingletonChannel = null;
+          } else {
+            supabase.removeChannel(channel);
+          }
+        } catch {
+          // ignore cleanup errors
         }
       };
     } catch (e) {

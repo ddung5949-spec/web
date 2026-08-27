@@ -7,9 +7,9 @@
 
 export async function compressImageFile(
   file: File,
-  maxWidth = 1280,
-  maxHeight = 1280,
-  quality = 0.82
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.7
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -32,12 +32,12 @@ export async function compressImageFile(
 
 export async function compressBase64String(
   dataUrl: string,
-  maxWidth = 1280,
-  maxHeight = 1280,
-  quality = 0.82
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.7
 ): Promise<string> {
-  // If not a base64 data url or already very small (< 100KB), return as is
-  if (!dataUrl || !dataUrl.startsWith('data:image/') || dataUrl.length < 100 * 1024) {
+  // If not a base64 data url or already very small (< 40KB), return as is
+  if (!dataUrl || !dataUrl.startsWith('data:image/') || dataUrl.length < 40 * 1024) {
     return dataUrl;
   }
 
@@ -110,7 +110,7 @@ export async function optimizeArticleImagesPayload(article: {
   let mainImage = article.image || '';
   if (mainImage.startsWith('data:image/')) {
     try {
-      mainImage = await compressBase64String(mainImage, 1280, 1280, 0.82);
+      mainImage = await compressBase64String(mainImage, 1200, 1200, 0.7);
     } catch (e) {
       console.warn('Main image compression fallback:', e);
     }
@@ -122,7 +122,7 @@ export async function optimizeArticleImagesPayload(article: {
       imagesList.map(async (img) => {
         if (img.url && img.url.startsWith('data:image/')) {
           try {
-            const compressed = await compressBase64String(img.url, 1280, 1280, 0.82);
+            const compressed = await compressBase64String(img.url, 1200, 1200, 0.7);
             return { ...img, url: compressed };
           } catch {
             return img;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight, Newspaper } from 'lucide-react';
 import { Article, PageView } from '../types';
+import { defaultArticles } from '../data/initialData';
 
 interface HomeLatestNewsWidgetProps {
   articles: Article[];
@@ -13,7 +14,8 @@ export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
   onOpenArticle,
   onSelectSection,
 }) => {
-  const latestArticles = articles.slice(0, 5);
+  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
+  const latestArticles = effectiveArticles.slice(0, 5);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden flex flex-col justify-between h-full min-h-[340px]">

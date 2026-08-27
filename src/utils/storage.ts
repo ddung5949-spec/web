@@ -1,5 +1,4 @@
 import { supabaseDb, isSupabaseConfigured } from './supabase';
-import { firestoreDb, isFirebaseConfigured } from './firebase';
 import {
   Article,
   DocumentItem,
@@ -17,9 +16,13 @@ import {
   RoomBroadcastAction,
 } from '../types';
 
-// Synchronous local storage caching (solely for instant offline cache and snappy UI rendering)
+// Synchronous safe memory / localStorage store with try-catch
+// IMPORTANT: ARTICLES ARE NEVER STORED IN LOCALSTORAGE TO PREVENT QUOTA EXCEEDED (5MB limit)
 export const safeStore = {
   get: <T>(key: string, fallback: T): T => {
+    if (key === 'mangyang_articles' || key.startsWith('mangyang_article_')) {
+      return fallback;
+    }
     try {
       const item = localStorage.getItem(key);
       return item ? (JSON.parse(item) as T) : fallback;
@@ -28,10 +31,14 @@ export const safeStore = {
     }
   },
   set: <T>(key: string, value: T): void => {
+    // Strictly prevent writing articles to localStorage
+    if (key === 'mangyang_articles' || key.startsWith('mangyang_article_')) {
+      return;
+    }
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.warn('LocalStorage save failed:', e);
+      console.warn('LocalStorage save skipped/failed for key:', key, e);
     }
   },
   remove: (key: string): void => {
@@ -44,109 +51,55 @@ export const safeStore = {
 };
 
 // Re-export utilities
-export { isSupabaseConfigured, isFirebaseConfigured, firestoreDb, supabaseDb };
+export { isSupabaseConfigured, supabaseDb };
 
-// Database-First Cloud Storage Manager connecting Supabase & Firestore
+// Database-First Cloud Storage Manager connecting exclusively to Supabase
 export const cloudStorage = {
   // Check whether cloud sync is active
-  isCloudActive: () => isSupabaseConfigured() || isFirebaseConfigured(),
+  isCloudActive: () => isSupabaseConfigured(),
 
   // =========================================================================
-  // 1. ARTICLES & TIN TỨC (DATABASE-FIRST)
+  // 1. ARTICLES & TIN TỨC (DATABASE-FIRST EXCLUSIVELY VIA SUPABASE)
   // =========================================================================
   async loadArticles(fallback: Article[]): Promise<Article[]> {
-    // 1. Primary: Supabase
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchArticles();
-        if (remote !== null) {
-          safeStore.set('mangyang_articles', remote);
+        if (remote !== null && remote.length > 0) {
           return remote;
         }
       } catch (e) {
         console.warn('Supabase loadArticles error:', e);
       }
     }
-
-    // 2. Secondary: Firestore
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchArticles();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_articles', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadArticles error:', e);
-      }
-    }
-
-    return safeStore.get('mangyang_articles', fallback);
+    return fallback;
   },
 
   async saveArticle(article: Article): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertArticle(article);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu vào Supabase';
+      if (res.success) {
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Lỗi lưu vào Supabase' };
     }
-
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertArticle(article);
-      if (fbRes) saved = true;
-    }
-
-    // Update local cache
-    const currentList = safeStore.get<Article[]>('mangyang_articles', []);
-    const existsIdx = currentList.findIndex((a) => a.id === article.id);
-    let updatedList: Article[];
-    if (existsIdx >= 0) {
-      updatedList = currentList.map((a) => (a.id === article.id ? article : a));
-    } else {
-      updatedList = [article, ...currentList];
-    }
-    safeStore.set('mangyang_articles', updatedList);
-
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg || 'Lỗi lưu bài viết vào Cơ sở dữ liệu' };
+    return { success: true };
   },
 
   async deleteArticle(articleId: number): Promise<{ success: boolean; error?: string }> {
-    let deleted = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.deleteArticle(articleId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa khỏi Supabase';
+      if (res.success) {
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Lỗi xóa khỏi Supabase' };
     }
-
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteArticle(articleId);
-      if (fbRes) deleted = true;
-    }
-
-    const currentList = safeStore.get<Article[]>('mangyang_articles', []);
-    const filtered = currentList.filter((a) => a.id !== articleId);
-    safeStore.set('mangyang_articles', filtered);
-
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg || 'Lỗi khi xóa bài viết' };
+    return { success: true };
   },
 
   async incrementViews(articleId: number, currentViews: number): Promise<void> {
     if (isSupabaseConfigured()) {
       await supabaseDb.incrementArticleViews(articleId, currentViews);
-    }
-    if (isFirebaseConfigured()) {
-      await firestoreDb.incrementArticleViews(articleId, currentViews);
     }
   },
 
@@ -165,34 +118,15 @@ export const cloudStorage = {
         console.warn('Supabase loadUsers error:', e);
       }
     }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchUsers();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_users', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadUsers error:', e);
-      }
-    }
-
     return safeStore.get('mangyang_users', fallback);
   },
 
   async saveUser(user: User): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertUser(user);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu tài khoản';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertUser(user);
-      if (fbRes) saved = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu tài khoản' };
+      }
     }
 
     const currentList = safeStore.get<User[]>('mangyang_users', []);
@@ -202,34 +136,22 @@ export const cloudStorage = {
       : [user, ...currentList];
     safeStore.set('mangyang_users', updated);
 
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   async deleteUser(userId: number): Promise<{ success: boolean; error?: string }> {
-    let deleted = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.deleteUser(userId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa tài khoản';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteUser(userId);
-      if (fbRes) deleted = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi xóa tài khoản' };
+      }
     }
 
     const currentList = safeStore.get<User[]>('mangyang_users', []);
     const updated = currentList.filter((u) => u.id !== userId);
     safeStore.set('mangyang_users', updated);
 
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   // =========================================================================
@@ -239,7 +161,7 @@ export const cloudStorage = {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchDocuments();
-        if (remote !== null) {
+        if (remote !== null && remote.length > 0) {
           safeStore.set('mangyang_documents', remote);
           return remote;
         }
@@ -247,71 +169,38 @@ export const cloudStorage = {
         console.warn('Supabase loadDocuments error:', e);
       }
     }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchDocuments();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_documents', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadDocuments error:', e);
-      }
-    }
-
     return safeStore.get('mangyang_documents', fallback);
   },
 
   async saveDocument(doc: DocumentItem): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertDocument(doc);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu văn bản vào Supabase';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertDocument(doc);
-      if (fbRes) saved = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu văn bản' };
+      }
     }
 
-    const currentList = safeStore.get<DocumentItem[]>('mangyang_documents', []);
-    const exists = currentList.some((d) => d.id === doc.id);
-    const updatedList = exists
-      ? currentList.map((d) => (d.id === doc.id ? doc : d))
-      : [doc, ...currentList];
-    safeStore.set('mangyang_documents', updatedList);
+    const current = safeStore.get<DocumentItem[]>('mangyang_documents', []);
+    const exists = current.some((d) => d.id === doc.id);
+    const updated = exists ? current.map((d) => (d.id === doc.id ? doc : d)) : [doc, ...current];
+    safeStore.set('mangyang_documents', updated);
 
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   async deleteDocument(docId: number): Promise<{ success: boolean; error?: string }> {
-    let deleted = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.deleteDocument(docId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa văn bản khỏi Supabase';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteDocument(docId);
-      if (fbRes) deleted = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi xóa văn bản' };
+      }
     }
 
-    const currentList = safeStore.get<DocumentItem[]>('mangyang_documents', []);
-    const filtered = currentList.filter((d) => d.id !== docId);
-    safeStore.set('mangyang_documents', filtered);
+    const current = safeStore.get<DocumentItem[]>('mangyang_documents', []);
+    const updated = current.filter((d) => d.id !== docId);
+    safeStore.set('mangyang_documents', updated);
 
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   // =========================================================================
@@ -321,7 +210,7 @@ export const cloudStorage = {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchLectures();
-        if (remote !== null) {
+        if (remote !== null && remote.length > 0) {
           safeStore.set('mangyang_lectures', remote);
           return remote;
         }
@@ -329,181 +218,180 @@ export const cloudStorage = {
         console.warn('Supabase loadLectures error:', e);
       }
     }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchLectures();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_lectures', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadLectures error:', e);
-      }
-    }
-
     return safeStore.get('mangyang_lectures', fallback);
   },
 
   async saveLecture(lecture: LectureItem): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertLecture(lecture);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu bài giảng vào Supabase';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertLecture(lecture);
-      if (fbRes) saved = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu bài giảng' };
+      }
     }
 
-    const currentList = safeStore.get<LectureItem[]>('mangyang_lectures', []);
-    const exists = currentList.some((l) => l.id === lecture.id);
-    const updatedList = exists
-      ? currentList.map((l) => (l.id === lecture.id ? lecture : l))
-      : [lecture, ...currentList];
-    safeStore.set('mangyang_lectures', updatedList);
+    const current = safeStore.get<LectureItem[]>('mangyang_lectures', []);
+    const exists = current.some((l) => l.id === lecture.id);
+    const updated = exists
+      ? current.map((l) => (l.id === lecture.id ? lecture : l))
+      : [lecture, ...current];
+    safeStore.set('mangyang_lectures', updated);
 
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   async deleteLecture(lectureId: number): Promise<{ success: boolean; error?: string }> {
-    let deleted = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.deleteLecture(lectureId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa bài giảng';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteLecture(lectureId);
-      if (fbRes) deleted = true;
-    }
-
-    const currentList = safeStore.get<LectureItem[]>('mangyang_lectures', []);
-    const filtered = currentList.filter((l) => l.id !== lectureId);
-    safeStore.set('mangyang_lectures', filtered);
-
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
-  },
-
-  // =========================================================================
-  // 5. MEETING VOTES
-  // =========================================================================
-  async loadMeetingVotes(fallback: Record<number, MeetingVote>): Promise<Record<number, MeetingVote>> {
-    if (isSupabaseConfigured()) {
-      const remote = await supabaseDb.fetchMeetingVotes();
-      if (remote !== null) {
-        safeStore.set('mangyang_meeting_votes', remote);
-        return remote;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi xóa bài giảng' };
       }
     }
-    return safeStore.get('mangyang_meeting_votes', fallback);
-  },
 
-  async saveMeetingVote(vote: MeetingVote): Promise<void> {
-    if (isSupabaseConfigured()) {
-      await supabaseDb.upsertMeetingVote(vote);
-    }
-  },
+    const current = safeStore.get<LectureItem[]>('mangyang_lectures', []);
+    const updated = current.filter((l) => l.id !== lectureId);
+    safeStore.set('mangyang_lectures', updated);
 
-  async resetMeetingVotes(): Promise<void> {
-    if (isSupabaseConfigured()) {
-      await supabaseDb.clearMeetingVotes();
-    }
+    return { success: true };
   },
 
   // =========================================================================
-  // 6. MEETING DOCUMENTS
+  // 5. SITE CONFIG & CẤU HÌNH GIAO DIỆN
+  // =========================================================================
+  async loadSiteConfig(fallback: SiteConfig): Promise<SiteConfig> {
+    if (isSupabaseConfigured()) {
+      try {
+        const remote = await supabaseDb.fetchSiteConfig();
+        if (remote !== null) {
+          safeStore.set('mangyang_site_config', remote);
+          return remote;
+        }
+      } catch (e) {
+        console.warn('Supabase loadSiteConfig error:', e);
+      }
+    }
+    return safeStore.get('mangyang_site_config', fallback);
+  },
+
+  async saveSiteConfig(config: SiteConfig): Promise<{ success: boolean; error?: string }> {
+    safeStore.set('mangyang_site_config', config);
+    if (isSupabaseConfigured()) {
+      const res = await supabaseDb.upsertSiteConfig(config);
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu cấu hình giao diện' };
+      }
+    }
+    return { success: true };
+  },
+
+  // =========================================================================
+  // 6. MEETING ROOMS & THIẾT LẬP PHÒNG HỌP CHI BỘ
+  // =========================================================================
+  async loadMeetingRooms(fallback: MeetingRoomItem[]): Promise<MeetingRoomItem[]> {
+    if (isSupabaseConfigured()) {
+      try {
+        const remote = await supabaseDb.fetchMeetingRooms();
+        if (remote !== null && remote.length > 0) {
+          safeStore.set('mangyang_meeting_rooms', remote);
+          return remote;
+        }
+      } catch (e) {
+        console.warn('Supabase loadMeetingRooms error:', e);
+      }
+    }
+    return safeStore.get('mangyang_meeting_rooms', fallback);
+  },
+
+  async saveMeetingRoom(room: MeetingRoomItem, _updatedList?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured()) {
+      const res = await supabaseDb.upsertMeetingRoom(room);
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu phòng họp' };
+      }
+    }
+
+    const current = safeStore.get<MeetingRoomItem[]>('mangyang_meeting_rooms', []);
+    const exists = current.some((r) => r.id === room.id);
+    const updated = exists ? current.map((r) => (r.id === room.id ? room : r)) : [room, ...current];
+    safeStore.set('mangyang_meeting_rooms', updated);
+
+    return { success: true };
+  },
+
+  async saveMeetingRooms(rooms: MeetingRoomItem[]): Promise<void> {
+    safeStore.set('mangyang_meeting_rooms', rooms);
+    if (isSupabaseConfigured()) {
+      for (const r of rooms) {
+        await supabaseDb.upsertMeetingRoom(r);
+      }
+    }
+  },
+
+  async deleteMeetingRoom(roomId: string, _updatedList?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string }> {
+    if (isSupabaseConfigured()) {
+      const res = await supabaseDb.deleteMeetingRoom(roomId);
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi xóa phòng họp' };
+      }
+    }
+
+    const current = safeStore.get<MeetingRoomItem[]>('mangyang_meeting_rooms', []);
+    const updated = current.filter((r) => r.id !== roomId);
+    safeStore.set('mangyang_meeting_rooms', updated);
+
+    return { success: true };
+  },
+
+  // =========================================================================
+  // 7. MEETING DOCUMENTS / TÀI LIỆU CUỘC HỌP
   // =========================================================================
   async loadMeetingDocuments(fallback: MeetingDocumentItem[]): Promise<MeetingDocumentItem[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchMeetingDocuments();
-        if (remote !== null) {
-          safeStore.set('mangyang_meeting_docs', remote);
+        if (remote !== null && remote.length > 0) {
+          safeStore.set('mangyang_meeting_documents', remote);
           return remote;
         }
       } catch (e) {
         console.warn('Supabase loadMeetingDocuments error:', e);
       }
     }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchMeetingDocuments();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_meeting_docs', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadMeetingDocuments error:', e);
-      }
-    }
-
-    return safeStore.get('mangyang_meeting_docs', fallback);
+    return safeStore.get('mangyang_meeting_documents', fallback);
   },
 
   async saveMeetingDocument(doc: MeetingDocumentItem): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertMeetingDocument(doc);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu tài liệu phòng họp';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertMeetingDocument(doc);
-      if (fbRes) saved = true;
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi lưu tài liệu họp' };
+      }
     }
 
-    const currentList = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_docs', []);
-    const exists = currentList.some((d) => d.id === doc.id);
-    const updated = exists ? currentList.map((d) => (d.id === doc.id ? doc : d)) : [doc, ...currentList];
-    safeStore.set('mangyang_meeting_docs', updated);
+    const current = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_documents', []);
+    const exists = current.some((d) => d.id === doc.id);
+    const updated = exists ? current.map((d) => (d.id === doc.id ? doc : d)) : [doc, ...current];
+    safeStore.set('mangyang_meeting_documents', updated);
 
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
-  async deleteMeetingDocument(docId: number): Promise<{ success: boolean; error?: string }> {
-    let deleted = false;
-    let errorMsg = '';
-
+  async deleteMeetingDocument(docId: number | string): Promise<{ success: boolean; error?: string }> {
     if (isSupabaseConfigured()) {
-      const res = await supabaseDb.deleteMeetingDocument(docId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa tài liệu họp';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteMeetingDocument(docId);
-      if (fbRes) deleted = true;
+      const res = await supabaseDb.deleteMeetingDocument(Number(docId));
+      if (!res.success) {
+        return { success: false, error: res.error || 'Lỗi xóa tài liệu họp' };
+      }
     }
 
-    const currentList = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_docs', []);
-    const updated = currentList.filter((d) => d.id !== docId);
-    safeStore.set('mangyang_meeting_docs', updated);
+    const current = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_documents', []);
+    const updated = current.filter((d) => String(d.id) !== String(docId));
+    safeStore.set('mangyang_meeting_documents', updated);
 
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   // =========================================================================
-  // 7. MEETING SETTINGS & PASSWORD
+  // 8. MEETING SETTINGS / CẤU HÌNH PHÒNG HỌP
   // =========================================================================
   async loadMeetingSettings(fallback: MeetingRoomSettings): Promise<MeetingRoomSettings> {
     if (isSupabaseConfigured()) {
@@ -521,273 +409,87 @@ export const cloudStorage = {
   },
 
   async saveMeetingSettings(settings: MeetingRoomSettings): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
+    safeStore.set('mangyang_meeting_settings', settings);
     if (isSupabaseConfigured()) {
       const res = await supabaseDb.upsertMeetingSettings(settings);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu cấu hình phòng họp';
+      return res;
     }
-
-    safeStore.set('mangyang_meeting_settings', settings);
-
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
+    return { success: true };
   },
 
   // =========================================================================
-  // 8. MULTI-MEETING ROOMS
+  // 9. MEETING VOTES / BIỂU QUYẾT
   // =========================================================================
-  async loadMeetingRooms(fallback: MeetingRoomItem[]): Promise<MeetingRoomItem[]> {
+  async loadMeetingVotes(fallback: Record<string, MeetingVote>): Promise<Record<string, MeetingVote>> {
     if (isSupabaseConfigured()) {
       try {
-        const remote = await supabaseDb.fetchMeetingRooms();
-        if (remote !== null) {
-          safeStore.set('mangyang_meeting_rooms', remote);
-          return remote;
+        const remote = await supabaseDb.fetchMeetingVotes();
+        if (remote && Object.keys(remote).length > 0) {
+          safeStore.set('mangyang_meeting_votes', remote as any);
+          return remote as any;
         }
       } catch (e) {
-        console.warn('Supabase loadMeetingRooms error:', e);
+        console.warn('Supabase loadMeetingVotes error:', e);
       }
     }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchMeetingRooms();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_meeting_rooms', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadMeetingRooms error:', e);
-      }
-    }
-
-    return safeStore.get('mangyang_meeting_rooms', fallback);
+    return safeStore.get('mangyang_meeting_votes', fallback);
   },
 
-  async saveMeetingRooms(rooms: MeetingRoomItem[]): Promise<void> {
-    safeStore.set('mangyang_meeting_rooms', rooms.slice(0, 30));
-    if (isSupabaseConfigured()) {
-      rooms.forEach((r) => supabaseDb.upsertMeetingRoom(r));
-    }
-    if (isFirebaseConfigured()) {
-      rooms.forEach((r) => firestoreDb.upsertMeetingRoom(r));
-    }
-  },
-
-  async saveMeetingRoom(room: MeetingRoomItem, currentRooms?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string; updatedRooms: MeetingRoomItem[] }> {
-    const list = currentRooms || safeStore.get('mangyang_meeting_rooms', []);
-    const exists = list.some((r: MeetingRoomItem) => r.id === room.id);
-    let updated: MeetingRoomItem[];
-    if (exists) {
-      updated = list.map((r: MeetingRoomItem) => (r.id === room.id ? room : r));
-    } else {
-      updated = [room, ...list].slice(0, 30);
-    }
-    safeStore.set('mangyang_meeting_rooms', updated);
-
-    let saved = false;
-    let errorMsg = '';
+  async saveMeetingVote(vote: MeetingVote): Promise<void> {
+    const current = safeStore.get<Record<string, MeetingVote>>('mangyang_meeting_votes', {});
+    current[vote.userId] = vote;
+    safeStore.set('mangyang_meeting_votes', current);
 
     if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertMeetingRoom(room);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu phòng họp';
+      await supabaseDb.upsertMeetingVote(vote);
     }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertMeetingRoom(room);
-      if (fbRes) saved = true;
-    }
-
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true, updatedRooms: updated };
-    }
-    return { success: false, error: errorMsg, updatedRooms: updated };
   },
 
-  async deleteMeetingRoom(roomId: string, currentRooms?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string; updatedRooms: MeetingRoomItem[] }> {
-    const list = currentRooms || safeStore.get('mangyang_meeting_rooms', []);
-    const updated = list.filter((r: MeetingRoomItem) => r.id !== roomId);
-    safeStore.set('mangyang_meeting_rooms', updated);
-
-    let deleted = false;
-    let errorMsg = '';
-
+  async resetMeetingVotes(): Promise<void> {
+    safeStore.set('mangyang_meeting_votes', {});
     if (isSupabaseConfigured()) {
-      const res = await supabaseDb.deleteMeetingRoom(roomId);
-      if (res.success) deleted = true;
-      else errorMsg = res.error || 'Lỗi xóa phòng họp';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.deleteMeetingRoom(roomId);
-      if (fbRes) deleted = true;
-    }
-
-    if (deleted || !cloudStorage.isCloudActive()) {
-      return { success: true, updatedRooms: updated };
-    }
-    return { success: false, error: errorMsg, updatedRooms: updated };
-  },
-
-  // =========================================================================
-  // 8.1. REAL-TIME COLLABORATIVE PRESENCE & LIVE SYNC (Firebase/Supabase)
-  // =========================================================================
-  subscribeRoomPresence(roomId: string, onUpdate: (presenceList: RoomPresenceItem[]) => void): (() => void) | null {
-    if (isFirebaseConfigured()) {
-      return firestoreDb.subscribeRoomPresence(roomId, onUpdate);
-    }
-    return null;
-  },
-
-  async updateRoomPresence(presence: RoomPresenceItem): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.updateRoomPresence(presence);
-    }
-  },
-
-  async removeRoomPresence(roomId: string, userId: number): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.removeRoomPresence(roomId, userId);
-    }
-  },
-
-  subscribeCollabDoc(roomId: string, docId: number, onUpdate: (docData: CollabDocData) => void): (() => void) | null {
-    if (isFirebaseConfigured()) {
-      return firestoreDb.subscribeCollabDoc(roomId, docId, onUpdate);
-    }
-    return null;
-  },
-
-  async saveCollabDoc(roomId: string, docId: number, docData: Partial<CollabDocData>): Promise<void> {
-    const key = `collab_doc_${roomId}_${docId}`;
-    safeStore.set(key, docData);
-    if (isFirebaseConfigured()) {
-      await firestoreDb.upsertCollabDoc(roomId, docId, docData);
-    }
-  },
-
-  subscribeRoomActions(roomId: string, onUpdate: (actions: RoomBroadcastAction[]) => void): (() => void) | null {
-    if (isFirebaseConfigured()) {
-      return firestoreDb.subscribeRoomActions(roomId, onUpdate);
-    }
-    return null;
-  },
-
-  async broadcastRoomAction(action: RoomBroadcastAction): Promise<void> {
-    if (isFirebaseConfigured()) {
-      await firestoreDb.broadcastRoomAction(action);
+      await supabaseDb.clearMeetingVotes();
     }
   },
 
   // =========================================================================
-  // 9. SITE CONFIG
-  // =========================================================================
-  async loadSiteConfig(fallback: SiteConfig): Promise<SiteConfig> {
-    if (isSupabaseConfigured()) {
-      try {
-        const remote = await supabaseDb.fetchSiteConfig();
-        if (remote !== null) {
-          safeStore.set('mangyang_site_config', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Supabase loadSiteConfig error:', e);
-      }
-    }
-
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchSiteConfig();
-        if (remote !== null) {
-          safeStore.set('mangyang_site_config', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadSiteConfig error:', e);
-      }
-    }
-
-    return safeStore.get('mangyang_site_config', fallback);
-  },
-
-  async saveSiteConfig(config: SiteConfig): Promise<{ success: boolean; error?: string }> {
-    let saved = false;
-    let errorMsg = '';
-
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertSiteConfig(config);
-      if (res.success) saved = true;
-      else errorMsg = res.error || 'Lỗi lưu cấu hình vào Supabase';
-    }
-    if (isFirebaseConfigured()) {
-      const fbRes = await firestoreDb.upsertSiteConfig(config);
-      if (fbRes) saved = true;
-    }
-
-    safeStore.set('mangyang_site_config', config);
-
-    if (saved || !cloudStorage.isCloudActive()) {
-      return { success: true };
-    }
-    return { success: false, error: errorMsg };
-  },
-
-  // =========================================================================
-  // 10. UNCLE HO QUOTES & SETTINGS
+  // 10. BÁC HỒ & LỜI DẠY
   // =========================================================================
   async loadUncleHoQuotes(fallback: UncleHoQuote[]): Promise<UncleHoQuote[]> {
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchUncleHoQuotes();
-        if (remote !== null && remote.length > 0) {
-          safeStore.set('mangyang_uncle_ho_quotes', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadUncleHoQuotes error:', e);
-      }
-    }
     return safeStore.get('mangyang_uncle_ho_quotes', fallback);
   },
 
   async saveUncleHoQuotes(quotes: UncleHoQuote[]): Promise<void> {
     safeStore.set('mangyang_uncle_ho_quotes', quotes);
-    if (isFirebaseConfigured()) {
-      await firestoreDb.upsertUncleHoQuotes(quotes);
-    }
   },
 
   async loadUncleHoSettings(fallback: UncleHoSettings): Promise<UncleHoSettings> {
-    if (isFirebaseConfigured()) {
-      try {
-        const remote = await firestoreDb.fetchUncleHoSettings();
-        if (remote !== null) {
-          safeStore.set('mangyang_uncle_ho_settings', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Firestore loadUncleHoSettings error:', e);
-      }
-    }
     return safeStore.get('mangyang_uncle_ho_settings', fallback);
   },
 
   async saveUncleHoSettings(settings: UncleHoSettings): Promise<void> {
     safeStore.set('mangyang_uncle_ho_settings', settings);
-    if (isFirebaseConfigured()) {
-      await firestoreDb.upsertUncleHoSettings(settings);
-    }
   },
 
   // =========================================================================
-  // 11. GLOBAL REALTIME SUBSCRIPTION (SUPABASE & FIRESTORE)
+  // 11. COLLABORATION WORKSPACE METHODS (SAFE NO-OP / IN-MEMORY)
+  // =========================================================================
+  subscribeRoomPresence: (_roomId: string, _callback: (list: RoomPresenceItem[]) => void) => () => {},
+  subscribeCollabDoc: (_roomId: string, _docId: number, _callback: (doc: CollabDocData | null) => void) => () => {},
+  subscribeRoomActions: (_roomId: string, _callback: (actions: RoomBroadcastAction[]) => void) => () => {},
+  updateRoomPresence: async (_userOrRoom: RoomPresenceItem | string, _user?: RoomPresenceItem) => {},
+  removeRoomPresence: async (_roomId: string, _userId: number) => {},
+  saveCollabDoc: async (_roomId: string, _docId: number, _docData: CollabDocData) => {},
+  broadcastRoomAction: async (_actionOrRoom: RoomBroadcastAction | string, _action?: RoomBroadcastAction) => {},
+
+  // =========================================================================
+  // 12. GLOBAL REALTIME SUBSCRIPTION (EXCLUSIVELY SUPABASE)
   // =========================================================================
   subscribeAll(callbacks: {
     onArticlesChange?: (articles: Article[]) => void;
+    onArticleInsert?: (article: Article) => void;
+    onArticleUpdate?: (article: Article) => void;
+    onArticleDelete?: (articleId: number) => void;
     onDocumentsChange?: (docs: DocumentItem[]) => void;
     onLecturesChange?: (lectures: LectureItem[]) => void;
     onMeetingSettingsChange?: (settings: MeetingRoomSettings) => void;
@@ -796,32 +498,9 @@ export const cloudStorage = {
     onSiteConfigChange?: (config: SiteConfig) => void;
     onUsersChange?: (users: User[]) => void;
   }): (() => void) | null {
-    const unsubs: Array<(() => void) | null> = [];
-
     if (isSupabaseConfigured()) {
-      const unsubSupa = supabaseDb.subscribeAllChanges(callbacks);
-      if (unsubSupa) unsubs.push(unsubSupa);
+      return supabaseDb.subscribeAllChanges(callbacks);
     }
-
-    if (isFirebaseConfigured()) {
-      if (callbacks.onArticlesChange) unsubs.push(firestoreDb.subscribeArticles(callbacks.onArticlesChange));
-      if (callbacks.onDocumentsChange) unsubs.push(firestoreDb.subscribeDocuments(callbacks.onDocumentsChange));
-      if (callbacks.onLecturesChange) unsubs.push(firestoreDb.subscribeLectures(callbacks.onLecturesChange));
-      if (callbacks.onMeetingRoomsChange) unsubs.push(firestoreDb.subscribeMeetingRooms(callbacks.onMeetingRoomsChange));
-      if (callbacks.onMeetingDocumentsChange) unsubs.push(firestoreDb.subscribeMeetingDocuments(callbacks.onMeetingDocumentsChange));
-      if (callbacks.onSiteConfigChange) unsubs.push(firestoreDb.subscribeSiteConfig(callbacks.onSiteConfigChange));
-    }
-
-    return () => {
-      unsubs.forEach((u) => {
-        if (u) {
-          try {
-            u();
-          } catch (e) {
-            // ignore
-          }
-        }
-      });
-    };
+    return null;
   },
 };

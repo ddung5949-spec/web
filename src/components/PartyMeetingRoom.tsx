@@ -465,15 +465,23 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
           }
         }
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status, err) => {
         if (status === 'SUBSCRIBED' && currentUser) {
-          await channel.track({
-            userId: currentUser.id,
-            userName: currentUser.fullName,
-            rankUnit: currentUser.rankUnit || currentUser.rank || 'Đảng ủy viên',
-            avatar: currentUser.avatar,
-            joinedAt: new Date().toISOString(),
-          });
+          try {
+            await channel.track({
+              userId: currentUser.id,
+              userName: currentUser.fullName,
+              rankUnit: currentUser.rankUnit || currentUser.rank || 'Đảng ủy viên',
+              avatar: currentUser.avatar,
+              joinedAt: new Date().toISOString(),
+            });
+          } catch {
+            // ignore presence tracking error
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (err) {
+            console.warn('[PartyMeetingRoom] Channel notice (' + status + '):', err.message || err);
+          }
         }
       });
 
