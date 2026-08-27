@@ -38,6 +38,7 @@ interface SectionViewProps {
   articles: Article[];
   currentUser: User | null;
   siteConfig?: SiteConfig;
+  isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onOpenPostModal: (section: SectionType) => void;
   onEditArticle?: (article: Article) => void;
@@ -55,6 +56,7 @@ export const SectionView: React.FC<SectionViewProps> = ({
   articles,
   currentUser,
   siteConfig,
+  isLoading = false,
   onOpenArticle,
   onOpenPostModal,
   onEditArticle,
@@ -470,6 +472,7 @@ export const SectionView: React.FC<SectionViewProps> = ({
             articles={filteredArticles}
             selectedCategory={selectedCategory}
             searchQuery={searchQuery}
+            isLoading={isLoading}
             canEdit={isAdmin}
             canDelete={isAdmin}
             onOpenArticle={onOpenArticle}

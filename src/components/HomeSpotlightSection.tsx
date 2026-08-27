@@ -15,13 +15,14 @@ import {
   UserPen,
 } from 'lucide-react';
 import { Article, User } from '../types';
-import { defaultArticles } from '../data/initialData';
 import { SpotlightArticleSelectModal } from './modals/SpotlightArticleSelectModal';
+import { SpotlightSkeleton } from './SkeletonLoader';
 
 interface HomeSpotlightSectionProps {
   articles: Article[];
   spotlightArticleId?: number;
   currentUser: User | null;
+  isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onEditArticle?: (article: Article) => void;
   onSelectSpotlightArticle?: (articleId: number) => void;
@@ -31,6 +32,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   articles,
   spotlightArticleId,
   currentUser,
+  isLoading = false,
   onOpenArticle,
   onEditArticle,
   onSelectSpotlightArticle,
@@ -38,21 +40,31 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   const isAdmin = currentUser?.role === 'admin';
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
 
-  // Safe articles pool with fallback
-  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
+  if (isLoading) {
+    return <SpotlightSkeleton />;
+  }
 
-  // Find the primary spotlight article
+  // Find the primary spotlight article from real articles
   const primaryArticle =
-    (spotlightArticleId ? effectiveArticles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
-    effectiveArticles[0] ||
-    defaultArticles[0];
+    (spotlightArticleId ? articles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
+    articles[0];
 
   // Secondary sub-featured articles
-  const subArticles = effectiveArticles
+  const subArticles = articles
     .filter((a) => String(a.id) !== String(primaryArticle?.id))
     .slice(0, 2);
 
-  if (!primaryArticle) return null;
+  if (!primaryArticle) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+        <div className="w-10 h-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center mx-auto mb-2">
+          <Flame className="w-5 h-5" />
+        </div>
+        <p className="text-xs font-bold text-gray-700">Chưa có bài đăng tiêu biểu</p>
+        <p className="text-[11px] text-gray-400 mt-1">Bài viết mới được phê duyệt sẽ hiển thị tại đây.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col justify-between">

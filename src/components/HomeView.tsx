@@ -71,6 +71,7 @@ interface HomeViewProps {
   uncleHoSettings?: UncleHoSettings;
   currentUser?: User | null;
   siteConfig?: SiteConfig;
+  isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onSelectSection: (section: PageView) => void;
   onEditArticle?: (article: Article) => void;
@@ -101,6 +102,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   },
   currentUser = null,
   siteConfig,
+  isLoading = false,
   onOpenArticle,
   onSelectSection,
   onEditArticle,
@@ -355,6 +357,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   quotes={uncleHoQuotes}
                   settings={uncleHoSettings}
                   currentUser={currentUser}
+                  isLoading={isLoading}
                   onOpenManager={onOpenUncleHoManager}
                   onSaveQuotes={onSaveUncleHoQuotes}
                   layout="vertical"
@@ -366,6 +369,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   announcements={announcements}
                   currentUser={currentUser}
                   articles={approvedArticles}
+                  isLoading={isLoading}
                   onOpenArticle={onOpenArticle}
                   onOpenAnnouncementManager={onOpenAnnouncementManager}
                 />
@@ -380,6 +384,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <HomeMiddleFeaturedSlider
                   articles={approvedArticles}
                   currentUser={currentUser}
+                  isLoading={isLoading}
                   onOpenArticle={onOpenArticle}
                   onEditArticle={onEditArticle}
                   onDeleteArticle={onDeleteArticle}
@@ -391,6 +396,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   articles={approvedArticles}
                   spotlightArticleId={siteConfig?.spotlightArticleId}
                   currentUser={currentUser}
+                  isLoading={isLoading}
                   onOpenArticle={onOpenArticle}
                   onEditArticle={onEditArticle}
                   onSelectSpotlightArticle={onSelectSpotlightArticle}
@@ -405,6 +411,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               {showLatestNews && (
                 <HomeLatestNewsWidget
                   articles={approvedArticles}
+                  isLoading={isLoading}
                   onOpenArticle={onOpenArticle}
                   onSelectSection={onSelectSection}
                 />
@@ -543,6 +550,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             Chưa cấu hình mã nhúng hoặc liên kết nguồn
                           </div>
                         )}
+                      </div>
+                    ) : isLoading ? (
+                      <div className="p-3 divide-y divide-gray-100 space-y-2.5 flex-1">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="pt-2 first:pt-0 space-y-1.5 animate-pulse">
+                            <div className="w-11/12 h-3.5 bg-gray-200 rounded" />
+                            <div className="w-1/2 h-2.5 bg-gray-200 rounded" />
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">

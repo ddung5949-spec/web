@@ -1842,6 +1842,7 @@ export function App() {
                 uncleHoSettings={uncleHoSettings}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
+                isLoading={isLoadingData}
                 onOpenArticle={handleOpenArticle}
                 onSelectSection={handleSelectPage}
                 onEditArticle={handleOpenEditArticleModal}
@@ -1866,6 +1867,7 @@ export function App() {
                 articles={articles}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
+                isLoading={isLoadingData}
                 onOpenArticle={handleOpenArticle}
                 onOpenPostModal={handleOpenPostModal}
                 onEditArticle={handleOpenEditArticleModal}
@@ -1893,6 +1895,7 @@ export function App() {
                       quotes={uncleHoQuotes}
                       settings={uncleHoSettings}
                       currentUser={currentUser}
+                      isLoading={isLoadingData}
                       onOpenManager={() => setUncleHoManagerOpen(true)}
                       onSaveQuotes={handleSaveUncleHoQuotes}
                       layout="vertical"
@@ -1903,6 +1906,7 @@ export function App() {
                       announcements={siteConfig.homeAnnouncements || defaultHomeAnnouncements}
                       currentUser={currentUser}
                       articles={approvedArticles}
+                      isLoading={isLoadingData}
                       onOpenArticle={handleOpenArticle}
                       onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
                     />
@@ -1929,6 +1933,7 @@ export function App() {
                     {/* Top Block: Tin mới nhất */}
                     <HomeLatestNewsWidget
                       articles={approvedArticles}
+                      isLoading={isLoadingData}
                       onOpenArticle={handleOpenArticle}
                       onSelectSection={handleSelectPage}
                     />

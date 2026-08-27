@@ -42,8 +42,6 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   onSaveQuotes,
   onSaveSettings,
 }) => {
-  if (!isOpen) return null;
-
   const [activeTab, setActiveTab] = useState<'schedule' | 'upload_folder' | 'quote_list' | 'add_quote'>('schedule');
 
   // Settings local state
@@ -66,6 +64,8 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   const [folderTargetDate, setFolderTargetDate] = useState('19/08');
   const [searchQuoteTerm, setSearchQuoteTerm] = useState('');
   const [isProcessingFolder, setIsProcessingFolder] = useState(false);
+
+  if (!isOpen) return null;
 
   // Handle Save Settings
   const handleSaveSettingsSubmit = (e: React.FormEvent) => {

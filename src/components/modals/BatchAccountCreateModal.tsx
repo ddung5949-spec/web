@@ -53,8 +53,6 @@ export const BatchAccountCreateModal: React.FC<BatchAccountCreateModalProps> = (
   existingUsers,
   onBatchCreate,
 }) => {
-  if (!isOpen) return null;
-
   // Unlinked profiles (do not have a userId yet)
   const unlinkedProfiles = useMemo(
     () => militaryProfiles.filter((p) => !p.userId),
@@ -123,6 +121,8 @@ export const BatchAccountCreateModal: React.FC<BatchAccountCreateModalProps> = (
         };
       });
   }, [unlinkedProfiles, selectedProfileIds, usernameRule, customPrefix, defaultPassword, defaultRole, existingUsers]);
+
+  if (!isOpen) return null;
 
   // Execute Batch Creation
   const handleConfirm = () => {

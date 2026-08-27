@@ -61,11 +61,11 @@ export const cloudStorage = {
   // =========================================================================
   // 1. ARTICLES & TIN TỨC (DATABASE-FIRST EXCLUSIVELY VIA SUPABASE)
   // =========================================================================
-  async loadArticles(fallback: Article[]): Promise<Article[]> {
+  async loadArticles(fallback: Article[] = []): Promise<Article[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchArticles();
-        if (remote !== null && remote.length > 0) {
+        if (remote !== null) {
           return remote;
         }
       } catch (e) {
@@ -157,11 +157,11 @@ export const cloudStorage = {
   // =========================================================================
   // 3. DOCUMENTS / VĂN BẢN
   // =========================================================================
-  async loadDocuments(fallback: DocumentItem[]): Promise<DocumentItem[]> {
+  async loadDocuments(fallback: DocumentItem[] = []): Promise<DocumentItem[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchDocuments();
-        if (remote !== null && remote.length > 0) {
+        if (remote !== null) {
           safeStore.set('mangyang_documents', remote);
           return remote;
         }
@@ -206,11 +206,11 @@ export const cloudStorage = {
   // =========================================================================
   // 4. LECTURES / BÀI GIẢNG ĐIỆN TỬ
   // =========================================================================
-  async loadLectures(fallback: LectureItem[]): Promise<LectureItem[]> {
+  async loadLectures(fallback: LectureItem[] = []): Promise<LectureItem[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchLectures();
-        if (remote !== null && remote.length > 0) {
+        if (remote !== null) {
           safeStore.set('mangyang_lectures', remote);
           return remote;
         }
@@ -286,11 +286,11 @@ export const cloudStorage = {
   // =========================================================================
   // 6. MEETING ROOMS & THIẾT LẬP PHÒNG HỌP CHI BỘ
   // =========================================================================
-  async loadMeetingRooms(fallback: MeetingRoomItem[]): Promise<MeetingRoomItem[]> {
+  async loadMeetingRooms(fallback: MeetingRoomItem[] = []): Promise<MeetingRoomItem[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchMeetingRooms();
-        if (remote !== null && remote.length > 0) {
+        if (remote !== null) {
           safeStore.set('mangyang_meeting_rooms', remote);
           return remote;
         }
@@ -344,11 +344,11 @@ export const cloudStorage = {
   // =========================================================================
   // 7. MEETING DOCUMENTS / TÀI LIỆU CUỘC HỌP
   // =========================================================================
-  async loadMeetingDocuments(fallback: MeetingDocumentItem[]): Promise<MeetingDocumentItem[]> {
+  async loadMeetingDocuments(fallback: MeetingDocumentItem[] = []): Promise<MeetingDocumentItem[]> {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchMeetingDocuments();
-        if (remote !== null && remote.length > 0) {
+        if (remote !== null) {
           safeStore.set('mangyang_meeting_documents', remote);
           return remote;
         }

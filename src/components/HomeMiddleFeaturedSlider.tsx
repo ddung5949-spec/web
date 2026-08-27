@@ -10,11 +10,12 @@ import {
   UserPen,
 } from 'lucide-react';
 import { Article, User } from '../types';
-import { defaultArticles } from '../data/initialData';
+import { SliderSkeleton } from './SkeletonLoader';
 
 interface HomeMiddleFeaturedSliderProps {
   articles: Article[];
   currentUser: User | null;
+  isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onEditArticle?: (article: Article) => void;
   onDeleteArticle?: (articleId: number) => void;
@@ -25,13 +26,13 @@ export const HomeMiddleFeaturedSlider: React.FC<
 > = ({
   articles,
   currentUser,
+  isLoading = false,
   onOpenArticle,
   onEditArticle,
   onDeleteArticle,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
-  const featuredArticles = effectiveArticles.slice(0, 5);
+  const featuredArticles = articles.slice(0, 5);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -43,6 +44,10 @@ export const HomeMiddleFeaturedSlider: React.FC<
     }, 5000);
     return () => clearInterval(interval);
   }, [featuredArticles.length, isHovered]);
+
+  if (isLoading) {
+    return <SliderSkeleton />;
+  }
 
   const currentArticle = featuredArticles[currentIndex] || featuredArticles[0];
 

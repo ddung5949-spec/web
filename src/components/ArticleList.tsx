@@ -2,11 +2,13 @@ import React from 'react';
 import { BookOpen, Edit3, Eye, Filter, Trash2, UserPen } from 'lucide-react';
 import { Article } from '../types';
 import { ArticleCard } from './ArticleCard';
+import { ArticleCardSkeleton } from './SkeletonLoader';
 
 interface ArticleListProps {
   articles: Article[];
   selectedCategory?: string;
   searchQuery?: string;
+  isLoading?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
   onOpenArticle: (article: Article) => void;
@@ -20,6 +22,7 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   articles,
   selectedCategory = 'all',
   searchQuery = '',
+  isLoading = false,
   canEdit = false,
   canDelete = false,
   onOpenArticle,
@@ -28,6 +31,16 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   onResetFilter,
   onOpenPostModal,
 }) => {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <ArticleCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {articles.length > 0 ? (

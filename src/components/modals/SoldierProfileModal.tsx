@@ -38,8 +38,6 @@ export const SoldierProfileModal: React.FC<SoldierProfileModalProps> = ({
   roles,
   defaultUnit = 'Ban Tuyên huấn - Phòng Chính trị Sư đoàn 10',
 }) => {
-  if (!isOpen) return null;
-
   const isEditing = !!profile;
 
   const [formData, setFormData] = useState<MilitaryProfile>(() => {
@@ -79,6 +77,8 @@ export const SoldierProfileModal: React.FC<SoldierProfileModalProps> = ({
   const [newAccountPassword, setNewAccountPassword] = useState('123456');
   const [newAccountRole, setNewAccountRole] = useState<string>('user');
   const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
 
   // Available users not yet linked to other soldiers (or currently linked to this soldier)
   const availableUsers = allUsers.filter(

@@ -1,11 +1,13 @@
 import React from 'react';
 import { Bell, ChevronRight, ExternalLink, Megaphone, Settings2 } from 'lucide-react';
 import { Article, HomeAnnouncement, User } from '../types';
+import { AnnouncementsSkeleton } from './SkeletonLoader';
 
 interface HomeAnnouncementsWidgetProps {
   announcements: HomeAnnouncement[];
   currentUser: User | null;
   articles?: Article[];
+  isLoading?: boolean;
   onOpenArticle?: (article: Article) => void;
   onOpenAnnouncementManager?: () => void;
 }
@@ -14,10 +16,15 @@ export const HomeAnnouncementsWidget: React.FC<HomeAnnouncementsWidgetProps> = (
   announcements,
   currentUser,
   articles = [],
+  isLoading = false,
   onOpenArticle,
   onOpenAnnouncementManager,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
+
+  if (isLoading) {
+    return <AnnouncementsSkeleton />;
+  }
 
   const handleClickItem = (ann: HomeAnnouncement) => {
     if (ann.link) {

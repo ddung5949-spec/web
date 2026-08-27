@@ -26,11 +26,13 @@ import {
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings, User } from '../types';
 import { compressImageFile, validateImageFile } from '../utils/imageUtils';
+import { UncleHoSkeleton } from './SkeletonLoader';
 
 interface UncleHoDailySectionProps {
   quotes: UncleHoQuote[];
   settings: UncleHoSettings;
   currentUser: User | null;
+  isLoading?: boolean;
   onOpenManager: () => void;
   onSaveQuotes?: (quotes: UncleHoQuote[]) => void;
   onSelectDay?: (quote: UncleHoQuote) => void;
@@ -38,9 +40,14 @@ interface UncleHoDailySectionProps {
 }
 
 export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
-  quotes,
-  settings,
+  quotes = [],
+  settings = {
+    autoSelectToday: true,
+    bannerTitle: 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+    showQuoteOfTheDay: true,
+  },
   currentUser,
+  isLoading = false,
   onOpenManager,
   onSaveQuotes,
 }) => {
@@ -54,15 +61,15 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // Determine which quote to show
   const [selectedDayStr, setSelectedDayStr] = useState<string>(() => {
-    if (settings.autoSelectToday) {
-      const matchToday = quotes.find((q) => q.dayMonth === todayStr);
+    if (settings?.autoSelectToday) {
+      const matchToday = quotes?.find((q) => q.dayMonth === todayStr);
       if (matchToday) return todayStr;
     }
-    if (settings.activeQuoteId) {
-      const matchActive = quotes.find((q) => q.id === settings.activeQuoteId);
+    if (settings?.activeQuoteId) {
+      const matchActive = quotes?.find((q) => q.id === settings.activeQuoteId);
       if (matchActive) return matchActive.dayMonth;
     }
-    return quotes[0]?.dayMonth || todayStr;
+    return quotes?.[0]?.dayMonth || todayStr;
   });
 
   // Carousel and Display states
@@ -85,8 +92,8 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // Find active quote
   const currentQuote: UncleHoQuote =
-    quotes.find((q) => q.dayMonth === selectedDayStr) ||
-    quotes[0] || {
+    quotes?.find((q) => q.dayMonth === selectedDayStr) ||
+    quotes?.[0] || {
       id: 'default',
       dayMonth: todayStr,
       yearRecorded: '1945',
@@ -119,6 +126,44 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     }, 4500);
     return () => clearInterval(interval);
   }, [isAutoPlay, imagesList.length]);
+
+  if (isLoading) {
+    return <UncleHoSkeleton />;
+  }
+
+  if (!quotes || quotes.length === 0) {
+    return (
+      <div
+        id="uncle-ho-daily-section"
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] to-[#FFF8E7] text-gray-900 shadow-md border border-amber-400/70 p-4 flex flex-col justify-between h-full min-h-[350px]"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-amber-300/60">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-red-900 flex items-center justify-center">
+              <Star className="w-2.5 h-2.5 text-amber-300 fill-amber-300" />
+            </div>
+            <h2 className="text-xs font-black uppercase text-red-900">
+              LỜI BÁC DẠY NGÀY NÀY NĂM XƯA
+            </h2>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onOpenManager}
+              className="bg-amber-100 hover:bg-amber-200 text-red-900 text-[10px] font-bold px-2 py-1 rounded-md border border-amber-300 cursor-pointer"
+            >
+              Quản lý
+            </button>
+          )}
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-500">
+          <Quote className="w-8 h-8 text-amber-300 mb-2 opacity-60" />
+          <p className="text-xs font-bold text-gray-700">Chưa có dữ liệu Lời Bác dạy</p>
+          <p className="text-[11px] text-gray-400 mt-1">Dữ liệu đang được cập nhật từ hệ thống.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Open Quick Edit
   const handleOpenQuickEdit = () => {

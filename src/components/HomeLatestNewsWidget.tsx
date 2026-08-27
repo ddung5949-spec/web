@@ -1,21 +1,26 @@
 import React from 'react';
 import { ChevronRight, Newspaper } from 'lucide-react';
 import { Article, PageView } from '../types';
-import { defaultArticles } from '../data/initialData';
+import { LatestNewsSkeleton } from './SkeletonLoader';
 
 interface HomeLatestNewsWidgetProps {
   articles: Article[];
+  isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onSelectSection: (section: PageView) => void;
 }
 
 export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
   articles,
+  isLoading = false,
   onOpenArticle,
   onSelectSection,
 }) => {
-  const effectiveArticles = articles && articles.length > 0 ? articles : defaultArticles;
-  const latestArticles = effectiveArticles.slice(0, 5);
+  if (isLoading) {
+    return <LatestNewsSkeleton />;
+  }
+
+  const latestArticles = articles.slice(0, 5);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden flex flex-col justify-between h-full min-h-[340px]">
