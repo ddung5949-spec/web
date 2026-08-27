@@ -884,7 +884,13 @@ export const supabaseDb = {
           }
         }
         if (config && typeof config === 'object') {
-          return config as SiteConfig;
+          const result: any = { ...config };
+          if (row.title && !result.title) result.title = row.title;
+          if (row.subtitle && !result.subtitle) result.subtitle = row.subtitle;
+          if (row.marquee_text && !result.ticker) result.ticker = row.marquee_text;
+          if (row.theme_color && !result.colorRed) result.colorRed = row.theme_color;
+          if (row.unit_name && !result.footerUnitName) result.footerUnitName = row.unit_name;
+          return result as SiteConfig;
         }
       }
       return null;
@@ -905,6 +911,11 @@ export const supabaseDb = {
       // 1. Primary payload containing all compatible columns as requested
       const payload: any = {
         id: 'default',
+        title: configData.title || '',
+        subtitle: configData.subtitle || '',
+        unit_name: configData.footerUnitName || configData.title || '',
+        marquee_text: configData.ticker || '',
+        theme_color: configData.colorRed || '#b91c1c',
         config_json: configData,
         config: configData,
         data: configData,
@@ -918,13 +929,24 @@ export const supabaseDb = {
 
       // If column mismatch (e.g. 'config_json' column does not exist or id type differs), try fallback variations
       const fallbackPayloads = [
-        { id: 1, config_json: configData, config: configData, data: configData, updated_at: now },
+        {
+          id: 1,
+          title: configData.title || '',
+          subtitle: configData.subtitle || '',
+          unit_name: configData.footerUnitName || configData.title || '',
+          marquee_text: configData.ticker || '',
+          theme_color: configData.colorRed || '#b91c1c',
+          config_json: configData,
+          config: configData,
+          data: configData,
+          updated_at: now,
+        },
+        { id: 'default', config_json: configData, updated_at: now },
         { id: 'default', config: configData, updated_at: now },
         { id: 'default', data: configData, updated_at: now },
-        { id: 'default', config_json: configData, updated_at: now },
+        { id: 1, config_json: configData, updated_at: now },
         { id: 1, config: configData, updated_at: now },
         { id: 1, data: configData, updated_at: now },
-        { id: 1, config_json: configData, updated_at: now },
       ];
 
       for (const altPayload of fallbackPayloads) {

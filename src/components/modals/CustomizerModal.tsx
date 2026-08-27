@@ -419,6 +419,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     e.preventDefault();
 
     const updatedConfig: SiteConfig = {
+      ...siteConfig,
       title: title.trim(),
       subtitle: subtitle.trim(),
       slogan: slogan.trim(),

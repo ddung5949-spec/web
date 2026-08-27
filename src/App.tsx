@@ -1498,11 +1498,16 @@ export function App() {
     newConfig: SiteConfig,
     categoryRenames?: { sectionKey: SectionType; oldName: string; newName: string }[]
   ) => {
+    // 1. Cập nhật tức thì lên State và LocalStorage (Optimistic UI)
     setSiteConfig(newConfig);
+    safeStore.set('mangyang_site_config', newConfig);
+    showToast('success', 'Đã lưu tùy chỉnh hệ thống', 'Cấu hình giao diện, tiêu đề, khẩu hiệu và màu sắc đã được cập nhật.');
+
+    // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm (không làm gián đoạn Admin)
     try {
       await cloudStorage.saveSiteConfig(newConfig);
     } catch (e) {
-      console.warn('handleSaveCustomizer caught:', e);
+      console.warn('handleSaveCustomizer caught error (saved to state & local):', e);
     }
 
     if (categoryRenames && categoryRenames.length > 0) {
