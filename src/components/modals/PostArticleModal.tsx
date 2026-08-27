@@ -26,6 +26,7 @@ import {
   User,
 } from '../../types';
 import { defaultSiteConfig } from '../../data/initialData';
+import { compressImageFile, optimizeArticleImagesPayload, validateImageFile } from '../../utils/imageUtils';
 
 interface PostArticleModalProps {
   isOpen: boolean;
@@ -258,57 +259,74 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     }
   };
 
-  // Handle single / main image upload
-  const handleMainImageFileUpload = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn tệp hình ảnh hợp lệ (JPG, PNG, WEBP, GIF)!');
+  // Handle single / main image upload with auto compression
+  const handleMainImageFileUpload = async (file: File) => {
+    const val = validateImageFile(file);
+    if (!val.valid) {
+      alert(val.error || 'Vui lòng chọn tệp hình ảnh hợp lệ (JPG, PNG, WEBP, GIF)!');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      if (result) {
-        setImageUrl(result);
-        // Also add to articleImages if not present
-        const newImg: ArticleImage = {
-          id: `img-${Date.now()}`,
-          url: result,
-          caption: title || file.name.replace(/\.[^/.]+$/, ''),
-          position: 'top',
-        };
-        setArticleImages((prev) => {
-          if (prev.length === 0) return [newImg];
-          return prev;
-        });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
-  // Handle multiple image upload
-  const handleMultipleImageUpload = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file, idx) => {
-      if (!file.type.startsWith('image/')) return;
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+      setImageUrl(compressedDataUrl);
+      const newImg: ArticleImage = {
+        id: `img-${Date.now()}`,
+        url: compressedDataUrl,
+        caption: title || file.name.replace(/\.[^/.]+$/, ''),
+        position: 'top',
+      };
+      setArticleImages((prev) => {
+        if (prev.length === 0) return [newImg];
+        return prev;
+      });
+    } catch (err: any) {
+      console.warn('Error compressing main image:', err);
+      // Fallback
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
         const result = loadEvent.target?.result as string;
         if (result) {
+          setImageUrl(result);
           const newImg: ArticleImage = {
-            id: `img-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+            id: `img-${Date.now()}`,
             url: result,
-            caption: `Hình: ${file.name.replace(/\.[^/.]+$/, '')}`,
-            position: idx === 0 && articleImages.length === 0 ? 'top' : idx % 2 === 1 ? 'middle_1' : 'gallery',
+            caption: title || file.name.replace(/\.[^/.]+$/, ''),
+            position: 'top',
           };
-          setArticleImages((prev) => [...prev, newImg]);
-          if (!imageUrl && idx === 0) {
-            setImageUrl(result);
-          }
+          setArticleImages((prev) => (prev.length === 0 ? [newImg] : prev));
         }
       };
       reader.readAsDataURL(file);
-    });
+    }
+  };
+
+  // Handle multiple image upload with auto compression
+  const handleMultipleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    for (let idx = 0; idx < fileList.length; idx++) {
+      const file = fileList[idx];
+      const val = validateImageFile(file);
+      if (!val.valid) continue;
+
+      try {
+        const compressedDataUrl = await compressImageFile(file, 1280, 1280, 0.82);
+        const newImg: ArticleImage = {
+          id: `img-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+          url: compressedDataUrl,
+          caption: `Hình: ${file.name.replace(/\.[^/.]+$/, '')}`,
+          position: idx === 0 && articleImages.length === 0 ? 'top' : idx % 2 === 1 ? 'middle_1' : 'gallery',
+        };
+        setArticleImages((prev) => [...prev, newImg]);
+        if (!imageUrl && idx === 0) {
+          setImageUrl(compressedDataUrl);
+        }
+      } catch (e) {
+        console.warn('Multiple upload compression fallback for file:', file.name, e);
+      }
+    }
   };
 
   // Add image via URL
@@ -391,20 +409,26 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
           ? 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=800&auto=format&fit=crop'
           : 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop';
 
-      const finalImage = imageUrl.trim() || (articleImages[0]?.url) || defaultImg;
+      const rawFinalImage = imageUrl.trim() || (articleImages[0]?.url) || defaultImg;
 
       // Ensure articleImages has at least 1 image item if image exists
-      const finalImagesList =
+      const rawImagesList =
         articleImages.length > 0
           ? articleImages
           : [
               {
                 id: 'img-1',
-                url: finalImage,
+                url: rawFinalImage,
                 caption: title.trim(),
                 position: 'top' as ArticleImagePosition,
               },
             ];
+
+      // Auto optimize & compress any base64 images
+      const { image: finalImage, images: finalImagesList } = await optimizeArticleImagesPayload({
+        image: rawFinalImage,
+        images: rawImagesList,
+      });
 
       if (isEditing && articleToEdit && onUpdateArticle) {
         const updated: Article = {

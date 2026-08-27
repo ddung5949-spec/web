@@ -57,7 +57,22 @@ import {
   User,
   VoteChoice,
 } from '../types';
-import { RealtimeCollabDocumentWorkspace } from './RealtimeCollabDocumentWorkspace';
+import { getSupabase } from '../utils/supabase';
+
+interface OnlineParticipant {
+  userId: number;
+  userName: string;
+  rankUnit: string;
+  avatar?: string;
+  joinedAt: string;
+}
+
+interface DocLockInfo {
+  userId: number;
+  userName: string;
+  userRankUnit?: string;
+  timestamp: number;
+}
 
 interface PartyMeetingRoomProps {
   currentUser: User | null;
@@ -351,6 +366,161 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const [docCategoryFilter, setDocCategoryFilter] = useState('ALL');
   const [activeRoomTab, setActiveRoomTab] = useState<'workspace' | 'collab_studio'>('workspace');
 
+  // -------------------------------------------------------------
+  // REAL-TIME SUPABASE PRESENCE & DOCUMENT EDITING LOCK
+  // -------------------------------------------------------------
+  const [onlineMembers, setOnlineMembers] = useState<OnlineParticipant[]>([]);
+  const [docLocks, setDocLocks] = useState<Record<number, DocLockInfo>>({});
+  const [isCurrentlyEditing, setIsCurrentlyEditing] = useState(false);
+
+  // Supabase Presence Tracking & Document Lock Realtime Channel
+  useEffect(() => {
+    const supabase = getSupabase();
+    const targetRoomKey = activeRoomId || 'main-meeting-hall';
+
+    if (!supabase) {
+      if (currentUser) {
+        setOnlineMembers([
+          {
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            rankUnit: currentUser.rankUnit || currentUser.rank || 'Đảng ủy viên',
+            avatar: currentUser.avatar,
+            joinedAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return;
+    }
+
+    const channelName = `meeting-room-${targetRoomKey}`;
+    const channel = supabase.channel(channelName, {
+      config: {
+        presence: {
+          key: currentUser ? String(currentUser.id) : `guest-${Date.now()}`,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const members: OnlineParticipant[] = [];
+        const seenUserIds = new Set<string | number>();
+
+        Object.values(state).forEach((presenceList: any) => {
+          if (Array.isArray(presenceList)) {
+            presenceList.forEach((item: any) => {
+              const uid = item.userId || item.id;
+              if (uid && !seenUserIds.has(uid)) {
+                seenUserIds.add(uid);
+                members.push({
+                  userId: Number(uid) || 0,
+                  userName: item.userName || 'Đảng ủy viên',
+                  rankUnit: item.rankUnit || '',
+                  avatar: item.avatar,
+                  joinedAt: item.joinedAt || new Date().toISOString(),
+                });
+              }
+            });
+          }
+        });
+        setOnlineMembers(members);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('[Presence] Member joined:', key, newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('[Presence] Member left:', key, leftPresences);
+      })
+      .on('broadcast', { event: 'doc_lock_change' }, ({ payload }) => {
+        if (payload && payload.docId) {
+          if (payload.isEditing) {
+            setDocLocks((prev) => ({
+              ...prev,
+              [payload.docId]: {
+                userId: payload.userId,
+                userName: payload.userName,
+                userRankUnit: payload.userRankUnit,
+                timestamp: payload.timestamp || Date.now(),
+              },
+            }));
+          } else {
+            setDocLocks((prev) => {
+              const next = { ...prev };
+              delete next[payload.docId];
+              return next;
+            });
+          }
+        }
+      })
+      .on('broadcast', { event: 'doc_saved' }, ({ payload }) => {
+        if (payload && payload.doc) {
+          onSaveMeetingDocument(payload.doc);
+          if (currentRoom && onSaveMeetingRoom) {
+            const updatedDocs = currentRoomDocs.map((d) =>
+              d.id === payload.doc.id ? payload.doc : d
+            );
+            onSaveMeetingRoom({ ...currentRoom, documents: updatedDocs });
+          }
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && currentUser) {
+          await channel.track({
+            userId: currentUser.id,
+            userName: currentUser.fullName,
+            rankUnit: currentUser.rankUnit || currentUser.rank || 'Đảng ủy viên',
+            avatar: currentUser.avatar,
+            joinedAt: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      // Release any locks held by current user before leaving channel
+      if (activeDocId && isCurrentlyEditing && currentUser) {
+        try {
+          channel.send({
+            type: 'broadcast',
+            event: 'doc_lock_change',
+            payload: {
+              docId: activeDocId,
+              isEditing: false,
+              userId: currentUser.id,
+            },
+          });
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [activeRoomId, currentUser?.id]);
+
+  // Release lock when switching document
+  useEffect(() => {
+    if (isCurrentlyEditing && currentUser && activeDocId) {
+      const supabase = getSupabase();
+      if (supabase && activeRoomId) {
+        supabase.channel(`meeting-room-${activeRoomId}`).send({
+          type: 'broadcast',
+          event: 'doc_lock_change',
+          payload: {
+            docId: activeDocId,
+            isEditing: false,
+            userId: currentUser.id,
+          },
+        });
+      }
+      setIsCurrentlyEditing(false);
+    }
+  }, [activeDocId]);
+
   // Reset active doc when entering another room
   useEffect(() => {
     if (currentRoomDocs && currentRoomDocs.length > 0) {
@@ -500,7 +670,62 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
     range.insertNode(span);
   };
 
-  // Save document editor content
+  // Start editing active document (Broadcast lock)
+  const handleStartEditDoc = () => {
+    if (!activeDocument || !currentUser) {
+      alert('Đồng chí vui lòng đăng nhập để thực hiện chỉnh sửa văn bản!');
+      return;
+    }
+
+    const currentLock = docLocks[activeDocument.id];
+    if (currentLock && currentLock.userId !== currentUser.id) {
+      alert(
+        `⚠️ Đồng chí ${currentLock.userName} (${currentLock.userRankUnit || 'Đảng ủy viên'}) đang chỉnh sửa văn bản này! Vui lòng chờ đồng chí ấy lưu xong.`
+      );
+      return;
+    }
+
+    setIsCurrentlyEditing(true);
+    const supabase = getSupabase();
+    if (supabase && activeRoomId) {
+      const channelName = `meeting-room-${activeRoomId}`;
+      supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'doc_lock_change',
+        payload: {
+          docId: activeDocument.id,
+          isEditing: true,
+          userId: currentUser.id,
+          userName: currentUser.fullName,
+          userRankUnit: currentUser.rankUnit || currentUser.rank || 'Đảng ủy viên',
+          timestamp: Date.now(),
+        },
+      });
+    }
+  };
+
+  // Cancel editing active document (Release lock)
+  const handleCancelEditDoc = () => {
+    if (editorRef.current && activeDocument) {
+      editorRef.current.innerHTML = activeDocument.contentHtml || '';
+    }
+    setIsCurrentlyEditing(false);
+    const supabase = getSupabase();
+    if (supabase && activeRoomId && currentUser && activeDocument) {
+      const channelName = `meeting-room-${activeRoomId}`;
+      supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'doc_lock_change',
+        payload: {
+          docId: activeDocument.id,
+          isEditing: false,
+          userId: currentUser.id,
+        },
+      });
+    }
+  };
+
+  // Save document editor content (Save and Release lock)
   const handleSaveActiveDoc = () => {
     if (!editorRef.current || !activeDocument) return;
     const updatedHtml = editorRef.current.innerHTML;
@@ -516,6 +741,29 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
       onSaveMeetingRoom({
         ...currentRoom,
         documents: updatedDocs,
+      });
+    }
+
+    // Release editing lock and broadcast saved document
+    setIsCurrentlyEditing(false);
+    const supabase = getSupabase();
+    if (supabase && activeRoomId && currentUser) {
+      const channelName = `meeting-room-${activeRoomId}`;
+      supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'doc_lock_change',
+        payload: {
+          docId: activeDocument.id,
+          isEditing: false,
+          userId: currentUser.id,
+        },
+      });
+      supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'doc_saved',
+        payload: {
+          doc: updatedDoc,
+        },
       });
     }
 
@@ -1473,6 +1721,15 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
 
         {/* Action Controls in Header */}
         <div className="flex items-center gap-2 shrink-0 self-end md:self-center flex-wrap">
+          {/* Realtime Online Presence Pill */}
+          <div className="flex items-center gap-1.5 bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 px-3 py-1.5 rounded-xl text-xs font-bold shadow-2xs">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>{onlineMembers.length} trực tuyến</span>
+          </div>
+
           {/* Start / End Meeting Buttons */}
           {canManageActiveRoom && currentRoom.status === 'scheduled' && (
             <button
@@ -1530,72 +1787,8 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
         </div>
       </div>
 
-      {/* 2.5 TAB NAVIGATION FOR ACTIVE MEETING ROOM */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveRoomTab('workspace')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-              activeRoomTab === 'workspace'
-                ? 'bg-[#831843] text-white ring-2 ring-pink-300'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
-            }`}
-          >
-            <Columns className="w-3.5 h-3.5" />
-            <span>1. BÀN HỌP & BIỂU QUYẾT (3 CỘT)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveRoomTab('collab_studio')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-              activeRoomTab === 'collab_studio'
-                ? 'bg-gradient-to-r from-[#831843] to-purple-800 text-white ring-2 ring-amber-400'
-                : 'bg-white hover:bg-pink-50 text-pink-900 border border-pink-200'
-            }`}
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <FileEdit className="w-3.5 h-3.5 text-amber-300" />
-            <span>2. SOẠN THẢO CỘNG TÁC REAL-TIME (GOOGLE DOCS)</span>
-          </button>
-        </div>
-
-        {activeRoomTab === 'collab_studio' && (
-          <div className="text-[11px] text-gray-500 font-medium">
-            Đang mở: <strong className="text-pink-900">{activeDocument?.title}</strong>
-          </div>
-        )}
-      </div>
-
-      {activeRoomTab === 'collab_studio' && activeDocument ? (
-        <RealtimeCollabDocumentWorkspace
-          currentRoom={currentRoom}
-          activeDocument={activeDocument}
-          currentUser={currentUser}
-          allUsers={allUsers}
-          onSaveDocument={(updatedDoc) => {
-            onSaveMeetingDocument(updatedDoc);
-            if (onSaveMeetingRoom) {
-              const updatedDocs = currentRoomDocs.map((d) =>
-                d.id === updatedDoc.id ? updatedDoc : d
-              );
-              onSaveMeetingRoom({
-                ...currentRoom,
-                documents: updatedDocs,
-              });
-            }
-          }}
-          onUpdateRoom={onSaveMeetingRoom}
-          onBackToDocsList={() => setActiveRoomTab('workspace')}
-        />
-      ) : (
-        <>
-          {/* 3. THREE-COLUMN WORKSPACE */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* 3. THREE-COLUMN MEETING WORKSPACE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* =========================================================================
             COLUMN 1 (LEFT - 3 COLS): KHO VĂN BẢN HỌP CỦA PHÒNG
            ========================================================================= */}
@@ -1665,6 +1858,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                   const myVoteOnThis = currentUser
                     ? docVotes.find((v) => v.userId === currentUser.id)
                     : undefined;
+                  const docLock = docLocks[doc.id];
 
                   return (
                     <div
@@ -1676,8 +1870,8 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                           : 'border-gray-200 bg-white hover:bg-gray-50'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-start justify-between gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <span className="text-[9px] font-mono font-black text-pink-900 bg-pink-100 px-1 py-0.5 rounded">
                             {doc.code || `VB-${idx + 1}`}
                           </span>
@@ -1693,6 +1887,14 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                             {doc.category}
                           </span>
                         </div>
+
+                        {/* Real-time Editing Lock Badge on Document */}
+                        {docLock && (
+                          <span className="text-[8px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.5 rounded flex items-center gap-1 animate-pulse">
+                            <Lock className="w-2.5 h-2.5 text-amber-700" />
+                            <span>Đang sửa: {docLock.userName}</span>
+                          </span>
+                        )}
 
                         {canDelete && (
                           <button
@@ -1714,7 +1916,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                       </h4>
 
                       {/* Vote tally pill on document */}
-                      <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between gap-1 text-[9px]">
+                      <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between gap-1 text-[9px] flex-wrap">
                         <div className="flex items-center gap-1">
                           {hasVoted ? (
                             <span
@@ -1757,9 +1959,56 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
         </div>
 
         {/* =========================================================================
-            COLUMN 2 (MIDDLE - 6 COLS): SOẠN THẢO / ĐỌC VĂN KIỆN
+            COLUMN 2 (MIDDLE - 6 COLS): SOẠN THẢO / ĐỌC VĂN KIỆN (WITH DOCUMENT LOCK)
            ========================================================================= */}
         <div className="lg:col-span-6 space-y-3">
+          {/* Document Editing Lock Warning Banner */}
+          {(() => {
+            const activeLock = activeDocument ? docLocks[activeDocument.id] : undefined;
+            const isLockedByOther = !!(activeLock && activeLock.userId !== currentUser?.id);
+
+            if (isLockedByOther) {
+              return (
+                <div className="p-3 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl flex items-center justify-between text-amber-900 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                    <div>
+                      <div className="font-extrabold text-xs">
+                        ⚠️ Đồng chí {activeLock.userName} ({activeLock.userRankUnit || 'Đảng ủy viên'}) đang chỉnh sửa văn bản này...
+                      </div>
+                      <div className="text-[11px] text-amber-800">
+                        Để bảo đảm tính toàn vẹn dữ liệu, chức năng chỉnh sửa tạm thời bị khóa. Vui lòng đợi đồng chí ấy lưu xong.
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono bg-amber-200 text-amber-950 px-2 py-0.5 rounded font-black shrink-0">
+                    ĐANG KHÓA
+                  </span>
+                </div>
+              );
+            }
+
+            if (isCurrentlyEditing) {
+              return (
+                <div className="p-3 bg-emerald-50 border-l-4 border-emerald-600 rounded-r-xl flex items-center justify-between text-emerald-950 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <FileEdit className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <div className="font-extrabold text-xs">
+                        ✏️ Đồng chí đang trong chế độ CHỈNH SỬA VĂN BẢN (Đã khóa quyền sửa của các thành viên khác)
+                      </div>
+                      <div className="text-[11px] text-emerald-800">
+                        Sau khi hoàn tất, vui lòng bấm <strong>[LƯU VĂN BẢN]</strong> hoặc <strong>[HỦY CHỈNH SỬA]</strong> để giải phóng khóa.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
+
           <div className="bg-white rounded-2xl shadow-xs border border-gray-200 overflow-hidden">
             {/* Toolbar & Header */}
             <div className="bg-gray-50 border-b border-gray-200 p-3 space-y-2.5">
@@ -1773,36 +2022,82 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                   </h3>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveActiveDoc}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                    isSavedRecently
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-[#831843] hover:bg-[#701a75] text-white'
-                  }`}
-                >
-                  {isSavedRecently ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  <span>{isSavedRecently ? 'ĐÃ LƯU' : 'LƯU VĂN BẢN'}</span>
-                </button>
+                {/* Edit & Save Action Buttons */}
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const activeLock = activeDocument ? docLocks[activeDocument.id] : undefined;
+                    const isLockedByOther = !!(activeLock && activeLock.userId !== currentUser?.id);
+
+                    if (isCurrentlyEditing) {
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditDoc}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>HỦY CHỈNH SỬA</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveActiveDoc}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                              isSavedRecently
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
+                          >
+                            {isSavedRecently ? (
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            ) : (
+                              <Save className="w-3.5 h-3.5" />
+                            )}
+                            <span>{isSavedRecently ? 'ĐÃ LƯU & MỞ KHÓA' : 'LƯU VĂN BẢN (XONG)'}</span>
+                          </button>
+                        </>
+                      );
+                    }
+
+                    if (isLockedByOther) {
+                      return (
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 cursor-not-allowed opacity-80"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                          <span>ĐANG KHÓA (Đ/C {activeLock?.userName} ĐANG SỬA)</span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={handleStartEditDoc}
+                        className="px-3 py-1.5 rounded-lg text-xs font-black bg-[#831843] hover:bg-[#701a75] text-white flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-amber-300" />
+                        <span>✏️ BẮT ĐẦU CHỈNH SỬA VĂN BẢN</span>
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Status bar */}
               <div className="flex items-center justify-between text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-200 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  {canViewCollab ? (
+                  {isCurrentlyEditing ? (
                     <span className="flex items-center gap-1 text-emerald-700 font-bold">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                      <span>Đang mở chế độ xem đóng góp ý kiến & sửa đổi</span>
+                      <span>Đang mở chế độ soạn thảo (Đã khóa chỉnh sửa cho người khác)</span>
                     </span>
                   ) : (
                     <span className="text-gray-500 flex items-center gap-1">
-                      <EyeOff className="w-3.5 h-3.5" />
-                      <span>Chế độ đọc cá nhân</span>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Chế độ đọc văn kiện</span>
                     </span>
                   )}
                 </div>
@@ -1823,98 +2118,147 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                 </div>
               </div>
 
-              {/* Formatting Toolbar */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <input
-                  type="file"
-                  ref={wordImportInputRef}
-                  onChange={handleWordImport}
-                  accept=".docx"
-                  className="hidden"
-                />
+              {/* Formatting Toolbar (Only active during editing) */}
+              {isCurrentlyEditing && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-gray-200">
+                  <input
+                    type="file"
+                    ref={wordImportInputRef}
+                    onChange={handleWordImport}
+                    accept=".docx"
+                    className="hidden"
+                  />
 
-                <div className="flex items-center bg-white border border-gray-300 rounded-lg p-0.5 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => handleFormat('bold')}
-                    className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
-                    title="In đậm (Ctrl+B)"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFormat('italic')}
-                    className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
-                    title="In nghiêng (Ctrl+I)"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFormat('underline')}
-                    className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
-                    title="Gạch chân (Ctrl+U)"
-                  >
-                    <Underline className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="w-px h-4 bg-gray-200 mx-1" />
-                  <button
-                    type="button"
-                    onClick={handleHighlight}
-                    className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded text-[11px] flex items-center gap-1 cursor-pointer"
-                    title="Bôi đen văn bản để đánh dấu ý kiến đóng góp"
-                  >
-                    <Highlighter className="w-3 h-3 text-amber-700" />
-                    <span>Đánh dấu góp ý</span>
-                  </button>
+                  <div className="flex items-center bg-white border border-gray-300 rounded-lg p-0.5 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => handleFormat('bold')}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
+                      title="In đậm (Ctrl+B)"
+                    >
+                      <Bold className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFormat('italic')}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
+                      title="In nghiêng (Ctrl+I)"
+                    >
+                      <Italic className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFormat('underline')}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-700 cursor-pointer"
+                      title="Gạch chân (Ctrl+U)"
+                    >
+                      <Underline className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
+                    <button
+                      type="button"
+                      onClick={handleHighlight}
+                      className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded text-[11px] flex items-center gap-1 cursor-pointer"
+                      title="Bôi đen văn bản để đánh dấu ý kiến đóng góp"
+                    >
+                      <Highlighter className="w-3 h-3 text-amber-700" />
+                      <span>Đánh dấu góp ý</span>
+                    </button>
+                  </div>
+
+                  {canUpload && (
+                    <button
+                      type="button"
+                      onClick={() => wordImportInputRef.current?.click()}
+                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Nhập đè nội dung từ tệp Word (.docx)"
+                    >
+                      <FileUp className="w-3.5 h-3.5" />
+                      <span>Nạp Word (.docx)</span>
+                    </button>
+                  )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveRoomTab('collab_studio')}
-                  className="px-2.5 py-1.5 bg-gradient-to-r from-[#831843] to-purple-800 hover:from-[#701a75] hover:to-purple-900 text-white font-black rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  title="Mở chế độ cộng tác trực tiếp đa người dùng kiểu Google Docs"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                  <span>✍️ Mở Soạn thảo Cộng tác Trực tiếp</span>
-                </button>
-
-                {canUpload && (
-                  <button
-                    type="button"
-                    onClick={() => wordImportInputRef.current?.click()}
-                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Nhập đè nội dung từ tệp Word (.docx)"
-                  >
-                    <FileUp className="w-3.5 h-3.5" />
-                    <span>Nạp Word (.docx)</span>
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* Document Content Editable Area */}
+            {/* Document Content Area */}
             <div className="p-5 bg-white min-h-[420px] max-h-[580px] overflow-y-auto">
               <div
                 ref={editorRef}
-                contentEditable
+                contentEditable={isCurrentlyEditing}
                 suppressContentEditableWarning
-                className="party-meeting-content outline-none text-xs text-gray-800 leading-relaxed font-sans space-y-3 focus:ring-0"
+                className={`party-meeting-content outline-none text-xs text-gray-800 leading-relaxed font-sans space-y-3 ${
+                  isCurrentlyEditing ? 'focus:ring-2 focus:ring-pink-300 p-2 rounded-lg border border-dashed border-pink-200 bg-pink-50/20' : ''
+                }`}
               />
             </div>
 
             <div className="bg-gray-50 border-t border-gray-200 p-2.5 px-4 text-[11px] text-gray-500 flex items-center justify-between">
-              <span>Hỗ trợ định dạng trực quan: Tiêu đề la mã, bảng biểu, ký hiệu số</span>
+              <span>Hỗ trợ định dạng: Tiêu đề, bảng biểu, trích yếu, điều khoản</span>
               <span className="text-pink-900 font-bold">{activeDocument?.category}</span>
             </div>
           </div>
         </div>
 
         {/* =========================================================================
-            COLUMN 3 (RIGHT - 3 COLS): BIỂU QUYẾT TÀI LIỆU
+            COLUMN 3 (RIGHT - 3 COLS): THÀNH VIÊN TRỰC TUYẾN (PRESENCE) & BIỂU QUYẾT
            ========================================================================= */}
         <div className="lg:col-span-3 space-y-3">
+          {/* Real-time Online Attendees (Supabase Presence) */}
+          <div className="bg-white rounded-2xl shadow-xs border border-emerald-200 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+              <div className="flex items-center gap-1.5 text-emerald-900 font-black text-xs">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span>ĐANG TRỰC TUYẾN ({onlineMembers.length})</span>
+              </div>
+              <span className="text-[9px] bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.5 rounded border border-emerald-200">
+                Thời gian thực
+              </span>
+            </div>
+
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
+              {onlineMembers.length === 0 ? (
+                <div className="text-gray-400 text-xs italic text-center py-2">
+                  Chưa có thành viên trực tuyến
+                </div>
+              ) : (
+                onlineMembers.map((member) => (
+                  <div
+                    key={member.userId}
+                    className="flex items-center justify-between p-1.5 rounded-lg bg-emerald-50/50 border border-emerald-100 text-[11px]"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div className="relative shrink-0">
+                        <img
+                          src={member.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                          alt={member.userName}
+                          className="w-5 h-5 rounded-full object-cover ring-1 ring-emerald-400"
+                        />
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white" />
+                      </div>
+                      <div className="truncate">
+                        <div className="font-bold text-gray-900 truncate leading-tight">
+                          {member.userName}
+                          {currentUser?.id === member.userId && (
+                            <span className="text-[9px] text-pink-700 font-bold ml-1">(Tôi)</span>
+                          )}
+                        </div>
+                        <div className="text-[9px] text-gray-500 truncate">{member.rankUnit || 'Đảng ủy viên'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[8px] font-mono text-emerald-800 bg-emerald-100 px-1 py-0.2 rounded shrink-0 font-bold">
+                      ONLINE
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Voting Box */}
           <div className="bg-white rounded-2xl shadow-xs border border-gray-200 p-3.5 space-y-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
               <div className="flex items-center gap-1.5">
@@ -2268,8 +2612,6 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
           </table>
         </div>
       </div>
-      </>
-      )}
 
       {/* MODAL: ADD DOCUMENT */}
       {isAddDocModalOpen && (
