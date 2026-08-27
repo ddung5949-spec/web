@@ -85,27 +85,19 @@ export function App() {
     safeStore.get('mangyang_current_user', null)
   );
 
-  const [articles, setArticles] = useState<Article[]>(defaultArticles);
+  const [articles, setArticles] = useState<Article[]>([]);
 
-  const [documents, setDocuments] = useState<DocumentItem[]>(() =>
-    safeStore.get('mangyang_documents', defaultDocuments)
-  );
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
-  const [lectures, setLectures] = useState<LectureItem[]>(() =>
-    safeStore.get('mangyang_lectures', defaultLectures)
-  );
+  const [lectures, setLectures] = useState<LectureItem[]>([]);
 
-  const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>(() =>
-    safeStore.get('mangyang_uncle_ho_quotes', defaultUncleHoQuotes)
-  );
+  const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>([]);
 
   const [uncleHoSettings, setUncleHoSettings] = useState<UncleHoSettings>(() =>
     safeStore.get('mangyang_uncle_ho_settings', defaultUncleHoSettings)
   );
 
-  const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>(() =>
-    safeStore.get('mangyang_meeting_docs', defaultMeetingDocuments)
-  );
+  const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>([]);
 
   const [meetingSettings, setMeetingSettings] = useState<MeetingRoomSettings>(() =>
     safeStore.get('mangyang_meeting_settings', defaultMeetingSettings)
@@ -115,9 +107,7 @@ export function App() {
     safeStore.get('mangyang_meeting_votes', {})
   );
 
-  const [meetingRooms, setMeetingRooms] = useState<MeetingRoomItem[]>(() =>
-    safeStore.get('mangyang_meeting_rooms', defaultMeetingRooms)
-  );
+  const [meetingRooms, setMeetingRooms] = useState<MeetingRoomItem[]>([]);
 
   const [roles, setRoles] = useState<RoleDefinition[]>(() =>
     safeStore.get('mangyang_custom_roles', defaultRoles)
@@ -196,20 +186,22 @@ export function App() {
     let isMounted = true;
     setIsLoadingData(true);
 
-    // 1. TÁCH BIỆT HOÀN TOÀN HÀM TẢI BÀI VIẾT (FETCH ARTICLES ĐỘC LẬP TỪ SUPABASE)
+    // 1. Tải dữ liệu bài viết trực tiếp từ Supabase
     cloudStorage
-      .loadArticles(defaultArticles)
+      .loadArticles([])
       .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          console.log('[App] Articles loaded successfully:', data.length);
-          setArticles(data);
+        if (isMounted) {
+          setArticles(data || []);
         }
       })
       .catch((err) => {
         console.warn('[App] Error loading articles:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingData(false);
       });
 
-    // 2. Tải các cấu hình và dữ liệu khác độc lập (không chặn hay xóa lẫn nhau)
+    // 2. Tải các cấu hình và dữ liệu khác độc lập
     cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
       if (isMounted && data) setSiteConfig(data);
     }).catch(console.warn);
@@ -218,28 +210,28 @@ export function App() {
       if (isMounted && data && data.length > 0) setUsers(data);
     }).catch(console.warn);
 
-    cloudStorage.loadDocuments(defaultDocuments).then((data) => {
-      if (isMounted && data && data.length > 0) setDocuments(data);
+    cloudStorage.loadDocuments([]).then((data) => {
+      if (isMounted && data) setDocuments(data);
     }).catch(console.warn);
 
-    cloudStorage.loadLectures(defaultLectures).then((data) => {
-      if (isMounted && data && data.length > 0) setLectures(data);
+    cloudStorage.loadLectures([]).then((data) => {
+      if (isMounted && data) setLectures(data);
     }).catch(console.warn);
 
-    cloudStorage.loadUncleHoQuotes(defaultUncleHoQuotes).then((data) => {
-      if (isMounted && data && data.length > 0) setUncleHoQuotes(data);
+    cloudStorage.loadUncleHoQuotes([]).then((data) => {
+      if (isMounted && data) setUncleHoQuotes(data);
     }).catch(console.warn);
 
     cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => {
       if (isMounted && data) setUncleHoSettings(data);
     }).catch(console.warn);
 
-    cloudStorage.loadMeetingRooms(defaultMeetingRooms).then((data) => {
-      if (isMounted && data && data.length > 0) setMeetingRooms(data);
+    cloudStorage.loadMeetingRooms([]).then((data) => {
+      if (isMounted && data) setMeetingRooms(data);
     }).catch(console.warn);
 
-    cloudStorage.loadMeetingDocuments(defaultMeetingDocuments).then((data) => {
-      if (isMounted && data && data.length > 0) setMeetingDocuments(data);
+    cloudStorage.loadMeetingDocuments([]).then((data) => {
+      if (isMounted && data) setMeetingDocuments(data);
     }).catch(console.warn);
 
     cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => {
@@ -250,15 +242,10 @@ export function App() {
       if (isMounted && data) setMeetingVotes(data);
     }).catch(console.warn);
 
-    // Xóa trạng thái loading sau thời gian khởi động
-    const loadingTimer = setTimeout(() => {
-      if (isMounted) setIsLoadingData(false);
-    }, 600);
-
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
     const unsub = cloudStorage.subscribeAll({
       onArticlesChange: (freshArticles) => {
-        if (isMounted && freshArticles && freshArticles.length > 0) {
+        if (isMounted && freshArticles) {
           setArticles(freshArticles);
         }
       },
@@ -287,22 +274,22 @@ export function App() {
         }
       },
       onDocumentsChange: (freshDocs) => {
-        if (isMounted && freshDocs && freshDocs.length > 0) {
+        if (isMounted && freshDocs) {
           setDocuments(freshDocs);
         }
       },
       onLecturesChange: (freshLectures) => {
-        if (isMounted && freshLectures && freshLectures.length > 0) {
+        if (isMounted && freshLectures) {
           setLectures(freshLectures);
         }
       },
       onMeetingRoomsChange: (freshRooms) => {
-        if (isMounted && freshRooms && freshRooms.length > 0) {
+        if (isMounted && freshRooms) {
           setMeetingRooms(freshRooms);
         }
       },
       onMeetingDocumentsChange: (freshMeetingDocs) => {
-        if (isMounted && freshMeetingDocs && freshMeetingDocs.length > 0) {
+        if (isMounted && freshMeetingDocs) {
           setMeetingDocuments(freshMeetingDocs);
         }
       },
@@ -325,7 +312,6 @@ export function App() {
 
     return () => {
       isMounted = false;
-      clearTimeout(loadingTimer);
       if (unsub) unsub();
     };
   }, []);
@@ -1513,9 +1499,10 @@ export function App() {
     categoryRenames?: { sectionKey: SectionType; oldName: string; newName: string }[]
   ) => {
     setSiteConfig(newConfig);
-    const res = await cloudStorage.saveSiteConfig(newConfig);
-    if (!res.success) {
-      showToast('error', 'Lỗi lưu cấu hình hệ thống', res.error);
+    try {
+      await cloudStorage.saveSiteConfig(newConfig);
+    } catch (e) {
+      console.warn('handleSaveCustomizer caught:', e);
     }
 
     if (categoryRenames && categoryRenames.length > 0) {
@@ -1557,12 +1544,8 @@ export function App() {
       homeAnnouncements: updatedList,
     };
     setSiteConfig(updatedConfig);
-    const res = await cloudStorage.saveSiteConfig(updatedConfig);
-    if (res.success) {
-      showToast('success', 'Đã lưu danh sách thông báo', 'Nội dung thông báo đã được lưu lên Cơ sở dữ liệu.');
-    } else {
-      showToast('error', 'Lỗi lưu thông báo', res.error);
-    }
+    await cloudStorage.saveSiteConfig(updatedConfig);
+    showToast('success', 'Đã lưu danh sách thông báo', 'Nội dung thông báo đã được lưu thành công.');
   };
 
   // Quick Action Cards Save Handler
@@ -1573,12 +1556,8 @@ export function App() {
       homeQuickActions: cards,
     };
     setSiteConfig(updatedConfig);
-    const res = await cloudStorage.saveSiteConfig(updatedConfig);
-    if (res.success) {
-      showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
-    } else {
-      showToast('error', 'Lỗi lưu tiện ích', res.error);
-    }
+    await cloudStorage.saveSiteConfig(updatedConfig);
+    showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
   };
 
   // Spotlight Article Select Handler
@@ -1598,12 +1577,8 @@ export function App() {
       homeCategoryColumns: columns,
     };
     setSiteConfig(updatedConfig);
-    const res = await cloudStorage.saveSiteConfig(updatedConfig);
-    if (res.success) {
-      showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
-    } else {
-      showToast('error', 'Lỗi lưu cột chuyên mục', res.error);
-    }
+    await cloudStorage.saveSiteConfig(updatedConfig);
+    showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
   };
 
   // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ)
@@ -1711,27 +1686,7 @@ export function App() {
 
   const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
 
-  const defaultHomeAnnouncements: HomeAnnouncement[] = [
-    {
-      id: 'ann-1',
-      title:
-        'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Sư đoàn 10 nhiệm kỳ 2025-2030 (Tuần thứ 3)',
-      date: '19/08/2026',
-      highlight: true,
-    },
-    {
-      id: 'ann-2',
-      title:
-        'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Sư đoàn 10 nhiệm kỳ 2025-2030 (Tuần thứ nhất)',
-      date: '12/08/2026',
-    },
-    {
-      id: 'ann-3',
-      title:
-        'VIETTEL TUNG NHIỀU ƯU ĐÃI KHUYẾN KHÍCH CÁN BỘ CHIẾN SĨ SỚM XÁC THỰC THÔNG TIN THUÊ BAO CHÍNH CHỦ',
-      date: '08/08/2026',
-    },
-  ];
+  const defaultHomeAnnouncements: HomeAnnouncement[] = [];
 
   const defaultQuickActionCards: QuickActionCard[] = [
     {

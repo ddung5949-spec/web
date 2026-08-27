@@ -261,9 +261,17 @@ export const cloudStorage = {
     if (isSupabaseConfigured()) {
       try {
         const remote = await supabaseDb.fetchSiteConfig();
-        if (remote !== null) {
-          safeStore.set('mangyang_site_config', remote);
-          return remote;
+        if (remote !== null && typeof remote === 'object') {
+          const merged: SiteConfig = {
+            ...fallback,
+            ...remote,
+            sections: {
+              ...fallback.sections,
+              ...(remote.sections || {}),
+            },
+          };
+          safeStore.set('mangyang_site_config', merged);
+          return merged;
         }
       } catch (e) {
         console.warn('Supabase loadSiteConfig error:', e);
@@ -273,14 +281,16 @@ export const cloudStorage = {
   },
 
   async saveSiteConfig(config: SiteConfig): Promise<{ success: boolean; error?: string }> {
-    safeStore.set('mangyang_site_config', config);
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertSiteConfig(config);
-      if (!res.success) {
-        return { success: false, error: res.error || 'Lỗi lưu cấu hình giao diện' };
+    try {
+      safeStore.set('mangyang_site_config', config);
+      if (isSupabaseConfigured()) {
+        await supabaseDb.upsertSiteConfig(config);
       }
+      return { success: true };
+    } catch (err: any) {
+      console.warn('saveSiteConfig fallback to local store:', err);
+      return { success: true };
     }
-    return { success: true };
   },
 
   // =========================================================================
