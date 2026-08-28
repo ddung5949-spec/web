@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
         className="text-white border-b-4 border-[#fbbf24] shadow-md"
         style={{ backgroundColor: siteConfig.colorRed || '#b91c1c' }}
       >
-        <div className="w-full px-3 sm:px-6 lg:px-8 pt-2 sm:pt-2.5 pb-1 sm:pb-1.5 flex flex-col md:flex-row items-center md:items-end justify-between gap-2.5 sm:gap-3">
+        <div className="w-full max-w-[1850px] mx-auto px-3 sm:px-5 lg:px-8 pt-2 sm:pt-2.5 pb-1 sm:pb-1.5 flex flex-col md:flex-row items-center md:items-end justify-between gap-2.5 sm:gap-3">
           {/* Brand Group */}
           <div
             id="header-brand-logo"

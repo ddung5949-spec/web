@@ -420,6 +420,21 @@ export type RightSidebarWidgetType =
   | 'public_survey'
   | 'custom_shortcuts';
 
+export type SidebarWidgetId =
+  | 'uncle_ho' // Khối Lời Bác dạy ngày này năm xưa
+  | 'daily_widgets' // Khối 3 chuyên mục hằng ngày (An toàn, Giao thông, Hành động đẹp)
+  | 'announcements' // Khối Thông báo & Sự kiện quan trọng
+  | 'latest_news' // Khối Tin mới nhất
+  | 'quick_actions'; // Khối Tiện ích quân nhân
+
+export interface SidebarWidgetSetting {
+  id: SidebarWidgetId;
+  name: string;
+  side: 'left' | 'right';
+  order: number;
+  enabled: boolean;
+}
+
 export interface DailyWidgetItem {
   id: string; // 'safety_message' | 'traffic_situation' | 'good_deed'
   categoryName: string;
@@ -458,6 +473,7 @@ export interface SiteConfig {
   customMenuItems?: CustomMenuItem[];
   navTabs?: NavTabItem[];
   dailyWidgets?: DailyWidgetItem[];
+  sidebarWidgets?: SidebarWidgetSetting[];
   tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined';
   tickerDays?: number;
   tickerCustomList?: string[];
@@ -500,6 +516,7 @@ export interface HomeLayoutSettings {
   showCategoryColumns?: boolean;
   showQuickLibrarySection?: boolean;
   topColumnsOrder?: ('left' | 'middle' | 'right')[];
+  sidebarWidgets?: SidebarWidgetSetting[];
 }
 
 export interface UncleHoQuote {

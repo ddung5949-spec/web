@@ -10,6 +10,7 @@ import {
   MilitaryProfile,
   NavTabItem,
   RoleDefinition,
+  SidebarWidgetSetting,
   SiteConfig,
   UncleHoCustomCategory,
   UncleHoQuote,
@@ -19,6 +20,44 @@ import {
   UncleHoStory,
   User,
 } from '../types';
+
+export const defaultSidebarWidgets: SidebarWidgetSetting[] = [
+  {
+    id: 'uncle_ho',
+    name: 'Lời Bác dạy ngày này năm xưa',
+    side: 'left',
+    order: 1,
+    enabled: true,
+  },
+  {
+    id: 'daily_widgets',
+    name: '3 Chuyên mục hằng ngày (An toàn, Giao thông, Hành động đẹp)',
+    side: 'left',
+    order: 2,
+    enabled: true,
+  },
+  {
+    id: 'announcements',
+    name: 'Thông báo & Sự kiện quan trọng',
+    side: 'left',
+    order: 3,
+    enabled: true,
+  },
+  {
+    id: 'latest_news',
+    name: 'Tin mới nhất',
+    side: 'right',
+    order: 1,
+    enabled: true,
+  },
+  {
+    id: 'quick_actions',
+    name: 'Tiện ích quân nhân',
+    side: 'right',
+    order: 2,
+    enabled: true,
+  },
+];
 
 export const defaultNavTabs: NavTabItem[] = [
   { id: 'home', label: 'Trang chủ', type: 'internal', targetPage: 'home', enabled: true, order: 1 },
@@ -185,6 +224,7 @@ export const defaultSiteConfig: SiteConfig = {
   homeAnnouncements: [],
   navTabs: defaultNavTabs,
   dailyWidgets: defaultDailyWidgets,
+  sidebarWidgets: defaultSidebarWidgets,
   quickActionCards: [
     {
       id: 'card-exam',

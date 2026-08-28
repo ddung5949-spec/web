@@ -47,12 +47,14 @@ import {
   LectureItem,
   PageView,
   QuickActionCard,
+  SidebarWidgetId,
+  SidebarWidgetSetting,
   SiteConfig,
   UncleHoQuote,
   UncleHoSettings,
   User,
 } from '../types';
-import { defaultHomeCategoryColumns } from '../data/initialData';
+import { defaultHomeCategoryColumns, defaultSidebarWidgets } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
 import { DailyWidgetsSection } from './DailyWidgetsSection';
 import { HomeAnnouncementsWidget } from './HomeAnnouncementsWidget';
@@ -133,14 +135,39 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Layout Settings
   const layout = siteConfig?.layoutSettings || {};
-  const showUncleHo = layout.showUncleHoSection !== false;
-  const showAnnouncements = layout.showAnnouncementsWidget !== false;
   const showFeaturedSlider = layout.showFeaturedSlider !== false;
   const showSpotlight = layout.showSpotlightSection !== false;
-  const showLatestNews = layout.showLatestNewsWidget !== false;
-  const showQuickActions = layout.showQuickActionsWidget !== false;
   const showCategoryColumns = layout.showCategoryColumns !== false;
   const showQuickLibrary = layout.showQuickLibrarySection !== false;
+
+  // Dynamic Sidebar Widgets setup
+  const configuredSidebarWidgets: SidebarWidgetSetting[] = React.useMemo(() => {
+    const fromLayout = siteConfig?.layoutSettings?.sidebarWidgets;
+    const fromConfig = siteConfig?.sidebarWidgets;
+    const list =
+      fromLayout && fromLayout.length > 0
+        ? fromLayout
+        : fromConfig && fromConfig.length > 0
+        ? fromConfig
+        : defaultSidebarWidgets;
+    return list;
+  }, [siteConfig?.layoutSettings?.sidebarWidgets, siteConfig?.sidebarWidgets]);
+
+  const leftWidgets = React.useMemo(() => {
+    return configuredSidebarWidgets
+      .filter((w) => w.side === 'left' && w.enabled !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [configuredSidebarWidgets]);
+
+  const rightWidgets = React.useMemo(() => {
+    return configuredSidebarWidgets
+      .filter((w) => w.side === 'right' && w.enabled !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [configuredSidebarWidgets]);
+
+  const hasLeftColumn = leftWidgets.length > 0;
+  const hasRightColumn = rightWidgets.length > 0;
+  const hasMiddleColumn = showFeaturedSlider || showSpotlight;
 
   // Quick Action Cards from siteConfig (support both property keys) or default
   const quickActionCards: QuickActionCard[] =
@@ -351,44 +378,100 @@ export const HomeView: React.FC<HomeViewProps> = ({
               + Tin mới nhất (if enabled)
               + Tiện ích quân nhân / Cuộc thi trực tuyến (if enabled)
          ======================================================== */}
-      {(showUncleHo || showAnnouncements || showFeaturedSlider || showSpotlight || showLatestNews || showQuickActions) && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
-          {/* LEFT COLUMN: 1 fraction (1/4) */}
-          <div className="lg:col-span-1 flex flex-col gap-4">
-            {showUncleHo && (
-              <UncleHoDailySection
-                quotes={uncleHoQuotes}
-                settings={uncleHoSettings}
-                currentUser={currentUser}
-                isLoading={isLoading}
-                onOpenManager={onOpenUncleHoManager}
-                onSaveQuotes={onSaveUncleHoQuotes}
-                layout="vertical"
-              />
-            )}
+      {/* ========================================================
+          1. 3-COLUMN SMART TOP MAIN SECTION
+          - Dynamic Left / Right widget placement
+          - Intelligent auto-expansion (50% Center with both, 75% Center with one side, 100% Center without sidebars)
+         ======================================================== */}
+      {(hasLeftColumn || hasMiddleColumn || hasRightColumn) && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full">
+          {/* LEFT COLUMN */}
+          {hasLeftColumn && (
+            <div
+              className={`flex flex-col gap-4 ${
+                hasMiddleColumn && hasRightColumn
+                  ? 'lg:col-span-3'
+                  : hasMiddleColumn && !hasRightColumn
+                  ? 'lg:col-span-3'
+                  : !hasMiddleColumn && hasRightColumn
+                  ? 'lg:col-span-6'
+                  : 'lg:col-span-12'
+              }`}
+            >
+              {leftWidgets.map((widget) => {
+                switch (widget.id) {
+                  case 'uncle_ho':
+                    return (
+                      <UncleHoDailySection
+                        key="widget-uncle-ho"
+                        quotes={uncleHoQuotes}
+                        settings={uncleHoSettings}
+                        currentUser={currentUser}
+                        isLoading={isLoading}
+                        onOpenManager={onOpenUncleHoManager}
+                        onSaveQuotes={onSaveUncleHoQuotes}
+                        layout="vertical"
+                      />
+                    );
+                  case 'daily_widgets':
+                    return (
+                      <DailyWidgetsSection
+                        key="widget-daily-widgets"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'announcements':
+                    return (
+                      <HomeAnnouncementsWidget
+                        key="widget-announcements"
+                        announcements={announcements}
+                        currentUser={currentUser}
+                        articles={approvedArticles}
+                        isLoading={isLoading}
+                        onOpenArticle={onOpenArticle}
+                        onOpenAnnouncementManager={onOpenAnnouncementManager}
+                      />
+                    );
+                  case 'latest_news':
+                    return (
+                      <HomeLatestNewsWidget
+                        key="widget-latest-news"
+                        articles={approvedArticles}
+                        isLoading={isLoading}
+                        onOpenArticle={onOpenArticle}
+                        onSelectSection={onSelectSection}
+                      />
+                    );
+                  case 'quick_actions':
+                    return (
+                      <HomeQuickActionsWidget
+                        key="widget-quick-actions"
+                        cards={quickActionCards}
+                        currentUser={currentUser}
+                        onSelectSection={onSelectSection}
+                        onOpenQuickActionManager={() => setIsQuickActionModalOpen(true)}
+                      />
+                    );
+                  default:
+                    return null;
+                }
+              })}
+            </div>
+          )}
 
-            {/* 3 Chuyên mục Hằng ngày (Cột trái): An toàn, Giao thông, Hành động đẹp */}
-            <DailyWidgetsSection
-              dailyWidgets={siteConfig?.dailyWidgets}
-              currentUser={currentUser}
-              onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-            />
-
-            {showAnnouncements && (
-              <HomeAnnouncementsWidget
-                announcements={announcements}
-                currentUser={currentUser}
-                articles={approvedArticles}
-                isLoading={isLoading}
-                onOpenArticle={onOpenArticle}
-                onOpenAnnouncementManager={onOpenAnnouncementManager}
-              />
-            )}
-          </div>
-
-          {/* MIDDLE COLUMN: 2 fractions (2/4 = 1/2) */}
-          {(showFeaturedSlider || showSpotlight) && (
-            <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* MIDDLE COLUMN: Auto-expand depending on active sidebars */}
+          {hasMiddleColumn && (
+            <div
+              className={`flex flex-col gap-4 ${
+                hasLeftColumn && hasRightColumn
+                  ? 'lg:col-span-6'
+                  : (hasLeftColumn && !hasRightColumn) || (!hasLeftColumn && hasRightColumn)
+                  ? 'lg:col-span-9'
+                  : 'lg:col-span-12'
+              }`}
+            >
               {showFeaturedSlider && (
                 <HomeMiddleFeaturedSlider
                   articles={approvedArticles}
@@ -414,26 +497,79 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
           )}
 
-          {/* RIGHT COLUMN: 1 fraction (1/4) */}
-          {(showLatestNews || showQuickActions) && (
-            <div className="lg:col-span-1 flex flex-col gap-4">
-              {showLatestNews && (
-                <HomeLatestNewsWidget
-                  articles={approvedArticles}
-                  isLoading={isLoading}
-                  onOpenArticle={onOpenArticle}
-                  onSelectSection={onSelectSection}
-                />
-              )}
-
-              {showQuickActions && (
-                <HomeQuickActionsWidget
-                  cards={quickActionCards}
-                  currentUser={currentUser}
-                  onSelectSection={onSelectSection}
-                  onOpenQuickActionManager={() => setIsQuickActionModalOpen(true)}
-                />
-              )}
+          {/* RIGHT COLUMN */}
+          {hasRightColumn && (
+            <div
+              className={`flex flex-col gap-4 ${
+                hasMiddleColumn && hasLeftColumn
+                  ? 'lg:col-span-3'
+                  : hasMiddleColumn && !hasLeftColumn
+                  ? 'lg:col-span-3'
+                  : !hasMiddleColumn && hasLeftColumn
+                  ? 'lg:col-span-6'
+                  : 'lg:col-span-12'
+              }`}
+            >
+              {rightWidgets.map((widget) => {
+                switch (widget.id) {
+                  case 'uncle_ho':
+                    return (
+                      <UncleHoDailySection
+                        key="widget-uncle-ho"
+                        quotes={uncleHoQuotes}
+                        settings={uncleHoSettings}
+                        currentUser={currentUser}
+                        isLoading={isLoading}
+                        onOpenManager={onOpenUncleHoManager}
+                        onSaveQuotes={onSaveUncleHoQuotes}
+                        layout="vertical"
+                      />
+                    );
+                  case 'daily_widgets':
+                    return (
+                      <DailyWidgetsSection
+                        key="widget-daily-widgets"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'announcements':
+                    return (
+                      <HomeAnnouncementsWidget
+                        key="widget-announcements"
+                        announcements={announcements}
+                        currentUser={currentUser}
+                        articles={approvedArticles}
+                        isLoading={isLoading}
+                        onOpenArticle={onOpenArticle}
+                        onOpenAnnouncementManager={onOpenAnnouncementManager}
+                      />
+                    );
+                  case 'latest_news':
+                    return (
+                      <HomeLatestNewsWidget
+                        key="widget-latest-news"
+                        articles={approvedArticles}
+                        isLoading={isLoading}
+                        onOpenArticle={onOpenArticle}
+                        onSelectSection={onSelectSection}
+                      />
+                    );
+                  case 'quick_actions':
+                    return (
+                      <HomeQuickActionsWidget
+                        key="widget-quick-actions"
+                        cards={quickActionCards}
+                        currentUser={currentUser}
+                        onSelectSection={onSelectSection}
+                        onOpenQuickActionManager={() => setIsQuickActionModalOpen(true)}
+                      />
+                    );
+                  default:
+                    return null;
+                }
+              })}
             </div>
           )}
         </div>

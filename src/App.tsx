@@ -1802,7 +1802,7 @@ export function App() {
       />
 
       {/* 4. Main Body Container */}
-      <main className="flex-1 w-full px-3 sm:px-6 lg:px-8 py-5">
+      <main className="flex-1 w-full max-w-[1850px] mx-auto px-3 sm:px-5 lg:px-8 py-4 sm:py-5">
         <div className="w-full">
           {/* Main Content Area */}
           <div className="w-full min-w-0">
