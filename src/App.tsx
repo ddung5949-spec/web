@@ -54,6 +54,7 @@ import { Footer } from './components/Footer';
 
 // Modals
 import { AuthModal } from './components/modals/AuthModal';
+import { LoginModal } from './components/LoginModal';
 import { ProfileModal } from './components/modals/ProfileModal';
 import { CustomizerModal } from './components/modals/CustomizerModal';
 import { PostArticleModal } from './components/modals/PostArticleModal';
@@ -65,6 +66,7 @@ import { TabIntroManagerModal } from './components/modals/TabIntroManagerModal';
 import { QuickActionManagerModal } from './components/modals/QuickActionManagerModal';
 import { AccessDeniedModal } from './components/modals/AccessDeniedModal';
 import { LayoutManagerModal } from './components/modals/LayoutManagerModal';
+import { supabase, supabaseAuth } from './utils/supabase';
 
 // Home Widgets for 3-Column Layout
 import { UncleHoDailySection } from './components/UncleHoDailySection';
@@ -311,9 +313,30 @@ export function App() {
       },
     });
 
+    // 4. Supabase Auth session checking & auto-listener
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (isMounted && session?.user) {
+        const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
+        setCurrentUser((prev) => (prev ? prev : adminUser));
+      }
+    }).catch(console.warn);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
+        setCurrentUser(adminUser);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+      }
+    });
+
     return () => {
       isMounted = false;
       if (unsub) unsub();
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
   }, []);
 
@@ -587,7 +610,13 @@ export function App() {
     return true;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('[App] Supabase signOut error:', err);
+    }
+
     if (currentUser) {
       const now = new Date();
       const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(
@@ -612,6 +641,7 @@ export function App() {
     }
 
     setCurrentUser(null);
+    showToast('info', 'Đã đăng xuất', 'Bạn đã đăng xuất khỏi hệ thống thành công.');
     if (currentPage === 'meeting' || currentPage === 'approvals' || currentPage === 'users') {
       setCurrentPage('home');
     }
@@ -1566,16 +1596,19 @@ export function App() {
     showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
   };
 
-  // Daily Widgets Save Handler
+  // Daily Widgets & Posters Save Handler
   const handleSaveDailyWidgets = async (widgets: DailyWidgetItem[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       dailyWidgets: widgets,
+      dailyPosters: widgets,
+      daily_widgets: widgets,
+      daily_posters: widgets,
     };
     setSiteConfig(updatedConfig);
     safeStore.set('mangyang_site_config', updatedConfig);
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã cập nhật chuyên mục hằng ngày', 'Nội dung và hình ảnh 3 chuyên mục hằng ngày đã được lưu trữ.');
+    showToast('success', 'Đã cập nhật ảnh poster chuyên mục', 'Poster đã được nén và lưu đồng bộ trực tiếp vào cơ sở dữ liệu.');
   };
 
   // Spotlight Article Select Handler

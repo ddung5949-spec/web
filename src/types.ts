@@ -51,6 +51,8 @@ export interface User {
   username: string;
   password?: string;
   fullName: string;
+  email?: string;
+  createdAt?: string;
   birthDate?: string;
   rank?: string;
   position?: string;
@@ -480,6 +482,9 @@ export interface SiteConfig {
   customMenuItems?: CustomMenuItem[];
   navTabs?: NavTabItem[];
   dailyWidgets?: DailyWidgetItem[];
+  dailyPosters?: DailyWidgetItem[] | Record<string, any>;
+  daily_widgets?: DailyWidgetItem[] | Record<string, any>;
+  daily_posters?: DailyWidgetItem[] | Record<string, any>;
   sidebarWidgets?: SidebarWidgetSetting[];
   tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined';
   tickerDays?: number;

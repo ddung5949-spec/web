@@ -1,5 +1,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Article, DocumentItem, LectureItem, MeetingDocumentItem, MeetingRoomItem, MeetingRoomSettings, MeetingVote, SectionType, SiteConfig, User } from '../types';
+import {
+  Article,
+  DailyWidgetItem,
+  DocumentItem,
+  LectureItem,
+  MeetingDocumentItem,
+  MeetingRoomItem,
+  MeetingRoomSettings,
+  MeetingVote,
+  SectionType,
+  SiteConfig,
+  User,
+} from '../types';
 
 // Read Supabase credentials from client-side Vite environment variables with project defaults
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
@@ -18,16 +30,14 @@ export const isSupabaseConfigured = (): boolean => {
 
 let clientInstance: SupabaseClient | null = null;
 
-export const getSupabase = (): SupabaseClient | null => {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
+export const getSupabase = (): SupabaseClient => {
   if (!clientInstance) {
     try {
-      clientInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      clientInstance = createClient(supabaseUrl || 'https://zarihmliquvtbksuhajp.supabase.co', supabaseAnonKey || 'sb_publishable_GeVd72FMAJD3aLRzoTBNgA_E4KBRYFq', {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
+          detectSessionInUrl: true,
         },
         realtime: {
           params: {
@@ -37,10 +47,78 @@ export const getSupabase = (): SupabaseClient | null => {
       });
     } catch (err) {
       console.warn('Lỗi khởi tạo Supabase Client:', err);
-      return null;
+      // Fallback instance
+      clientInstance = createClient(
+        'https://zarihmliquvtbksuhajp.supabase.co',
+        'sb_publishable_GeVd72FMAJD3aLRzoTBNgA_E4KBRYFq',
+        {
+          auth: { persistSession: true, autoRefreshToken: true },
+        }
+      );
     }
   }
   return clientInstance;
+};
+
+// Export direct supabase singleton instance for direct supabase.auth... and supabase.from... calls
+export const supabase = getSupabase();
+
+// Supabase Auth Helper & User Mapper
+export const supabaseAuth = {
+  async signInWithPassword(email: string, password: string) {
+    const sb = getSupabase();
+    return await sb.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+  },
+
+  async signOut() {
+    const sb = getSupabase();
+    return await sb.auth.signOut();
+  },
+
+  async getSession() {
+    const sb = getSupabase();
+    return await sb.auth.getSession();
+  },
+
+  onAuthStateChange(callback: (event: string, session: any) => void) {
+    const sb = getSupabase();
+    return sb.auth.onAuthStateChange(callback);
+  },
+
+  mapSupabaseUserToAdmin(sbUser: any): User {
+    const email = sbUser.email || '';
+    const username = email ? email.split('@')[0] : 'admin';
+    const fullName =
+      sbUser.user_metadata?.full_name ||
+      sbUser.user_metadata?.name ||
+      username ||
+      'Quản trị viên Hệ thống';
+
+    return {
+      id: 1,
+      username: username,
+      fullName: fullName,
+      role: 'admin',
+      email: email,
+      rank: 'Sĩ quan',
+      position: 'Quản trị viên',
+      rankUnit: 'Sĩ quan - Quản trị viên Hệ thống',
+      avatar:
+        sbUser.user_metadata?.avatar_url ||
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      isOnline: true,
+      totalActiveMinutes: 120,
+      sessionCount: 1,
+      canViewSecretDocs: true,
+      canUploadDocs: true,
+      canJoinPartyMeeting: true,
+      createdAt: sbUser.created_at || new Date().toISOString(),
+      lastActiveAt: new Date().toLocaleString('vi-VN'),
+    };
+  },
 };
 
 /* =========================================================================
@@ -890,6 +968,63 @@ export const supabaseDb = {
           if (row.marquee_text && !result.ticker) result.ticker = row.marquee_text;
           if (row.theme_color && !result.colorRed) result.colorRed = row.theme_color;
           if (row.unit_name && !result.footerUnitName) result.footerUnitName = row.unit_name;
+
+          // Check direct column daily_widgets or daily_posters on row if not inside json
+          const rowDaily = row.daily_widgets || row.daily_posters || row.dailyWidgets;
+          if (rowDaily) {
+            let parsedDaily = rowDaily;
+            if (typeof parsedDaily === 'string') {
+              try {
+                parsedDaily = JSON.parse(parsedDaily);
+              } catch {}
+            }
+            if (Array.isArray(parsedDaily)) {
+              result.dailyWidgets = parsedDaily;
+            } else if (parsedDaily && typeof parsedDaily === 'object') {
+              // Normalize object format { safety_message: { image, ... }, ... } into DailyWidgetItem[]
+              const items: DailyWidgetItem[] = Object.entries(parsedDaily).map(([key, val]: [string, any]) => ({
+                id: key,
+                categoryName:
+                  val?.categoryName ||
+                  (key === 'safety_message'
+                    ? 'Mỗi ngày 1 thông điệp an toàn'
+                    : key === 'traffic_situation'
+                    ? 'Mỗi ngày một tình huống giao thông'
+                    : key === 'good_deed'
+                    ? 'Mỗi ngày một hành động đẹp'
+                    : 'Chuyên mục hằng ngày'),
+                title: val?.title || '',
+                content: val?.content || '',
+                imageUrl: val?.image || val?.imageUrl || '',
+                aspectRatioMode: val?.aspectRatio || val?.aspectRatioMode || 'auto',
+                updatedAt: val?.updatedAt || '',
+              }));
+              result.dailyWidgets = items;
+            }
+          }
+
+          // Also normalize result.dailyWidgets if it was stored as an object or dictionary inside json
+          if (result.dailyWidgets && !Array.isArray(result.dailyWidgets) && typeof result.dailyWidgets === 'object') {
+            const items: DailyWidgetItem[] = Object.entries(result.dailyWidgets).map(([key, val]: [string, any]) => ({
+              id: key,
+              categoryName:
+                val?.categoryName ||
+                (key === 'safety_message'
+                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  : key === 'traffic_situation'
+                  ? 'Mỗi ngày một tình huống giao thông'
+                  : key === 'good_deed'
+                  ? 'Mỗi ngày một hành động đẹp'
+                  : 'Chuyên mục hằng ngày'),
+              title: val?.title || '',
+              content: val?.content || '',
+              imageUrl: val?.image || val?.imageUrl || '',
+              aspectRatioMode: val?.aspectRatio || val?.aspectRatioMode || 'auto',
+              updatedAt: val?.updatedAt || '',
+            }));
+            result.dailyWidgets = items;
+          }
+
           return result as SiteConfig;
         }
       }
@@ -908,6 +1043,25 @@ export const supabaseDb = {
       const configData = config;
       const now = new Date().toISOString();
 
+      // Convert dailyWidgets to dictionary structure for compatibility with daily_widgets / daily_posters json columns
+      const dailyWidgetsDict: Record<string, any> = {};
+      if (Array.isArray(configData.dailyWidgets)) {
+        configData.dailyWidgets.forEach((item) => {
+          const cleanKey = item.id.replace(/^widget_/, '');
+          dailyWidgetsDict[cleanKey] = {
+            id: cleanKey,
+            categoryName: item.categoryName,
+            title: item.title || '',
+            content: item.content || '',
+            image: item.imageUrl || '',
+            imageUrl: item.imageUrl || '',
+            aspectRatio: item.aspectRatioMode || 'auto',
+            aspectRatioMode: item.aspectRatioMode || 'auto',
+            updatedAt: item.updatedAt || now,
+          };
+        });
+      }
+
       // 1. Primary payload containing all compatible columns as requested
       const payload: any = {
         id: 'default',
@@ -916,6 +1070,8 @@ export const supabaseDb = {
         unit_name: configData.footerUnitName || configData.title || '',
         marquee_text: configData.ticker || '',
         theme_color: configData.colorRed || '#b91c1c',
+        daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
+        daily_posters: dailyWidgetsDict,
         config_json: configData,
         config: configData,
         data: configData,
@@ -927,10 +1083,10 @@ export const supabaseDb = {
         return { success: true };
       }
 
-      // If column mismatch (e.g. 'config_json' column does not exist or id type differs), try fallback variations
+      // If column mismatch (e.g. some columns do not exist in custom schema), try fallback variations
       const fallbackPayloads = [
         {
-          id: 1,
+          id: 'default',
           title: configData.title || '',
           subtitle: configData.subtitle || '',
           unit_name: configData.footerUnitName || configData.title || '',
@@ -941,9 +1097,30 @@ export const supabaseDb = {
           data: configData,
           updated_at: now,
         },
+        {
+          id: 'default',
+          daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
+          daily_posters: dailyWidgetsDict,
+          config_json: configData,
+          updated_at: now,
+        },
         { id: 'default', config_json: configData, updated_at: now },
         { id: 'default', config: configData, updated_at: now },
         { id: 'default', data: configData, updated_at: now },
+        {
+          id: 1,
+          title: configData.title || '',
+          subtitle: configData.subtitle || '',
+          unit_name: configData.footerUnitName || configData.title || '',
+          marquee_text: configData.ticker || '',
+          theme_color: configData.colorRed || '#b91c1c',
+          daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
+          daily_posters: dailyWidgetsDict,
+          config_json: configData,
+          config: configData,
+          data: configData,
+          updated_at: now,
+        },
         { id: 1, config_json: configData, updated_at: now },
         { id: 1, config: configData, updated_at: now },
         { id: 1, data: configData, updated_at: now },

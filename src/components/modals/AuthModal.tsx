@@ -5,8 +5,10 @@ import {
   Eye,
   EyeOff,
   IdCard,
+  Loader2,
   Lock,
   LogIn,
+  Mail,
   Medal,
   Shield,
   User,
@@ -16,12 +18,13 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { UnitLogo } from '../UnitLogo';
+import { supabase, supabaseAuth } from '../../utils/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
   initialTab?: 'login' | 'register';
   onClose: () => void;
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (usernameOrEmail: string, password: string) => boolean | Promise<boolean>;
   onRegister: (data: {
     username: string;
     password: string;
@@ -91,6 +94,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loginUser, setLoginUser] = useState('');
   const [loginPass, setLoginPass] = useState('');
   const [showLoginPass, setShowLoginPass] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Register States: Tên tài khoản, Mật khẩu, Nhập lại mật khẩu, Họ và tên, Ngày sinh, Cấp bậc, Chức vụ
   const [regUsername, setRegUsername] = useState('');
@@ -106,19 +111,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginUser.trim() || !loginPass.trim()) {
-      alert('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!');
+    setLoginError(null);
+
+    const identifier = loginUser.trim();
+    const password = loginPass;
+
+    if (!identifier || !password) {
+      setLoginError('Vui lòng nhập đầy đủ Email/Tên tài khoản và Mật khẩu!');
       return;
     }
-    const success = onLogin(loginUser.trim(), loginPass.trim());
-    if (success) {
-      setLoginUser('');
-      setLoginPass('');
-      onClose();
-    } else {
-      alert('Tên đăng nhập hoặc mật khẩu chưa chính xác! Vui lòng kiểm tra lại.');
+
+    setIsLoggingIn(true);
+
+    try {
+      // 1. Try Supabase Auth if input looks like an email or direct call
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: identifier,
+        password: password,
+      });
+
+      if (!error && data?.user) {
+        setLoginUser('');
+        setLoginPass('');
+        setLoginError(null);
+        onClose();
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // 2. Call onLogin prop (which also attempts fallback authentication)
+      const success = await Promise.resolve(onLogin(identifier, password));
+      if (success) {
+        setLoginUser('');
+        setLoginPass('');
+        setLoginError(null);
+        onClose();
+      } else {
+        setLoginError('Email hoặc mật khẩu không chính xác!');
+      }
+    } catch (err) {
+      console.warn('[AuthModal] login error:', err);
+      setLoginError('Email hoặc mật khẩu không chính xác!');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -252,19 +289,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                TAB: ĐĂNG NHẬP
                ========================================================================= */
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {loginError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-gray-500" />
-                  <span>Tên đăng nhập / Tài khoản (*):</span>
+                  <span>Email / Tên tài khoản (*):</span>
                 </label>
                 <input
                   type="text"
                   id="login-username-input"
                   value={loginUser}
-                  onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="Nhập tên tài khoản (ví dụ: admin hoặc canbo24)..."
+                  onChange={(e) => {
+                    setLoginUser(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  placeholder="Nhập email hoặc tên tài khoản (ví dụ: ddung5949@gmail.com)..."
                   className="w-full text-xs p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-hidden transition-all"
                   required
+                  disabled={isLoggingIn}
                 />
               </div>
 
@@ -278,10 +326,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showLoginPass ? 'text' : 'password'}
                     id="login-password-input"
                     value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
+                    onChange={(e) => {
+                      setLoginPass(e.target.value);
+                      if (loginError) setLoginError(null);
+                    }}
                     placeholder="Nhập mật khẩu..."
                     className="w-full text-xs p-2.5 pr-10 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-hidden transition-all"
                     required
+                    disabled={isLoggingIn}
                   />
                   <button
                     type="button"
@@ -296,10 +348,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 id="btn-submit-login"
-                className="w-full bg-red-700 hover:bg-red-800 text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer mt-3"
+                disabled={isLoggingIn}
+                className="w-full bg-red-700 hover:bg-red-800 disabled:bg-red-400 text-white font-bold text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer mt-3"
               >
-                <LogIn className="w-4 h-4" />
-                <span>ĐĂNG NHẬP HỆ THỐNG</span>
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>ĐANG XÁC THỰC SUPABASE...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>ĐĂNG NHẬP HỆ THỐNG</span>
+                  </>
+                )}
               </button>
             </form>
           ) : (

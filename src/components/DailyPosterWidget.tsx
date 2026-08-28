@@ -75,21 +75,42 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   const cleanId = widgetId.replace(/^widget_/, '');
 
   // Find default fallback
-  const defaultItem = defaultDailyWidgets.find(
-    (w) => w.id === cleanId || w.id === widgetId
-  ) || {
+  const defaultCategoryTitle =
+    cleanId === 'safety_message'
+      ? 'Mỗi ngày 1 thông điệp an toàn'
+      : cleanId === 'traffic_situation'
+      ? 'Mỗi ngày một tình huống giao thông'
+      : cleanId === 'good_deed'
+      ? 'Mỗi ngày một hành động đẹp'
+      : 'Chuyên mục hằng ngày';
+
+  const defaultItem: DailyWidgetItem = {
     id: cleanId,
-    categoryName: 'Chuyên mục hằng ngày',
-    title: 'Thông điệp poster',
+    categoryName: defaultCategoryTitle,
+    title: '',
     content: '',
-    imageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '',
     aspectRatioMode: 'auto',
   };
 
-  // Find custom configured item
-  const customItem = dailyWidgets?.find(
-    (w) => w.id === cleanId || w.id === widgetId
-  );
+  // Find custom configured item from dailyWidgets prop (supports both array and object format)
+  let customItem: DailyWidgetItem | undefined;
+  if (Array.isArray(dailyWidgets)) {
+    customItem = dailyWidgets.find((w) => w.id === cleanId || w.id === widgetId);
+  } else if (dailyWidgets && typeof dailyWidgets === 'object') {
+    const rawVal = (dailyWidgets as any)[cleanId] || (dailyWidgets as any)[widgetId];
+    if (rawVal) {
+      customItem = {
+        id: cleanId,
+        categoryName: rawVal.categoryName || defaultCategoryTitle,
+        title: rawVal.title || '',
+        content: rawVal.content || '',
+        imageUrl: rawVal.image || rawVal.imageUrl || '',
+        aspectRatioMode: rawVal.aspectRatio || rawVal.aspectRatioMode || 'auto',
+        updatedAt: rawVal.updatedAt || '',
+      };
+    }
+  }
 
   const currentItem: DailyWidgetItem = {
     ...defaultItem,
