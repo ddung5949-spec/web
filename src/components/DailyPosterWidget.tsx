@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { DailyWidgetItem, User } from '../types';
 import { defaultDailyWidgets } from '../data/initialData';
+import { supabaseDb, getSupabase } from '../utils/supabase';
 
 interface DailyPosterWidgetProps {
   widgetId: string; // 'safety_message' | 'traffic_situation' | 'good_deed' | 'widget_safety_message' ...
@@ -27,9 +28,10 @@ interface DailyPosterWidgetProps {
 
 /**
  * High-performance client-side Canvas image compressor
- * Automatically downscales images > 1200px and optimizes compression to < 400KB
+ * Automatically downscales images (max width 800px, JPEG quality 0.65)
+ * Ensuring Base64 payload is ultra-light (< 150KB) for instantaneous Supabase sync
  */
-export function compressPosterImage(file: File, maxWidth = 1200, quality = 0.82): Promise<string> {
+export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -74,15 +76,21 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   // Normalize id (e.g. 'widget_safety_message' -> 'safety_message')
   const cleanId = widgetId.replace(/^widget_/, '');
 
+  // Standardized posterKey: 'safety' | 'traffic' | 'good_deed'
+  const posterKey =
+    cleanId === 'safety_message' || cleanId === 'safety'
+      ? 'safety'
+      : cleanId === 'traffic_situation' || cleanId === 'traffic'
+      ? 'traffic'
+      : 'good_deed';
+
   // Find default fallback
   const defaultCategoryTitle =
-    cleanId === 'safety_message'
+    posterKey === 'safety'
       ? 'Mỗi ngày 1 thông điệp an toàn'
-      : cleanId === 'traffic_situation'
+      : posterKey === 'traffic'
       ? 'Mỗi ngày một tình huống giao thông'
-      : cleanId === 'good_deed'
-      ? 'Mỗi ngày một hành động đẹp'
-      : 'Chuyên mục hằng ngày';
+      : 'Mỗi ngày một hành động đẹp';
 
   const defaultItem: DailyWidgetItem = {
     id: cleanId,
@@ -93,21 +101,52 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
     aspectRatioMode: 'auto',
   };
 
+  // 1. Instant fallback from localStorage cache if props not yet loaded
+  let cachedImg = '';
+  let cachedRatio = 'auto';
+  let cachedTitle = '';
+  let cachedCat = '';
+  try {
+    const cachedRaw = localStorage.getItem('daily_posters_cache');
+    if (cachedRaw) {
+      const cacheMap = JSON.parse(cachedRaw);
+      const found = cacheMap[posterKey] || cacheMap[cleanId] || cacheMap[widgetId];
+      if (found) {
+        cachedImg = found.image_data || found.imageUrl || found.image || '';
+        cachedRatio = found.aspect_ratio || found.aspectRatio || found.aspectRatioMode || 'auto';
+        cachedTitle = found.title || '';
+        cachedCat = found.category_name || found.categoryName || '';
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   // Find custom configured item from dailyWidgets prop (supports both array and object format)
   let customItem: DailyWidgetItem | undefined;
   if (Array.isArray(dailyWidgets)) {
-    customItem = dailyWidgets.find((w) => w.id === cleanId || w.id === widgetId);
+    customItem = dailyWidgets.find(
+      (w) =>
+        w.id === cleanId ||
+        w.id === widgetId ||
+        (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'widget_safety_message' || w.id === 'safety')) ||
+        (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation' || w.id === 'traffic')) ||
+        (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
+    );
   } else if (dailyWidgets && typeof dailyWidgets === 'object') {
-    const rawVal = (dailyWidgets as any)[cleanId] || (dailyWidgets as any)[widgetId];
+    const rawVal =
+      (dailyWidgets as any)[cleanId] ||
+      (dailyWidgets as any)[widgetId] ||
+      (dailyWidgets as any)[posterKey];
     if (rawVal) {
       customItem = {
         id: cleanId,
-        categoryName: rawVal.categoryName || defaultCategoryTitle,
+        categoryName: rawVal.categoryName || rawVal.category_name || defaultCategoryTitle,
         title: rawVal.title || '',
         content: rawVal.content || '',
-        imageUrl: rawVal.image || rawVal.imageUrl || '',
-        aspectRatioMode: rawVal.aspectRatio || rawVal.aspectRatioMode || 'auto',
-        updatedAt: rawVal.updatedAt || '',
+        imageUrl: rawVal.image || rawVal.imageUrl || rawVal.image_data || '',
+        aspectRatioMode: rawVal.aspectRatio || rawVal.aspectRatioMode || rawVal.aspect_ratio || 'auto',
+        updatedAt: rawVal.updatedAt || rawVal.updated_at || '',
       };
     }
   }
@@ -115,11 +154,16 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   const currentItem: DailyWidgetItem = {
     ...defaultItem,
     ...(customItem || {}),
+    imageUrl: customItem?.imageUrl || cachedImg || '',
+    aspectRatioMode: (customItem?.aspectRatioMode || cachedRatio as any || 'auto'),
+    categoryName: customItem?.categoryName || cachedCat || defaultCategoryTitle,
+    title: customItem?.title || cachedTitle || '',
   };
 
   // Config mapping for styling & icons
   const getWidgetStyle = (id: string) => {
     switch (id) {
+      case 'safety':
       case 'safety_message':
       case 'widget_safety_message':
         return {
@@ -129,6 +173,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           borderColor: 'border-red-200 hover:border-red-400',
           defaultCategory: 'Mỗi ngày 1 thông điệp an toàn',
         };
+      case 'traffic':
       case 'traffic_situation':
       case 'widget_traffic_situation':
         return {
@@ -183,7 +228,8 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
     try {
       setIsCompressing(true);
-      const compressedBase64 = await compressPosterImage(file, 1200, 0.82);
+      // Nén siêu nhẹ: Chiều rộng tối đa 800px, chất lượng JPEG 0.65 (< 150KB)
+      const compressedBase64 = await compressPosterImage(file, 800, 0.65);
       setFormImage(compressedBase64);
     } catch (err) {
       console.error('Error compressing poster image:', err);
@@ -197,20 +243,93 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
     e.preventDefault();
     try {
       setIsSaving(true);
+      const nowIso = new Date().toISOString();
       const todayStr = new Date().toLocaleDateString('vi-VN');
+      const finalImg = formImage || currentItem.imageUrl;
+      const finalCat = formCategory.trim() || styleConfig.defaultCategory;
+      const finalTitle = formTitle.trim() || styleConfig.defaultCategory;
+
       const updatedItem: DailyWidgetItem = {
         id: cleanId,
-        categoryName: formCategory.trim() || styleConfig.defaultCategory,
-        title: formTitle.trim() || styleConfig.defaultCategory,
-        imageUrl: formImage || currentItem.imageUrl,
+        categoryName: finalCat,
+        title: finalTitle,
+        imageUrl: finalImg,
         aspectRatioMode: formAspectRatio,
         updatedAt: todayStr,
       };
 
-      // Merge into full daily widgets list
+      // -------------------------------------------------------------
+      // Lớp 1 (Supabase): Upsert trực tiếp vào bảng `daily_posters`
+      // -------------------------------------------------------------
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { error: upsertErr } = await supabase.from('daily_posters').upsert(
+            {
+              id: posterKey, // 'safety' | 'traffic' | 'good_deed'
+              image_data: finalImg,
+              aspect_ratio: formAspectRatio,
+              category_name: finalCat,
+              title: finalTitle,
+              updated_at: nowIso,
+            },
+            { onConflict: 'id' }
+          );
+
+          if (upsertErr) {
+            // Thử thêm với alias columns để tương thích tối đa
+            await supabase.from('daily_posters').upsert(
+              {
+                id: posterKey,
+                key: posterKey,
+                image_data: finalImg,
+                aspect_ratio: formAspectRatio,
+                updated_at: nowIso,
+              } as any,
+              { onConflict: 'id' }
+            );
+          }
+        } catch (dbErr) {
+          console.warn('[DailyPosterWidget] Supabase direct upsert error:', dbErr);
+        }
+      }
+
+      // -------------------------------------------------------------
+      // Lớp 2 (Local Cache): Lưu vào localStorage cache tức thì
+      // -------------------------------------------------------------
+      try {
+        const cachedRaw = localStorage.getItem('daily_posters_cache');
+        const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+        const cacheEntry = {
+          id: posterKey,
+          image_data: finalImg,
+          aspect_ratio: formAspectRatio,
+          category_name: finalCat,
+          title: finalTitle,
+          updated_at: nowIso,
+        };
+        cacheMap[posterKey] = cacheEntry;
+        cacheMap[cleanId] = cacheEntry;
+        if (posterKey === 'safety') cacheMap['safety_message'] = cacheEntry;
+        if (posterKey === 'traffic') cacheMap['traffic_situation'] = cacheEntry;
+        localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+      } catch (cacheErr) {
+        console.warn('[DailyPosterWidget] Local cache save error:', cacheErr);
+      }
+
+      // -------------------------------------------------------------
+      // Cập nhật State chung & siteConfig toàn ứng dụng
+      // -------------------------------------------------------------
       const existingList = dailyWidgets && dailyWidgets.length > 0 ? [...dailyWidgets] : [...defaultDailyWidgets];
-      const index = existingList.findIndex((w) => w.id === cleanId || w.id === widgetId);
-      
+      const index = existingList.findIndex(
+        (w) =>
+          w.id === cleanId ||
+          w.id === widgetId ||
+          (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'safety')) ||
+          (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'traffic')) ||
+          (posterKey === 'good_deed' && w.id === 'good_deed')
+      );
+
       let finalList: DailyWidgetItem[];
       if (index >= 0) {
         finalList = existingList.map((w, i) => (i === index ? updatedItem : w));

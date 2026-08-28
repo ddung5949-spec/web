@@ -1025,6 +1025,65 @@ export const supabaseDb = {
             result.dailyWidgets = items;
           }
 
+          // 2. Fetch individual daily_posters rows if table exists and merge into result.dailyWidgets
+          try {
+            const { data: posterRows, error: posterErr } = await supabase.from('daily_posters').select('*');
+            if (!posterErr && posterRows && posterRows.length > 0) {
+              const existingWidgets: DailyWidgetItem[] = Array.isArray(result.dailyWidgets)
+                ? [...result.dailyWidgets]
+                : [];
+              
+              posterRows.forEach((pRow: any) => {
+                const key = (pRow.id || pRow.widget_id || pRow.key || '').replace(/^widget_/, '');
+                const imgData = pRow.image_data || pRow.imageUrl || pRow.image || pRow.url || '';
+                const ratio = pRow.aspect_ratio || pRow.aspectRatio || pRow.aspectRatioMode || 'auto';
+                const catName =
+                  pRow.category_name ||
+                  pRow.categoryName ||
+                  (key === 'safety_message' || key === 'safety'
+                    ? 'Mỗi ngày 1 thông điệp an toàn'
+                    : key === 'traffic_situation' || key === 'traffic'
+                    ? 'Mỗi ngày một tình huống giao thông'
+                    : key === 'good_deed'
+                    ? 'Mỗi ngày một hành động đẹp'
+                    : 'Chuyên mục hằng ngày');
+                const title = pRow.title || catName;
+                const updatedAt = pRow.updated_at || pRow.updatedAt || '';
+
+                const idx = existingWidgets.findIndex(
+                  (w) =>
+                    w.id === key ||
+                    w.id === `widget_${key}` ||
+                    (key === 'safety' && (w.id === 'safety_message' || w.id === 'widget_safety_message')) ||
+                    (key === 'traffic' && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation'))
+                );
+
+                const itemData: DailyWidgetItem = {
+                  id: key === 'safety' ? 'safety_message' : key === 'traffic' ? 'traffic_situation' : key,
+                  categoryName: catName,
+                  title: title,
+                  imageUrl: imgData,
+                  aspectRatioMode: ratio,
+                  updatedAt: updatedAt,
+                };
+
+                if (idx >= 0) {
+                  existingWidgets[idx] = {
+                    ...existingWidgets[idx],
+                    ...itemData,
+                    imageUrl: imgData || existingWidgets[idx].imageUrl,
+                  };
+                } else {
+                  existingWidgets.push(itemData);
+                }
+              });
+
+              result.dailyWidgets = existingWidgets;
+            }
+          } catch {
+            // ignore if daily_posters table not available
+          }
+
           // Ensure sections have synchronized shortLabel, short_name, nav_title
           if (result.sections && typeof result.sections === 'object') {
             Object.keys(result.sections).forEach((secKey) => {
@@ -1171,6 +1230,93 @@ export const supabaseDb = {
     }
   },
 
+  async upsertDailyPoster(poster: {
+    id: string; // 'safety' | 'traffic' | 'good_deed' | 'safety_message' | 'traffic_situation'
+    image_data: string;
+    aspect_ratio?: string;
+    title?: string;
+    category_name?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
+
+    try {
+      const cleanKey = poster.id.replace(/^widget_/, '');
+      const standardKey =
+        cleanKey === 'safety_message' || cleanKey === 'safety'
+          ? 'safety'
+          : cleanKey === 'traffic_situation' || cleanKey === 'traffic'
+          ? 'traffic'
+          : 'good_deed';
+
+      const now = new Date().toISOString();
+
+      // Upsert into dedicated daily_posters table
+      try {
+        const payload = {
+          id: standardKey,
+          image_data: poster.image_data,
+          aspect_ratio: poster.aspect_ratio || 'auto',
+          title: poster.title || '',
+          category_name: poster.category_name || '',
+          updated_at: now,
+        };
+        const { error: upsertErr } = await supabase.from('daily_posters').upsert(payload, { onConflict: 'id' });
+        if (upsertErr) {
+          // If onConflict on id has column name differences, try key / widget_id
+          await supabase.from('daily_posters').upsert(
+            {
+              id: standardKey,
+              key: standardKey,
+              widget_id: standardKey,
+              image_data: poster.image_data,
+              aspect_ratio: poster.aspect_ratio || 'auto',
+              updated_at: now,
+            } as any,
+            { onConflict: 'id' }
+          );
+        }
+      } catch {
+        // ignore if table not yet created
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Supabase upsertDailyPoster error:', err?.message || err);
+      return { success: true };
+    }
+  },
+
+  async fetchDailyPosters(): Promise<Record<string, { image_data: string; aspect_ratio: string; updatedAt?: string }> | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase.from('daily_posters').select('*');
+      if (error || !data) return null;
+
+      const result: Record<string, { image_data: string; aspect_ratio: string; updatedAt?: string }> = {};
+      data.forEach((row: any) => {
+        const key = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+        const normKey =
+          key === 'safety_message' || key === 'safety'
+            ? 'safety'
+            : key === 'traffic_situation' || key === 'traffic'
+            ? 'traffic'
+            : 'good_deed';
+
+        result[normKey] = {
+          image_data: row.image_data || row.imageUrl || row.image || '',
+          aspect_ratio: row.aspect_ratio || row.aspectRatio || row.aspectRatioMode || 'auto',
+          updatedAt: row.updated_at || row.updatedAt || '',
+        };
+      });
+      return result;
+    } catch {
+      return null;
+    }
+  },
+
   // -------------------------------------------------------------
   // 10. REALTIME DATABASE-FIRST SUBSCRIPTION (Singleton Channel: 'public:articles')
   // -------------------------------------------------------------
@@ -1311,6 +1457,16 @@ export const supabaseDb = {
             }
           } catch (e) {
             console.warn('[Realtime Categories Handler] Error caught safely:', e);
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_posters' }, async () => {
+          try {
+            if (callbacks.onSiteConfigChange) {
+              const fresh = await supabaseDb.fetchSiteConfig();
+              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+            }
+          } catch (e) {
+            console.warn('[Realtime DailyPosters Handler] Error caught safely:', e);
           }
         })
         // 8. Users

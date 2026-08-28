@@ -23,6 +23,7 @@ import {
 } from './types';
 import {
   defaultArticles,
+  defaultDailyWidgets,
   defaultDocuments,
   defaultLectures,
   defaultMeetingDocuments,
@@ -66,7 +67,7 @@ import { TabIntroManagerModal } from './components/modals/TabIntroManagerModal';
 import { QuickActionManagerModal } from './components/modals/QuickActionManagerModal';
 import { AccessDeniedModal } from './components/modals/AccessDeniedModal';
 import { LayoutManagerModal } from './components/modals/LayoutManagerModal';
-import { supabase, supabaseAuth } from './utils/supabase';
+import { supabase, supabaseAuth, supabaseDb } from './utils/supabase';
 
 // Home Widgets for 3-Column Layout
 import { UncleHoDailySection } from './components/UncleHoDailySection';
@@ -75,10 +76,59 @@ import { HomeLatestNewsWidget } from './components/HomeLatestNewsWidget';
 import { HomeQuickActionsWidget } from './components/HomeQuickActionsWidget';
 
 export function App() {
-  // State initialization with localStorage persistence
-  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() =>
-    safeStore.get('mangyang_site_config', defaultSiteConfig)
-  );
+  // State initialization with localStorage persistence and instant daily_posters_cache hydration
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => {
+    const initial = safeStore.get('mangyang_site_config', defaultSiteConfig);
+    try {
+      const cachedRaw = localStorage.getItem('daily_posters_cache');
+      if (cachedRaw) {
+        const cacheMap = JSON.parse(cachedRaw);
+        const existingWidgets: DailyWidgetItem[] = Array.isArray(initial.dailyWidgets)
+          ? [...initial.dailyWidgets]
+          : [...defaultDailyWidgets];
+
+        ['safety', 'traffic', 'good_deed'].forEach((key) => {
+          const entry =
+            cacheMap[key] ||
+            cacheMap[`widget_${key}`] ||
+            (key === 'safety' ? cacheMap['safety_message'] : key === 'traffic' ? cacheMap['traffic_situation'] : null);
+          if (entry && (entry.image_data || entry.imageUrl)) {
+            const cleanKey = key === 'safety' ? 'safety_message' : key === 'traffic' ? 'traffic_situation' : key;
+            const idx = existingWidgets.findIndex(
+              (w) =>
+                w.id === cleanKey ||
+                (key === 'safety' && w.id === 'safety') ||
+                (key === 'traffic' && w.id === 'traffic')
+            );
+            const updatedItem: DailyWidgetItem = {
+              id: cleanKey,
+              categoryName:
+                entry.category_name ||
+                (key === 'safety'
+                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  : key === 'traffic'
+                  ? 'Mỗi ngày một tình huống giao thông'
+                  : 'Mỗi ngày một hành động đẹp'),
+              title: entry.title || '',
+              imageUrl: entry.image_data || entry.imageUrl,
+              aspectRatioMode: entry.aspect_ratio || entry.aspectRatio || 'auto',
+              updatedAt: entry.updated_at || '',
+            };
+            if (idx >= 0) {
+              existingWidgets[idx] = { ...existingWidgets[idx], ...updatedItem };
+            } else {
+              existingWidgets.push(updatedItem);
+            }
+          }
+        });
+        initial.dailyWidgets = existingWidgets;
+        initial.dailyPosters = existingWidgets;
+      }
+    } catch {
+      // ignore
+    }
+    return initial;
+  });
 
   const [users, setUsers] = useState<User[]>(() =>
     safeStore.get('mangyang_users', defaultUsers)
@@ -206,7 +256,95 @@ export function App() {
 
     // 2. Tải các cấu hình và dữ liệu khác độc lập
     cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
-      if (isMounted && data) setSiteConfig(data);
+      if (isMounted && data) {
+        setSiteConfig(data);
+        if (data.dailyWidgets && Array.isArray(data.dailyWidgets)) {
+          try {
+            const cacheMap: Record<string, any> = {};
+            data.dailyWidgets.forEach((w) => {
+              const k = (w.id || '').replace(/^widget_/, '');
+              const normKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
+              if (w.imageUrl) {
+                cacheMap[normKey] = {
+                  id: normKey,
+                  image_data: w.imageUrl,
+                  aspect_ratio: w.aspectRatioMode || 'auto',
+                  category_name: w.categoryName,
+                  title: w.title,
+                  updated_at: w.updatedAt || '',
+                };
+                cacheMap[w.id] = cacheMap[normKey];
+              }
+            });
+            if (Object.keys(cacheMap).length > 0) {
+              const existingCacheRaw = localStorage.getItem('daily_posters_cache');
+              const existingCache = existingCacheRaw ? JSON.parse(existingCacheRaw) : {};
+              localStorage.setItem('daily_posters_cache', JSON.stringify({ ...existingCache, ...cacheMap }));
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }).catch(console.warn);
+
+    // Fetch poster data from dedicated daily_posters table
+    supabaseDb.fetchDailyPosters().then((posters) => {
+      if (isMounted && posters && Object.keys(posters).length > 0) {
+        try {
+          const cachedRaw = localStorage.getItem('daily_posters_cache');
+          const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+          Object.entries(posters).forEach(([k, val]) => {
+            cacheMap[k] = val;
+            if (k === 'safety') cacheMap['safety_message'] = val;
+            if (k === 'traffic') cacheMap['traffic_situation'] = val;
+          });
+          localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+        } catch {
+          // ignore
+        }
+
+        setSiteConfig((prev) => {
+          const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
+            ? [...prev.dailyWidgets]
+            : [...defaultDailyWidgets];
+
+          Object.entries(posters).forEach(([k, rawVal]) => {
+            const val = rawVal as { image_data: string; aspect_ratio: string; updatedAt?: string };
+            const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : k;
+            const idx = existingWidgets.findIndex(
+              (w) =>
+                w.id === cleanKey ||
+                (k === 'safety' && w.id === 'safety') ||
+                (k === 'traffic' && w.id === 'traffic')
+            );
+            const item: DailyWidgetItem = {
+              id: cleanKey,
+              categoryName:
+                k === 'safety'
+                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  : k === 'traffic'
+                  ? 'Mỗi ngày một tình huống giao thông'
+                  : 'Mỗi ngày một hành động đẹp',
+              title: '',
+              imageUrl: val.image_data,
+              aspectRatioMode: (val.aspect_ratio as any) || 'auto',
+              updatedAt: val.updatedAt,
+            };
+            if (idx >= 0) {
+              existingWidgets[idx] = { ...existingWidgets[idx], ...item };
+            } else {
+              existingWidgets.push(item);
+            }
+          });
+
+          return {
+            ...prev,
+            dailyWidgets: existingWidgets,
+            dailyPosters: existingWidgets,
+          };
+        });
+      }
     }).catch(console.warn);
 
     cloudStorage.loadUsers(defaultUsers).then((data) => {
@@ -1596,7 +1734,7 @@ export function App() {
     showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
   };
 
-  // Daily Widgets & Posters Save Handler
+  // Daily Widgets & Posters Save Handler (2-layer sync: Supabase + LocalStorage Cache)
   const handleSaveDailyWidgets = async (widgets: DailyWidgetItem[]) => {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
@@ -1607,8 +1745,56 @@ export function App() {
     };
     setSiteConfig(updatedConfig);
     safeStore.set('mangyang_site_config', updatedConfig);
+
+    // Update LocalStorage cache immediately
+    try {
+      const cachedRaw = localStorage.getItem('daily_posters_cache');
+      const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+      widgets.forEach((w) => {
+        const k = (w.id || '').replace(/^widget_/, '');
+        const normKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
+        if (w.imageUrl) {
+          const entry = {
+            id: normKey,
+            image_data: w.imageUrl,
+            aspect_ratio: w.aspectRatioMode || 'auto',
+            category_name: w.categoryName,
+            title: w.title,
+            updated_at: new Date().toISOString(),
+          };
+          cacheMap[normKey] = entry;
+          cacheMap[w.id] = entry;
+          if (normKey === 'safety') cacheMap['safety_message'] = entry;
+          if (normKey === 'traffic') cacheMap['traffic_situation'] = entry;
+        }
+      });
+      localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+    } catch (e) {
+      console.warn('Error caching daily posters:', e);
+    }
+
+    // Save siteConfig and individual poster rows
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã cập nhật ảnh poster chuyên mục', 'Poster đã được nén và lưu đồng bộ trực tiếp vào cơ sở dữ liệu.');
+
+    // Also upsert rows in daily_posters table
+    try {
+      for (const w of widgets) {
+        if (w.imageUrl) {
+          const k = (w.id || '').replace(/^widget_/, '');
+          await supabaseDb.upsertDailyPoster({
+            id: k,
+            image_data: w.imageUrl,
+            aspect_ratio: w.aspectRatioMode || 'auto',
+            category_name: w.categoryName,
+            title: w.title,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Error saving poster rows to Supabase:', e);
+    }
+
+    showToast('success', 'Đã cập nhật ảnh poster thành công!', 'Poster đã được nén tối ưu và lưu đồng bộ 2 lớp.');
   };
 
   // Spotlight Article Select Handler
