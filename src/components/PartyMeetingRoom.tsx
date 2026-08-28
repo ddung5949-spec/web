@@ -182,7 +182,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const [roomFormChairPerson, setRoomFormChairPerson] = useState('');
   const [roomFormSecretary, setRoomFormSecretary] = useState('');
   const [roomFormDescription, setRoomFormDescription] = useState('');
-  const [roomFormUnitTarget, setRoomFormUnitTarget] = useState('Đảng ủy Sư đoàn 10');
+  const [roomFormUnitTarget, setRoomFormUnitTarget] = useState('Đảng ủy Trung đoàn 95, Sư đoàn 2');
   const [roomFormPasswordRequired, setRoomFormPasswordRequired] = useState(true);
   const [roomFormPassword, setRoomFormPassword] = useState('1945');
   const [roomFormStatus, setRoomFormStatus] = useState<'scheduled' | 'in_progress' | 'ended'>('scheduled');
@@ -197,12 +197,12 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
     const nextIndex = meetingRooms.length + 1;
     setEditingRoomId(null);
     setRoomFormCode(`PH-ĐU-${nextIndex < 10 ? '0' + nextIndex : nextIndex}`);
-    setRoomFormTitle(`Hội nghị Đảng ủy Sư đoàn 10 (Phiên họp ${nextIndex})`);
+    setRoomFormTitle(`Hội nghị Đảng ủy Trung đoàn 95, Sư đoàn 2 (Phiên họp ${nextIndex})`);
     setRoomFormSessionNumber(`Kỳ họp chuyên đề Quý III/2026`);
     setRoomFormChairPerson(currentUser?.fullName ? `Đồng chí ${currentUser.fullName}` : 'Đồng chí Bí thư Đảng ủy');
     setRoomFormSecretary('Đồng chí Văn phòng Đảng ủy');
     setRoomFormDescription('Thảo luận và biểu quyết dự thảo nghị quyết lãnh đạo thực hiện nhiệm vụ chính trị, quân sự.');
-    setRoomFormUnitTarget('Đảng ủy Sư đoàn 10');
+    setRoomFormUnitTarget('Đảng ủy Trung đoàn 95, Sư đoàn 2');
     setRoomFormPasswordRequired(true);
     setRoomFormPassword('1945');
     setRoomFormStatus('in_progress');
@@ -226,7 +226,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
     setRoomFormChairPerson(room.chairPerson);
     setRoomFormSecretary(room.secretary);
     setRoomFormDescription(room.description || '');
-    setRoomFormUnitTarget(room.unitTarget || 'Đảng ủy Sư đoàn 10');
+    setRoomFormUnitTarget(room.unitTarget || 'Đảng ủy Trung đoàn 95, Sư đoàn 2');
     setRoomFormPasswordRequired(room.passwordRequired);
     setRoomFormPassword(room.roomPassword || '1945');
     setRoomFormStatus(room.status);
@@ -1401,7 +1401,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                     type="text"
                     value={roomFormTitle}
                     onChange={(e) => setRoomFormTitle(e.target.value)}
-                    placeholder="Ví dụ: Hội nghị Ban Thường vụ Đảng ủy Sư đoàn 10..."
+                    placeholder="Ví dụ: Hội nghị Ban Thường vụ Đảng ủy Trung đoàn 95, Sư đoàn 2..."
                     className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-pink-700 focus:outline-hidden font-bold text-gray-900"
                     required
                   />
@@ -1430,7 +1430,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                       type="text"
                       value={roomFormUnitTarget}
                       onChange={(e) => setRoomFormUnitTarget(e.target.value)}
-                      placeholder="Ví dụ: Đảng ủy Sư đoàn 10, Đảng ủy e28..."
+                      placeholder="Ví dụ: Đảng ủy Trung đoàn 95, Đảng ủy d1..."
                       className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-pink-700 focus:outline-hidden font-medium"
                     />
                   </div>
@@ -1587,7 +1587,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
               {currentRoom.title}
             </h2>
             <p className="text-xs text-gray-500">
-              Phòng họp này được bảo vệ theo chế độ Mật của Ban Thường vụ Đảng ủy Sư đoàn 10.
+              Phòng họp này được bảo vệ theo chế độ Mật của Ban Thường vụ Đảng ủy Trung đoàn 95, Sư đoàn 2.
             </p>
           </div>
 

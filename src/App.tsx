@@ -614,7 +614,7 @@ export function App() {
       setAccessDeniedModal({
         isOpen: true,
         title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP KHU VỰC QUẢN TRỊ NÀY',
-        message: 'Khu vực phê duyệt tin bài và quản trị tài khoản quân nhân chỉ dành riêng cho Quản trị viên (Admin - Ban Biên tập Sư đoàn 10)!',
+        message: 'Khu vực phê duyệt tin bài và quản trị tài khoản quân nhân chỉ dành riêng cho Quản trị viên (Admin - Ban Biên tập Trung đoàn 95, Sư đoàn 2)!',
         requiredRole: 'Quản trị viên (Admin)',
       });
       return;

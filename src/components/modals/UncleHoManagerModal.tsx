@@ -1,20 +1,18 @@
 import React, { useRef, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
+  BookOpen,
   Calendar,
-  Camera,
   Check,
   Clock,
   Edit3,
-  FileImage,
-  FolderArchive,
-  FolderPlus,
-  FolderUp,
   Image as ImageIcon,
+  Info,
   Plus,
-  RefreshCw,
+  Quote,
   Save,
   Search,
-  Settings,
   Sparkles,
   Star,
   Trash2,
@@ -37,52 +35,64 @@ interface UncleHoManagerModalProps {
 export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   isOpen,
   onClose,
-  quotes,
-  settings,
+  quotes = [],
+  settings = {
+    autoPostEnabled: true,
+    dailyPostTime: '06:00',
+    autoSelectToday: true,
+    activeQuoteId: '',
+    images: [],
+    bannerTitle: 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+    showQuoteOfTheDay: true,
+  },
   onSaveQuotes,
   onSaveSettings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'schedule' | 'upload_folder' | 'quote_list' | 'add_quote'>('schedule');
+  const [activeTab, setActiveTab] = useState<'album' | 'quotes'>('album');
 
-  // Settings local state
-  const [localSettings, setLocalSettings] = useState<UncleHoSettings>(settings);
+  // Album ảnh Slideshow state
+  const [slideshowImages, setSlideshowImages] = useState<string[]>(() => {
+    if (settings?.images && Array.isArray(settings.images) && settings.images.length > 0) {
+      return settings.images.filter((img) => img && !img.includes('unsplash.com'));
+    }
+    try {
+      const cached = localStorage.getItem('uncle_ho_images') || localStorage.getItem('mangyang_uncle_ho_images');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((img: string) => img && !img.includes('unsplash.com'));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
 
-  // Form local state for add/edit quote
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Tab 2: Quản lý Nội dung theo ngày
+  const [quotesList, setQuotesList] = useState<UncleHoQuote[]>(quotes);
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
-  const [formDayMonth, setFormDayMonth] = useState('19/08');
+  const [selectedDayMonth, setSelectedDayMonth] = useState('28/08');
   const [formYear, setFormYear] = useState('1945');
   const [formQuote, setFormQuote] = useState('');
   const [formContext, setFormContext] = useState('');
   const [formLesson, setFormLesson] = useState('');
-  const [formImages, setFormImages] = useState<string[]>([]);
-  const [isProcessingUpload, setIsProcessingUpload] = useState(false);
-  const formFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Folder upload batch state
-  const [uploadedFolderImages, setUploadedFolderImages] = useState<{ name: string; url: string }[]>([]);
-  const [folderBatchName, setFolderBatchName] = useState('Thư mục ảnh tư liệu Bác Hồ');
-  const [folderTargetDate, setFolderTargetDate] = useState('19/08');
-  const [searchQuoteTerm, setSearchQuoteTerm] = useState('');
-  const [isProcessingFolder, setIsProcessingFolder] = useState(false);
+  const [searchQuoteQuery, setSearchQuoteQuery] = useState('');
 
   if (!isOpen) return null;
 
-  // Handle Save Settings
-  const handleSaveSettingsSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSaveSettings(localSettings);
-    alert('Đã cập nhật cấu hình tự động đăng "Lời Bác dạy ngày này năm xưa" thành công!');
-  };
-
-  // Handle Form Image File Upload (Single / Multiple)
-  const handleFormImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Xử lý upload ảnh từ máy tính/điện thoại cho Album Slideshow
+  const handleUploadSlideshowImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     try {
-      setIsProcessingUpload(true);
+      setIsProcessingImages(true);
       const fileList: File[] = Array.from(files);
-      const newCompressedUrls: string[] = [];
+      const newUrls: string[] = [];
 
       for (const file of fileList) {
         const validation = validateImageFile(file);
@@ -90,769 +100,561 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
           alert(validation.error || `Tệp ${file.name} không hợp lệ.`);
           continue;
         }
-        const dataUrl = await compressImageFile(file, 1280, 1280, 0.82);
-        newCompressedUrls.push(dataUrl);
+        // Nén ảnh nhẹ qua Canvas (chiều rộng tối đa 1000px, chất lượng 0.78)
+        const compressed = await compressImageFile(file, 1000, 1000, 0.78);
+        newUrls.push(compressed);
       }
 
-      if (newCompressedUrls.length > 0) {
-        setFormImages((prev) => [...prev, ...newCompressedUrls]);
+      if (newUrls.length > 0) {
+        setSlideshowImages((prev) => [...prev, ...newUrls]);
       }
     } catch (err: any) {
-      alert(err?.message || 'Không thể xử lý hình ảnh. Vui lòng thử lại.');
+      alert(`Lỗi khi tải ảnh: ${err.message || 'Không xác định'}`);
     } finally {
-      setIsProcessingUpload(false);
-      if (e.target) e.target.value = '';
+      setIsProcessingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Handle Folder Upload via input
-  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Di chuyển ảnh lên/xuống
+  const handleMoveImage = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === slideshowImages.length - 1) return;
 
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    const updated = [...slideshowImages];
+    const temp = updated[index];
+    updated[index] = updated[newIndex];
+    updated[newIndex] = temp;
+    setSlideshowImages(updated);
+  };
+
+  // Xóa 1 ảnh
+  const handleRemoveImage = (index: number) => {
+    setSlideshowImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Lưu Album ảnh Slideshow
+  const handleSaveAlbum = () => {
+    const updatedSettings: UncleHoSettings = {
+      ...settings,
+      images: slideshowImages,
+    };
+    onSaveSettings(updatedSettings);
     try {
-      setIsProcessingFolder(true);
-      const newImgs: { name: string; url: string }[] = [];
-      const fileList: File[] = Array.from(files);
-
-      for (const file of fileList) {
-        if (file.type.startsWith('image/') || file.name.match(/\.(png|jpe?g|webp)$/i)) {
-          try {
-            const dataUrl = await compressImageFile(file, 1280, 1280, 0.80);
-            newImgs.push({
-              name: file.name,
-              url: dataUrl,
-            });
-          } catch {
-            // Ignore unreadable image
-          }
-        }
-      }
-
-      if (newImgs.length > 0) {
-        setUploadedFolderImages((prev) => [...prev, ...newImgs]);
-        alert(`Đã tối ưu hóa và nạp thành công ${newImgs.length} ảnh tư liệu từ thư mục.`);
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Lỗi khi đọc thư mục hình ảnh.');
-    } finally {
-      setIsProcessingFolder(false);
-      if (e.target) e.target.value = '';
+      localStorage.setItem('uncle_ho_images', JSON.stringify(slideshowImages));
+      localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(slideshowImages));
+    } catch {
+      // ignore
     }
+    alert('Đã lưu Album ảnh Slideshow Bác Hồ thành công! Khung ảnh sẽ hiển thị cố định các ảnh này trên toàn bộ hệ thống.');
   };
 
-  // Apply uploaded folder images to target date
-  const handleApplyFolderToDate = () => {
-    if (uploadedFolderImages.length === 0) {
-      alert('Vui lòng chọn hoặc tải thư mục ảnh lên trước.');
-      return;
-    }
-
-    const targetDay = folderTargetDate.trim();
-    if (!targetDay) {
-      alert('Vui lòng nhập ngày/tháng áp dụng (DD/MM).');
-      return;
-    }
-
-    const imageUrls = uploadedFolderImages.map((img) => img.url);
-
-    const existsIndex = quotes.findIndex((q) => q.dayMonth === targetDay);
-    let updatedQuotes = [...quotes];
-
-    if (existsIndex >= 0) {
-      updatedQuotes[existsIndex] = {
-        ...updatedQuotes[existsIndex],
-        images: [...(updatedQuotes[existsIndex].images || []), ...imageUrls],
-      };
-    } else {
-      updatedQuotes.push({
-        id: `custom-${Date.now()}`,
-        dayMonth: targetDay,
-        yearRecorded: '1945',
-        quote: 'Dân ta xin nhớ chữ đồng: Đồng tình, đồng sức, đồng lòng, đồng minh.',
-        context: 'Chủ tịch Hồ Chí Minh căn dặn toàn dân, toàn quân đoàn kết vượt qua mọi khó khăn thử thách.',
-        lesson: 'Cán bộ, chiến sĩ Sư đoàn 10 luôn nêu cao tinh thần đoàn kết nội bộ, thi đua Quyết thắng.',
-        images: imageUrls,
-        publishTime: localSettings.dailyPostTime || '06:00',
-        status: 'active',
-        isAutoPublish: true,
-      });
-    }
-
-    onSaveQuotes(updatedQuotes);
-    alert(`Đã gán ${uploadedFolderImages.length} ảnh tư liệu vào bài Lời Bác dạy ngày ${targetDay} thành công!`);
-  };
-
-  // Start editing a quote
-  const handleStartEditQuote = (q: UncleHoQuote) => {
+  // Bắt đầu chỉnh sửa hoặc tạo mới lời Bác dạy theo ngày
+  const handleSelectQuoteForEdit = (q: UncleHoQuote) => {
     setEditingQuoteId(q.id);
-    setFormDayMonth(q.dayMonth);
+    setSelectedDayMonth(q.dayMonth);
     setFormYear(q.yearRecorded || '1945');
     setFormQuote(q.quote);
-    setFormContext(q.context);
-    setFormLesson(q.lesson);
-    setFormImages(q.images || []);
-    setActiveTab('add_quote');
+    setFormContext(q.context || '');
+    setFormLesson(q.lesson || '');
   };
 
-  // Reset form for adding new quote
-  const handleStartAddNewQuote = () => {
+  const handleCreateNewQuote = () => {
     setEditingQuoteId(null);
-    setFormDayMonth('24/08');
+    setSelectedDayMonth('19/08');
     setFormYear('1945');
     setFormQuote('');
     setFormContext('');
-    setFormLesson('');
-    setFormImages([]);
-    setActiveTab('add_quote');
+    setFormLesson('Cán bộ, chiến sĩ Trung đoàn 95, Sư đoàn 2 luôn nêu cao tinh thần đoàn kết nội bộ, đoàn kết quân dân, hiệp đồng chặt chẽ, quyết tâm hoàn thành xuất sắc mọi nhiệm vụ.');
   };
 
-  // Submit add/edit quote form
-  const handleSaveQuoteForm = (e: React.FormEvent) => {
+  // Lưu một lời dạy theo ngày vào danh sách
+  const handleSaveQuoteItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formDayMonth.trim() || !formQuote.trim()) {
-      alert('Vui lòng nhập đầy đủ ngày/tháng và nội dung Lời Bác dạy!');
+    if (!formQuote.trim()) {
+      alert('Vui lòng nhập Lời Bác dạy cốt lõi!');
+      return;
+    }
+    if (!selectedDayMonth.trim() || !selectedDayMonth.includes('/')) {
+      alert('Vui lòng nhập ngày/tháng theo định dạng DD/MM (ví dụ: 19/05, 02/09)!');
       return;
     }
 
-    let updatedQuotes = [...quotes];
-    if (editingQuoteId) {
-      updatedQuotes = updatedQuotes.map((q) =>
-        q.id === editingQuoteId
-          ? {
-              ...q,
-              dayMonth: formDayMonth.trim(),
-              yearRecorded: formYear.trim() || undefined,
-              quote: formQuote.trim(),
-              context: formContext.trim(),
-              lesson: formLesson.trim(),
-              images: formImages.length > 0 ? formImages : q.images,
-            }
-          : q
-      );
+    const newItem: UncleHoQuote = {
+      id: editingQuoteId || `quote-${selectedDayMonth.replace('/', '-')}-${Date.now()}`,
+      dayMonth: selectedDayMonth.trim(),
+      yearRecorded: formYear.trim(),
+      quote: formQuote.trim(),
+      context: formContext.trim(),
+      lesson: formLesson.trim(),
+      images: [],
+      publishTime: '06:00',
+      status: 'active',
+      isAutoPublish: true,
+    };
+
+    let updatedList: UncleHoQuote[];
+    const existingIndex = quotesList.findIndex(
+      (q) => q.id === newItem.id || q.dayMonth === newItem.dayMonth
+    );
+
+    if (existingIndex >= 0) {
+      updatedList = [...quotesList];
+      updatedList[existingIndex] = newItem;
     } else {
-      const newQuote: UncleHoQuote = {
-        id: `quote-${Date.now()}`,
-        dayMonth: formDayMonth.trim(),
-        yearRecorded: formYear.trim() || undefined,
-        quote: formQuote.trim(),
-        context: formContext.trim(),
-        lesson: formLesson.trim(),
-        images:
-          formImages.length > 0
-            ? formImages
-            : ['https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'],
-        publishTime: localSettings.dailyPostTime || '06:00',
-        status: 'active',
-        isAutoPublish: true,
-      };
-      updatedQuotes.push(newQuote);
+      updatedList = [newItem, ...quotesList];
     }
 
-    onSaveQuotes(updatedQuotes);
-    alert('Đã lưu bài viết Lời Bác dạy ngày này năm xưa thành công!');
-    setActiveTab('quote_list');
+    setQuotesList(updatedList);
+    onSaveQuotes(updatedList);
+    alert(`Đã lưu Lời Bác dạy ngày ${newItem.dayMonth} thành công!`);
+    handleCreateNewQuote();
   };
 
-  // Delete a quote
-  const handleDeleteQuote = (id: string) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa bài Lời Bác dạy này?')) {
-      const updated = quotes.filter((q) => q.id !== id);
-      onSaveQuotes(updated);
+  // Xóa lời dạy của 1 ngày
+  const handleDeleteQuote = (id: string, dayStr: string) => {
+    if (!confirm(`Đồng chí có chắc chắn muốn xóa Lời Bác dạy ngày ${dayStr}?`)) return;
+    const updated = quotesList.filter((q) => q.id !== id);
+    setQuotesList(updated);
+    onSaveQuotes(updated);
+    if (editingQuoteId === id) {
+      handleCreateNewQuote();
     }
   };
 
-  const filteredQuotes = quotes.filter(
+  // Lọc danh sách theo từ khóa
+  const filteredQuotes = quotesList.filter(
     (q) =>
-      q.dayMonth.includes(searchQuoteTerm.trim()) ||
-      q.quote.toLowerCase().includes(searchQuoteTerm.toLowerCase()) ||
-      q.context.toLowerCase().includes(searchQuoteTerm.toLowerCase())
+      q.dayMonth.includes(searchQuoteQuery) ||
+      q.quote.toLowerCase().includes(searchQuoteQuery.toLowerCase()) ||
+      (q.context && q.context.toLowerCase().includes(searchQuoteQuery.toLowerCase()))
   );
 
   return (
-    <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fadeIn">
+      <div className="bg-white rounded-2xl shadow-2xl border-2 border-amber-400 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scaleUp">
         {/* Modal Header */}
-        <div className="bg-linear-to-r from-red-900 via-red-800 to-amber-900 text-white p-4 px-6 flex items-center justify-between shrink-0 border-b border-amber-500/40">
+        <div className="bg-gradient-to-r from-red-850 via-red-900 to-red-950 text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-amber-400 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-amber-400/20 border border-amber-400/40 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-amber-400/20 border border-amber-300 flex items-center justify-center shadow-inner">
               <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm sm:text-base text-amber-300 uppercase tracking-wide">
+              <h2 className="text-base font-black uppercase text-amber-300 tracking-wide">
                 QUẢN LÝ CHUYÊN MỤC "LỜI BÁC DẠY NGÀY NÀY NĂM XƯA"
-              </h3>
-              <p className="text-[11px] text-amber-100/80">
-                Thiết lập tự động đăng hằng ngày • Tải thư mục ảnh tư liệu • Soạn thảo nội dung theo ngày
+              </h2>
+              <p className="text-[11px] text-amber-100/80 font-medium">
+                Tách biệt Album ảnh Slideshow cố định & Nội dung Lời Bác dạy theo ngày
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-gray-50 border-b border-gray-200 px-6 pt-2 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+        <div className="flex border-b border-gray-200 bg-amber-50/50 px-4 pt-2 gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab('schedule')}
-            className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'schedule'
-                ? 'border-red-700 text-red-800 bg-white rounded-t-lg'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+            onClick={() => setActiveTab('album')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition-all cursor-pointer ${
+              activeTab === 'album'
+                ? 'bg-white text-red-900 border-red-800 shadow-xs'
+                : 'text-gray-600 hover:text-red-900 border-transparent'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" />
-            <span>1. Thiết lập Tự động đăng</span>
+            <ImageIcon className="w-4 h-4 text-red-700" />
+            <span>Tab 1: Quản lý Album ảnh Slideshow (Cố định)</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold">
+              {slideshowImages.length}
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('upload_folder')}
-            className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'upload_folder'
-                ? 'border-red-700 text-red-800 bg-white rounded-t-lg'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+            onClick={() => setActiveTab('quotes')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition-all cursor-pointer ${
+              activeTab === 'quotes'
+                ? 'bg-white text-red-900 border-red-800 shadow-xs'
+                : 'text-gray-600 hover:text-red-900 border-transparent'
             }`}
           >
-            <FolderUp className="w-3.5 h-3.5" />
-            <span>2. Tải cả Folder ảnh lên</span>
-            {uploadedFolderImages.length > 0 && (
-              <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                {uploadedFolderImages.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('quote_list')}
-            className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'quote_list'
-                ? 'border-red-700 text-red-800 bg-white rounded-t-lg'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>3. Danh sách ngày ({quotes.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleStartAddNewQuote}
-            className={`px-3.5 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'add_quote'
-                ? 'border-red-700 text-red-800 bg-white rounded-t-lg'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{editingQuoteId ? 'Chỉnh sửa bài' : '+ Soạn bài mới'}</span>
+            <Quote className="w-4 h-4 text-red-700" />
+            <span>Tab 2: Nội dung Lời Bác dạy theo ngày</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold">
+              {quotesList.length}
+            </span>
           </button>
         </div>
 
-        {/* Tab Body Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 text-xs space-y-4">
-          {/* TAB 1: SCHEDULE & AUTO PUBLISH */}
-          {activeTab === 'schedule' && (
-            <form onSubmit={handleSaveSettingsSubmit} className="space-y-4">
-              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-900 block mb-0.5">
-                      Bật tính năng tự động đăng Lời Bác dạy hằng ngày
-                    </label>
-                    <p className="text-[11px] text-gray-600">
-                      Hệ thống sẽ tự động đối soát ngày hiện tại của năm (DD/MM) và cập nhật bài giảng tư tưởng tương ứng vào đúng khung giờ chỉ định.
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={localSettings.autoPostEnabled}
-                    onChange={(e) =>
-                      setLocalSettings((prev) => ({
-                        ...prev,
-                        autoPostEnabled: e.target.checked,
-                      }))
-                    }
-                    className="w-5 h-5 accent-red-700 rounded cursor-pointer shrink-0 mt-1"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200/60">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-800 mb-1 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-red-700" />
-                      <span>Khung giờ tự động đăng hàng ngày:</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={localSettings.dailyPostTime || '06:00'}
-                      onChange={(e) =>
-                        setLocalSettings((prev) => ({
-                          ...prev,
-                          dailyPostTime: e.target.value,
-                        }))
-                      }
-                      className="w-full text-xs font-bold p-2 border border-gray-300 rounded-lg bg-white focus:border-red-700 focus:outline-hidden"
-                    />
-                    <span className="text-[10px] text-gray-500 mt-1 block">
-                      Gợi ý: 06:00 sáng trước giờ báo thức và sinh hoạt chính trị sáng.
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-800 mb-1 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                      <span>Chế độ hiển thị ngày:</span>
-                    </label>
-                    <select
-                      value={localSettings.autoSelectToday ? 'auto' : 'manual'}
-                      onChange={(e) =>
-                        setLocalSettings((prev) => ({
-                          ...prev,
-                          autoSelectToday: e.target.value === 'auto',
-                        }))
-                      }
-                      className="w-full text-xs p-2 border border-gray-300 rounded-lg bg-white focus:border-red-700 focus:outline-hidden font-medium"
-                    >
-                      <option value="auto">Tự động chọn theo ngày thực tế (Hôm nay)</option>
-                      <option value="manual">Cho phép chọn thủ công ngày bất kỳ</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status summary preview */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2">
-                <h4 className="font-bold text-gray-800 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Trạng thái hoạt động hiện tại:</span>
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
-                  <div className="p-2 bg-white rounded border border-gray-200">
-                    <span className="text-gray-500 block">Số bài tư liệu đã có:</span>
-                    <strong className="text-red-800 text-xs">{quotes.length} ngày</strong>
-                  </div>
-                  <div className="p-2 bg-white rounded border border-gray-200">
-                    <span className="text-gray-500 block">Tự động đăng:</span>
-                    <strong className={localSettings.autoPostEnabled ? 'text-emerald-700' : 'text-gray-500'}>
-                      {localSettings.autoPostEnabled ? 'ĐANG BẬT' : 'TẮT'}
-                    </strong>
-                  </div>
-                  <div className="p-2 bg-white rounded border border-gray-200">
-                    <span className="text-gray-500 block">Giờ đăng hằng ngày:</span>
-                    <strong className="text-blue-800 text-xs">{localSettings.dailyPostTime || '06:00'} hàng ngày</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="submit"
-                  className="bg-red-800 hover:bg-red-900 text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Lưu cấu hình tự động đăng</span>
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* TAB 2: UPLOAD ENTIRE FOLDER */}
-          {activeTab === 'upload_folder' && (
+        {/* Modal Body Content */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-[#FAFAF8]">
+          {/* TAB 1: QUẢN LÝ ALBUM ẢNH SLIDESHOW */}
+          {activeTab === 'album' && (
             <div className="space-y-4">
-              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <FolderArchive className="w-5 h-5 text-blue-800" />
+              <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3.5 flex items-start gap-3">
+                <Info className="w-5 h-5 text-amber-800 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-950 leading-relaxed">
+                  <strong className="text-red-900">Quy tắc hiển thị:</strong> Album ảnh chân dung & tư liệu Bác Hồ ở đây sẽ được hiển thị <strong>cố định và chạy tự động (4s/lần)</strong> trên chuyên mục trang chủ cho tất cả các ngày, không bị mất hoặc đổi ảnh khi chuyển ngày. Quản trị viên có thể tải lên từ 1 đến 5 ảnh đẹp, trang trọng nhất.
+                </div>
+              </div>
+
+              {/* Khu vực Tải ảnh mới */}
+              <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-xs">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div>
-                    <h4 className="font-bold text-xs text-blue-950 uppercase">
-                      Tải lên trọn bộ thư mục ảnh tư liệu Bác Hồ
-                    </h4>
-                    <p className="text-[11px] text-blue-800/80">
-                      Cho phép chọn một thư mục trên máy tính để tải hàng loạt ảnh tư liệu lịch sử và tự động gán vào chuyên mục.
+                    <h3 className="text-xs font-black uppercase text-gray-900 flex items-center gap-1.5">
+                      <UploadCloud className="w-4 h-4 text-red-800" />
+                      <span>Tải thêm ảnh vào Album Slideshow</span>
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Hỗ trợ tệp PNG, JPG, JPEG, WebP. Tự động nén Canvas nhẹ nhàng, tối ưu hóa tốc độ load.
                     </p>
                   </div>
-                </div>
 
-                {/* Upload Inputs (Both Directory and Multi-files) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  {/* Folder picker */}
-                  <label className="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-xl p-5 text-center cursor-pointer transition-colors flex flex-col items-center justify-center gap-2">
-                    <FolderUp className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <span className="font-bold text-xs text-blue-900 block">
-                        Chọn CẢ THƯ MỤC ảnh (Folder)
-                      </span>
-                      <span className="text-[10px] text-gray-500">
-                        Hỗ trợ định dạng .jpg, .png, .webp
-                      </span>
-                    </div>
-                    {/* @ts-ignore */}
+                  <div>
                     <input
-                      type="file"
-                      // @ts-ignore
-                      webkitdirectory="true"
-                      directory="true"
-                      multiple
-                      onChange={handleFolderUpload}
-                      className="hidden"
-                      accept="image/*"
-                    />
-                  </label>
-
-                  {/* Multi files picker */}
-                  <label className="border-2 border-dashed border-gray-300 hover:border-blue-400 bg-white rounded-xl p-5 text-center cursor-pointer transition-colors flex flex-col items-center justify-center gap-2">
-                    <Upload className="w-8 h-8 text-gray-500" />
-                    <div>
-                      <span className="font-bold text-xs text-gray-800 block">
-                        Chọn nhiều tệp ảnh cùng lúc
-                      </span>
-                      <span className="text-[10px] text-gray-500">
-                        Giữ phím Ctrl / Shift để chọn nhiều ảnh
-                      </span>
-                    </div>
-                    <input
+                      ref={fileInputRef}
                       type="file"
                       multiple
-                      onChange={handleFolderUpload}
-                      className="hidden"
                       accept="image/*"
+                      onChange={handleUploadSlideshowImages}
+                      className="hidden"
+                      id="slideshow-file-input"
                     />
-                  </label>
+                    <label
+                      htmlFor="slideshow-file-input"
+                      className="flex items-center gap-1.5 bg-red-850 hover:bg-red-900 text-amber-200 text-xs font-bold px-4 py-2 rounded-lg border border-amber-400 shadow-xs cursor-pointer transition-all"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{isProcessingImages ? 'Đang nén & tải...' : 'Chọn ảnh từ máy tính / ĐT'}</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              {/* Uploaded Images List & Assignment */}
-              {uploadedFolderImages.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-bold text-xs text-gray-900 flex items-center gap-1.5">
-                      <FileImage className="w-4 h-4 text-emerald-600" />
-                      <span>Các ảnh tư liệu vừa tải ({uploadedFolderImages.length} ảnh):</span>
-                    </h5>
+              {/* Danh sách ảnh hiện tại trong Album */}
+              <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <h3 className="text-xs font-black uppercase text-gray-900 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-600" />
+                    <span>Danh sách ảnh trong Album ({slideshowImages.length} ảnh)</span>
+                  </h3>
+                  {slideshowImages.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setUploadedFolderImages([])}
-                      className="text-xs text-red-600 hover:underline font-bold cursor-pointer"
+                      onClick={() => setSlideshowImages([])}
+                      className="text-[11px] font-bold text-red-700 hover:text-red-900 flex items-center gap-1 cursor-pointer"
                     >
-                      Xóa danh sách tải
-                    </button>
-                  </div>
-
-                  {/* Grid of uploaded images */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 max-h-56 overflow-y-auto p-2 bg-gray-50 rounded-xl border border-gray-200">
-                    {uploadedFolderImages.map((img, idx) => (
-                      <div key={idx} className="relative rounded-lg border border-gray-300 overflow-hidden group aspect-square bg-gray-900 shadow-xs">
-                        <img
-                          src={img.url}
-                          alt={img.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-                        <div className="absolute bottom-1 left-1 right-1">
-                          <span className="text-[9px] text-white/90 font-medium truncate block">
-                            {img.name}
-                          </span>
-                        </div>
-                        {/* Delete button on top-right */}
-                        <button
-                          type="button"
-                          onClick={() => setUploadedFolderImages((prev) => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md transition-transform hover:scale-110 cursor-pointer"
-                          title="Xóa ảnh này khỏi danh sách"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Assignment Controls */}
-                  <div className="pt-3 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <label className="font-bold text-gray-700 whitespace-nowrap text-xs">
-                        Gán toàn bộ vào ngày:
-                      </label>
-                      <input
-                        type="text"
-                        value={folderTargetDate}
-                        onChange={(e) => setFolderTargetDate(e.target.value)}
-                        placeholder="DD/MM (ví dụ: 19/08)"
-                        className="w-28 p-1.5 border border-gray-300 rounded font-bold text-center text-xs"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleApplyFolderToDate}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Áp dụng vào Lời Bác dạy ngày {folderTargetDate}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: QUOTES LIST */}
-          {activeTab === 'quote_list' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuoteTerm}
-                    onChange={(e) => setSearchQuoteTerm(e.target.value)}
-                    placeholder="Tìm kiếm theo ngày (19/08), từ khóa lời dạy..."
-                    className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleStartAddNewQuote}
-                  className="bg-red-800 hover:bg-red-900 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shrink-0 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Thêm ngày mới</span>
-                </button>
-              </div>
-
-              <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-white">
-                {filteredQuotes.length > 0 ? (
-                  filteredQuotes.map((q) => (
-                    <div
-                      key={q.id}
-                      className="p-3.5 hover:bg-amber-50/40 transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-                    >
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-black text-red-800 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
-                            Ngày {q.dayMonth}
-                          </span>
-                          {q.yearRecorded && (
-                            <span className="text-[10px] text-gray-500 font-medium">
-                              (Năm {q.yearRecorded})
-                            </span>
-                          )}
-                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded">
-                            {q.images?.length || 0} ảnh tư liệu
-                          </span>
-                        </div>
-                        <p className="text-xs font-bold text-gray-900 line-clamp-1 italic">
-                          “{q.quote}”
-                        </p>
-                        <p className="text-[11px] text-gray-500 line-clamp-1">
-                          Hoàn cảnh: {q.context}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditQuote(q)}
-                          className="bg-gray-100 hover:bg-blue-100 text-blue-800 p-1.5 px-2 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Sửa</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteQuote(q.id)}
-                          className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-gray-500">
-                    Không tìm thấy bài Lời Bác dạy nào phù hợp.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: ADD / EDIT QUOTE FORM */}
-          {activeTab === 'add_quote' && (
-            <form onSubmit={handleSaveQuoteForm} className="space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Ngày / Tháng (* DD/MM):
-                  </label>
-                  <input
-                    type="text"
-                    value={formDayMonth}
-                    onChange={(e) => setFormDayMonth(e.target.value)}
-                    placeholder="Ví dụ: 19/08, 02/09, 22/12..."
-                    className="w-full text-xs p-2 border border-gray-300 rounded font-bold text-red-800"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Năm lịch sử (tùy chọn):
-                  </label>
-                  <input
-                    type="text"
-                    value={formYear}
-                    onChange={(e) => setFormYear(e.target.value)}
-                    placeholder="Ví dụ: 1945, 1954, 1968..."
-                    className="w-full text-xs p-2 border border-gray-300 rounded"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Nội dung Lời Bác dạy cốt lõi (*):
-                </label>
-                <textarea
-                  value={formQuote}
-                  onChange={(e) => setFormQuote(e.target.value)}
-                  rows={2}
-                  placeholder="Nhập trích dẫn nguyên văn lời Bác dạy..."
-                  className="w-full text-xs p-2 border border-gray-300 rounded font-sans italic text-gray-900"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Hoàn cảnh lịch sử / Nguồn tư liệu:
-                </label>
-                <textarea
-                  value={formContext}
-                  onChange={(e) => setFormContext(e.target.value)}
-                  rows={2}
-                  placeholder="Hoàn cảnh ra đời bài viết, bức thư hoặc bài phát biểu của Bác..."
-                  className="w-full text-xs p-2 border border-gray-300 rounded"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Ý nghĩa & Bài học vận dụng đối với cán bộ, chiến sĩ Sư đoàn 10:
-                </label>
-                <textarea
-                  value={formLesson}
-                  onChange={(e) => setFormLesson(e.target.value)}
-                  rows={2}
-                  placeholder="Định hướng tư tưởng, hành động cụ thể trong huấn luyện, SSCĐ và rèn luyện kỷ luật..."
-                  className="w-full text-xs p-2 border border-gray-300 rounded"
-                />
-              </div>
-
-              {/* Photos List with File Upload & Previews */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-gray-700">
-                    Ảnh tư liệu lịch sử đính kèm ({formImages.length} ảnh):
-                  </label>
-                  {formImages.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFormImages([])}
-                      className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
-                    >
-                      Xóa tất cả ảnh đã chọn
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Xóa hết ảnh</span>
                     </button>
                   )}
                 </div>
 
-                {/* File Upload Trigger Box */}
-                <input
-                  ref={formFileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  multiple
-                  onChange={handleFormImageUpload}
-                  className="hidden"
-                />
-
-                <div
-                  onClick={() => formFileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 hover:border-red-600 hover:bg-red-50/40 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5"
-                >
-                  <div className="w-9 h-9 rounded-full bg-red-100 text-red-700 flex items-center justify-center">
-                    <UploadCloud className="w-5 h-5" />
+                {slideshowImages.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    <ImageIcon className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                    <p className="text-xs font-bold text-gray-600">Chưa có ảnh nào trong Album</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Hệ thống sẽ hiển thị khung chân dung trang trọng mặc định. Hãy tải lên từ 1-5 ảnh Bác Hồ để bắt đầu Slideshow!
+                    </p>
                   </div>
-                  <div className="text-xs font-bold text-gray-800">
-                    Bấm để tải tệp ảnh lên từ máy tính / điện thoại
-                  </div>
-                  <div className="text-[10px] text-gray-500">
-                    Hỗ trợ định dạng: .png, .jpg, .jpeg, .webp (Có thể chọn nhiều ảnh cùng lúc)
-                  </div>
-                </div>
-
-                {/* Previews Grid */}
-                {formImages.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
-                    {formImages.map((url, idx) => (
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 mt-3.5">
+                    {slideshowImages.map((imgUrl, index) => (
                       <div
-                        key={idx}
-                        className="relative rounded-xl border border-gray-300 overflow-hidden bg-gray-900 shadow-xs aspect-4/3 group"
+                        key={`img-${index}`}
+                        className="relative rounded-xl overflow-hidden border-2 border-amber-300/80 bg-gray-900 group shadow-xs flex flex-col justify-between"
                       >
-                        <img
-                          src={url}
-                          alt={`Tư liệu Bác Hồ ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none" />
-
-                        {/* Sequence badge */}
-                        <div className="absolute bottom-1.5 left-1.5 bg-black/70 backdrop-blur-xs text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded">
-                          {idx === 0 ? 'Ảnh đại diện' : `Ảnh phụ ${idx + 1}`}
+                        {/* Ảnh preview */}
+                        <div className="w-full h-36 relative overflow-hidden bg-black">
+                          <img
+                            src={imgUrl}
+                            alt={`Ảnh Bác ${index + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute top-2 left-2 bg-red-900/90 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300/60">
+                            Ảnh {index + 1} {index === 0 ? '(Chính)' : ''}
+                          </div>
                         </div>
 
-                        {/* Red Delete Button on Top Right */}
-                        <button
-                          type="button"
-                          onClick={() => setFormImages((prev) => prev.filter((_, i) => i !== idx))}
-                          className="absolute top-1.5 right-1.5 p-1 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md transition-transform hover:scale-110 cursor-pointer"
-                          title="Xóa ảnh này"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {/* Thanh công cụ di chuyển & xóa */}
+                        <div className="p-2 bg-gray-50 flex items-center justify-between border-t border-gray-200 text-xs">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(index, 'up')}
+                              disabled={index === 0}
+                              className={`p-1 rounded border ${
+                                index === 0
+                                  ? 'text-gray-300 border-gray-200 cursor-not-allowed'
+                                  : 'text-gray-700 hover:bg-amber-100 border-gray-300 cursor-pointer'
+                              }`}
+                              title="Chuyển lên trước"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(index, 'down')}
+                              disabled={index === slideshowImages.length - 1}
+                              className={`p-1 rounded border ${
+                                index === slideshowImages.length - 1
+                                  ? 'text-gray-300 border-gray-200 cursor-not-allowed'
+                                  : 'text-gray-700 hover:bg-amber-100 border-gray-300 cursor-pointer'
+                              }`}
+                              title="Chuyển xuống sau"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="text-red-700 hover:text-red-900 p-1 rounded hover:bg-red-50 cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                            title="Xóa ảnh này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Xóa</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="pt-3 border-t border-gray-200 flex items-center justify-end gap-2">
+              {/* Nút Lưu Album Slideshow */}
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('quote_list')}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs px-4 py-2 rounded-lg cursor-pointer"
+                  onClick={handleSaveAlbum}
+                  className="flex items-center gap-2 bg-gradient-to-r from-red-850 to-red-900 hover:from-red-900 hover:to-red-950 text-amber-200 hover:text-amber-100 text-xs font-black px-5 py-2.5 rounded-xl border border-amber-400 shadow-md transition-all cursor-pointer active:scale-98"
                 >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="bg-red-800 hover:bg-red-900 text-white font-bold text-xs px-5 py-2 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingQuoteId ? 'Cập nhật bài viết' : 'Lưu bài viết mới'}</span>
+                  <Save className="w-4 h-4 text-amber-300" />
+                  <span>Lưu Album ảnh Slideshow Bác Hồ</span>
                 </button>
               </div>
-            </form>
+            </div>
           )}
+
+          {/* TAB 2: NỘI DUNG LỜI BÁC DẠY THEO NGÀY */}
+          {activeTab === 'quotes' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Cột trái: Form thêm/sửa câu nói theo ngày (7 cột) */}
+              <div className="lg:col-span-7 bg-white rounded-xl p-4 border border-gray-200 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                  <h3 className="text-xs font-black uppercase text-red-900 flex items-center gap-1.5">
+                    <Edit3 className="w-4 h-4 text-red-800" />
+                    <span>
+                      {editingQuoteId ? 'Chỉnh sửa Lời Bác dạy' : 'Thêm Lời Bác dạy cho ngày mới'}
+                    </span>
+                  </h3>
+                  {editingQuoteId && (
+                    <button
+                      type="button"
+                      onClick={handleCreateNewQuote}
+                      className="text-[11px] font-bold text-blue-700 hover:underline cursor-pointer"
+                    >
+                      + Tạo ngày mới
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveQuoteItem} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Ngày / Tháng */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Ngày / Tháng (DD/MM) <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ví dụ: 19/08 hoặc 02/09"
+                        value={selectedDayMonth}
+                        onChange={(e) => setSelectedDayMonth(e.target.value)}
+                        className="w-full text-xs font-bold text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-red-800"
+                      />
+                    </div>
+
+                    {/* Năm ghi nhận */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Năm lịch sử (nếu có)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: 1945, 1954..."
+                        value={formYear}
+                        onChange={(e) => setFormYear(e.target.value)}
+                        className="w-full text-xs font-medium text-gray-900 border border-gray-300 rounded-lg px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-red-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Câu nói cốt lõi */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Lời Bác dạy cốt lõi <span className="text-red-600">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Nhập câu nói của Bác Hồ..."
+                      value={formQuote}
+                      onChange={(e) => setFormQuote(e.target.value)}
+                      className="w-full text-xs font-medium text-gray-900 border border-gray-300 rounded-lg p-2.5 focus:outline-hidden focus:ring-2 focus:ring-red-800 italic"
+                    />
+                  </div>
+
+                  {/* Bối cảnh lịch sử */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Hoàn cảnh lịch sử & Nguồn tư liệu
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Bối cảnh Bác đưa ra lời dạy..."
+                      value={formContext}
+                      onChange={(e) => setFormContext(e.target.value)}
+                      className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg p-2.5 focus:outline-hidden focus:ring-2 focus:ring-red-800"
+                    />
+                  </div>
+
+                  {/* Bài học vận dụng */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                      Bài học vận dụng đối với cán bộ, chiến sĩ Trung đoàn 95, Sư đoàn 2
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ý nghĩa vận dụng trong huấn luyện, SSCĐ, rèn luyện kỷ luật..."
+                      value={formLesson}
+                      onChange={(e) => setFormLesson(e.target.value)}
+                      className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg p-2.5 focus:outline-hidden focus:ring-2 focus:ring-red-800"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-2">
+                    {editingQuoteId && (
+                      <button
+                        type="button"
+                        onClick={handleCreateNewQuote}
+                        className="text-xs font-bold text-gray-600 hover:text-gray-800 px-3 py-2 rounded-lg border border-gray-300 cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="flex items-center gap-1.5 bg-red-850 hover:bg-red-900 text-amber-200 text-xs font-black px-4 py-2 rounded-lg border border-amber-400 cursor-pointer shadow-xs"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{editingQuoteId ? 'Cập nhật ngày này' : 'Lưu Lời Bác dạy'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Cột phải: Danh sách các ngày đã có (5 cột) */}
+              <div className="lg:col-span-5 bg-white rounded-xl p-4 border border-gray-200 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <h3 className="text-xs font-black uppercase text-gray-900 flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-amber-700" />
+                      <span>Các ngày đã có ({filteredQuotes.length})</span>
+                    </h3>
+                  </div>
+
+                  {/* Ô tìm kiếm */}
+                  <div className="relative my-2.5">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo ngày hoặc từ khóa..."
+                      value={searchQuoteQuery}
+                      onChange={(e) => setSearchQuoteQuery(e.target.value)}
+                      className="w-full text-xs pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-red-800"
+                    />
+                  </div>
+
+                  {/* Danh sách cuộn */}
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {filteredQuotes.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-6">
+                        Không tìm thấy ngày nào phù hợp
+                      </p>
+                    ) : (
+                      filteredQuotes.map((q) => (
+                        <div
+                          key={q.id}
+                          className={`p-2.5 rounded-lg border text-xs transition-all ${
+                            editingQuoteId === q.id
+                              ? 'bg-amber-50 border-red-800 shadow-xs'
+                              : 'bg-gray-50/70 hover:bg-gray-100/80 border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-extrabold text-red-900 bg-red-100 px-2 py-0.5 rounded text-[11px]">
+                              Ngày {q.dayMonth}
+                              {q.yearRecorded ? ` • ${q.yearRecorded}` : ''}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSelectQuoteForEdit(q)}
+                                className="p-1 text-blue-700 hover:bg-blue-50 rounded cursor-pointer"
+                                title="Chỉnh sửa"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuote(q.id, q.dayMonth)}
+                                className="p-1 text-red-700 hover:bg-red-50 rounded cursor-pointer"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-gray-800 line-clamp-2 italic">
+                            &ldquo;{q.quote}&rdquo;
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-5 py-3 bg-gray-100 border-t border-gray-200 flex items-center justify-between shrink-0">
+          <div className="text-[11px] text-gray-600">
+            Hệ thống quản trị Cổng thông tin nội bộ <strong>Trung đoàn 95, Sư đoàn 2</strong>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs"
+          >
+            Đóng cửa sổ
+          </button>
         </div>
       </div>
     </div>
   );
 };
+export default UncleHoManagerModal;

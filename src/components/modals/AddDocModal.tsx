@@ -49,7 +49,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState(categories[0] || 'Nghị quyết - Chỉ thị');
   const [description, setDescription] = useState('');
-  const [issuer, setIssuer] = useState('Phòng Chính trị - Sư đoàn 10');
+  const [issuer, setIssuer] = useState('Ban Chính trị - Trung đoàn 95, Sư đoàn 2');
   const [type, setType] = useState<string>('pdf');
   const [secretLevel, setSecretLevel] = useState<'normal' | 'mat' | 'toi_mat'>('normal');
 
@@ -68,7 +68,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
       setTitle(editingDoc.title);
       setCategory(editingDoc.category || categories[0] || 'Nghị quyết - Chỉ thị');
       setDescription(editingDoc.description || '');
-      setIssuer(editingDoc.issuer || 'Bộ Tư lệnh Sư đoàn 10');
+      setIssuer(editingDoc.issuer || 'Chỉ huy Trung đoàn 95, Sư đoàn 2');
       setType(editingDoc.type || 'pdf');
       setSecretLevel(editingDoc.secretLevel || 'normal');
       setFileName(editingDoc.fileName || '');
@@ -80,7 +80,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
       setTitle('');
       setCategory(categories[0] || 'Nghị quyết - Chỉ thị');
       setDescription('');
-      setIssuer('Phòng Chính trị - Sư đoàn 10');
+      setIssuer('Ban Chính trị - Trung đoàn 95, Sư đoàn 2');
       setType('pdf');
       setSecretLevel('normal');
       setFileName('');

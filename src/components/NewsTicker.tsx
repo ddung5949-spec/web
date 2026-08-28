@@ -87,7 +87,7 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
         ? customList.filter((s) => s.trim().length > 0)
         : tickerText
         ? [tickerText]
-        : ['Chào mừng các đồng chí đến với Trang Thông tin Sư đoàn 10 - Đoàn Mang Yang anh hùng!'];
+        : ['Chào mừng các đồng chí đến với Cổng Thông tin Điện tử Trung đoàn 95, Sư đoàn 2 anh hùng!'];
 
     if (mode === 'manual') {
       manualAnnouncements.forEach((ann, idx) => {

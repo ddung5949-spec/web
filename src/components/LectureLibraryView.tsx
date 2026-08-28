@@ -68,7 +68,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
   const subtitle =
     siteConfig?.sections?.lecture?.subTitle ||
     siteConfig?.sections?.lecture?.desc ||
-    'Kho lưu trữ slide trình chiếu, giáo án và học liệu đa phương tiện phục vụ huấn luyện toàn Sư đoàn 10';
+    'Kho lưu trữ slide trình chiếu, giáo án và học liệu đa phương tiện phục vụ huấn luyện toàn Trung đoàn 95, Sư đoàn 2';
 
   const availableCategories = siteConfig?.sections?.lecture?.categories || [
     'Giáo án Chính trị',

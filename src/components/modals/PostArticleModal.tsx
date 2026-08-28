@@ -402,12 +402,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const defaultImg =
-        selectedSection === 'ctd'
-          ? 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
-          : selectedSection === 'hl'
-          ? 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=800&auto=format&fit=crop'
-          : 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop';
+      const defaultImg = '';
 
       const rawFinalImage = imageUrl.trim() || (articleImages[0]?.url) || defaultImg;
 
@@ -415,14 +410,16 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       const rawImagesList =
         articleImages.length > 0
           ? articleImages
-          : [
+          : rawFinalImage
+          ? [
               {
                 id: 'img-1',
                 url: rawFinalImage,
                 caption: title.trim(),
                 position: 'top' as ArticleImagePosition,
               },
-            ];
+            ]
+          : [];
 
       // Auto optimize & compress any base64 images
       const { image: finalImage, images: finalImagesList } = await optimizeArticleImagesPayload({
@@ -650,7 +647,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nhập tiêu đề tin bài (ví dụ: Sư đoàn 10 tổ chức diễn tập...)..."
+              placeholder="Nhập tiêu đề tin bài (ví dụ: Trung đoàn 95, Sư đoàn 2 tổ chức diễn tập...)..."
               className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold text-gray-900 text-sm"
               required
             />

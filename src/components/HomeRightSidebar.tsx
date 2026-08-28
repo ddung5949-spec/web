@@ -214,7 +214,7 @@ export const HomeRightSidebar: React.FC<HomeRightSidebarProps> = ({
             </div>
             <h3 className="font-bold text-sm text-gray-900">Cuộc thi Tìm hiểu Trực tuyến</h3>
             <p className="text-xs text-gray-600 leading-relaxed">
-              Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đảng bộ Sư đoàn 10 đang diễn ra tuần thứ 3. 100% cán bộ, chiến sĩ tham gia dự thi.
+              Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đảng bộ Trung đoàn 95 đang diễn ra tuần thứ 3. 100% cán bộ, chiến sĩ tham gia dự thi.
             </p>
             <div className="pt-2 flex items-center justify-center gap-2">
               <button

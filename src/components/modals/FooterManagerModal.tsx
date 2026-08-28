@@ -35,12 +35,12 @@ export const FooterManagerModal: React.FC<FooterManagerModalProps> = ({
   onClose,
 }) => {
   // Form States
-  const [footerUnitName, setFooterUnitName] = useState(siteConfig.footerUnitName || 'Sư đoàn 10 - Đoàn Mang Yang anh hùng');
-  const [footerAddress, setFooterAddress] = useState(siteConfig.footerAddress || 'Thành phố Pleiku, Tỉnh Gia Lai (Địa bàn đóng quân Sư đoàn 10)');
-  const [footerHotline, setFooterHotline] = useState(siteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Tuyên huấn)');
-  const [footerEmail, setFooterEmail] = useState(siteConfig.footerEmail || 'tuyenhuan.mangyang@bqp.vn');
+  const [footerUnitName, setFooterUnitName] = useState(siteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2');
+  const [footerAddress, setFooterAddress] = useState(siteConfig.footerAddress || 'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)');
+  const [footerHotline, setFooterHotline] = useState(siteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)');
+  const [footerEmail, setFooterEmail] = useState(siteConfig.footerEmail || 'chinhtri.trungdoan95@bqp.vn');
   const [slogan, setSlogan] = useState(siteConfig.slogan || 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG');
-  const [footerCopyright, setFooterCopyright] = useState(siteConfig.footerCopyright || '© Bản quyền thuộc về Bộ Tư lệnh Sư đoàn 10 - Quân đoàn 3');
+  const [footerCopyright, setFooterCopyright] = useState(siteConfig.footerCopyright || '© Bản quyền thuộc về Trung đoàn 95, Sư đoàn 2');
 
   // Layout & Styling
   const [footerLayout, setFooterLayout] = useState<'split' | 'centered' | 'compact' | 'columns'>(
@@ -114,10 +114,10 @@ export const FooterManagerModal: React.FC<FooterManagerModalProps> = ({
   };
 
   const handleResetDefaults = () => {
-    setFooterUnitName('Sư đoàn 10 - Đoàn Mang Yang anh hùng');
-    setFooterAddress('Thành phố Pleiku, Tỉnh Gia Lai (Địa bàn đóng quân Sư đoàn 10)');
-    setFooterHotline('069.xxx.xxx (Trực ban Tác chiến / Ban Tuyên huấn)');
-    setFooterEmail('tuyenhuan.mangyang@bqp.vn');
+    setFooterUnitName('Trung đoàn 95, Sư đoàn 2');
+    setFooterAddress('Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)');
+    setFooterHotline('069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)');
+    setFooterEmail('chinhtri.trungdoan95@bqp.vn');
     setSlogan('ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG');
     setFooterLayout('split');
     setFooterBgColor('#143d2b');
@@ -213,7 +213,7 @@ export const FooterManagerModal: React.FC<FooterManagerModalProps> = ({
                   value={footerUnitName}
                   onChange={(e) => setFooterUnitName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-emerald-700 focus:outline-hidden text-xs font-semibold"
-                  placeholder="Sư đoàn 10 - Đoàn Mang Yang anh hùng"
+                  placeholder="Trung đoàn 95, Sư đoàn 2"
                 />
               </div>
 
@@ -289,7 +289,7 @@ export const FooterManagerModal: React.FC<FooterManagerModalProps> = ({
                   value={footerCopyright}
                   onChange={(e) => setFooterCopyright(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-emerald-700 focus:outline-hidden text-xs text-gray-600"
-                  placeholder="© Bản quyền thuộc về Bộ Tư lệnh Sư đoàn 10 - Quân đoàn 3"
+                  placeholder="© Bản quyền thuộc về Trung đoàn 95, Sư đoàn 2"
                 />
               </div>
             </div>

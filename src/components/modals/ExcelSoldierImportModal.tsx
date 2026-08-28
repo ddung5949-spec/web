@@ -177,7 +177,7 @@ export const ExcelSoldierImportModal: React.FC<ExcelSoldierImportModalProps> = (
             row['Đơn vị'] ||
             row['DonVi'] ||
             row['unit'] ||
-            'Sư đoàn 10 - Đoàn Mang Yang'
+            'Trung đoàn 95, Sư đoàn 2'
           )
             .toString()
             .trim();
@@ -241,7 +241,7 @@ export const ExcelSoldierImportModal: React.FC<ExcelSoldierImportModalProps> = (
       birthDate: row.birthDate || '',
       rank: row.rank || 'Binh nhất',
       position: row.position || 'Chiến sĩ',
-      unit: row.unit || 'Sư đoàn 10',
+      unit: row.unit || 'Trung đoàn 95, Sư đoàn 2',
       hometown: row.hometown || '',
       enlistmentDate: row.enlistmentDate || '',
       partyJoinDate: row.partyJoinDate || '',

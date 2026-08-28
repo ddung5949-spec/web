@@ -105,7 +105,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [tickerDays, setTickerDays] = useState<number>(siteConfig?.tickerDays ?? 3);
   const [tickerCustomList, setTickerCustomList] = useState<string[]>(
     siteConfig?.tickerCustomList || [
-      'Chào mừng kỷ niệm ngày truyền thống Sư đoàn 10 - Đoàn Mang Yang anh hùng!',
+      'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
       'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
       'Các chi bộ, đảng bộ trực thuộc hoàn thành việc học tập, quán triệt các Nghị quyết mới.',
     ]
@@ -154,16 +154,16 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   // Footer & contact states
   const [footerUnitName, setFooterUnitName] = useState(
-    siteConfig?.footerUnitName || defaultSiteConfig.footerUnitName || 'Sư đoàn 10 - Đoàn Mang Yang anh hùng'
+    siteConfig?.footerUnitName || defaultSiteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2'
   );
   const [footerAddress, setFooterAddress] = useState(
-    siteConfig?.footerAddress || defaultSiteConfig.footerAddress || 'Thành phố Pleiku, Tỉnh Gia Lai (Địa bàn đóng quân Sư đoàn 10)'
+    siteConfig?.footerAddress || defaultSiteConfig.footerAddress || 'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)'
   );
   const [footerHotline, setFooterHotline] = useState(
-    siteConfig?.footerHotline || defaultSiteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Tuyên huấn)'
+    siteConfig?.footerHotline || defaultSiteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)'
   );
   const [footerEmail, setFooterEmail] = useState(
-    siteConfig?.footerEmail || defaultSiteConfig.footerEmail || 'tuyenhuan.mangyang@bqp.vn'
+    siteConfig?.footerEmail || defaultSiteConfig.footerEmail || 'chinhtri.trungdoan95@bqp.vn'
   );
   const [footerBgColor, setFooterBgColor] = useState(
     siteConfig?.footerBgColor || defaultSiteConfig.footerBgColor || '#143d2b'
@@ -202,7 +202,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setTickerDays(siteConfig?.tickerDays ?? 3);
       setTickerCustomList(
         siteConfig?.tickerCustomList || [
-          'Chào mừng kỷ niệm ngày truyền thống Sư đoàn 10 - Đoàn Mang Yang anh hùng!',
+          'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
           'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
           'Các chi bộ, đảng bộ trực thuộc hoàn thành việc học tập, quán triệt các Nghị quyết mới.',
         ]
@@ -223,14 +223,14 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         ...defaultSiteConfig.sections,
         ...(siteConfig?.sections || {}),
       });
-      setFooterUnitName(siteConfig?.footerUnitName || defaultSiteConfig.footerUnitName || 'Sư đoàn 10 - Đoàn Mang Yang anh hùng');
+      setFooterUnitName(siteConfig?.footerUnitName || defaultSiteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2');
       setFooterAddress(
-        siteConfig?.footerAddress || defaultSiteConfig.footerAddress || 'Thành phố Pleiku, Tỉnh Gia Lai (Địa bàn đóng quân Sư đoàn 10)'
+        siteConfig?.footerAddress || defaultSiteConfig.footerAddress || 'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)'
       );
       setFooterHotline(
-        siteConfig?.footerHotline || defaultSiteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Tuyên huấn)'
+        siteConfig?.footerHotline || defaultSiteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)'
       );
-      setFooterEmail(siteConfig?.footerEmail || defaultSiteConfig.footerEmail || 'tuyenhuan.mangyang@bqp.vn');
+      setFooterEmail(siteConfig?.footerEmail || defaultSiteConfig.footerEmail || 'chinhtri.trungdoan95@bqp.vn');
       setFooterBgColor(siteConfig?.footerBgColor || defaultSiteConfig.footerBgColor || '#143d2b');
       setFooterSloganBgColor(siteConfig?.footerSloganBgColor || defaultSiteConfig.footerSloganBgColor || '#0a2318');
       setFooterAccentColor(siteConfig?.footerAccentColor || defaultSiteConfig.footerAccentColor || '#fbbf24');
@@ -842,10 +842,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                     />
                     <div>
                       <div className="font-black text-red-900 text-xs">
-                        Huy hiệu Quân kỳ Sư đoàn 10 (Vector chuẩn)
+                        Huy hiệu Quân kỳ Trung đoàn 95, Sư đoàn 2 (Vector chuẩn)
                       </div>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Sao vàng năm cánh, bánh răng công nghiệp, bông lúa và dải lụa chữ "SƯ ĐOÀN 10".
+                        Sao vàng năm cánh, bánh răng công nghiệp, bông lúa và dải lụa chữ "TRUNG ĐOÀN 95".
                       </p>
                     </div>
                   </label>
@@ -1730,7 +1730,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[
                     {
-                      name: 'Sư đoàn 10 - Mang Yang (Mặc định)',
+                      name: 'Trung đoàn 95 - Sư đoàn 2 (Mặc định)',
                       red: '#b91c1c',
                       green: '#143d2b',
                     },

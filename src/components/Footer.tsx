@@ -134,7 +134,7 @@ export const Footer: React.FC<FooterProps> = ({
                 <p className="text-white/75 text-[10px] sm:text-[11px] leading-tight truncate max-w-2xl flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-amber-300/80 shrink-0" />
                   <span>
-                    {siteConfig.footerUnitName || 'Sư đoàn 10 - Đoàn Mang Yang anh hùng'}
+                    {siteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2'}
                     {siteConfig.footerAddress ? ` • ${siteConfig.footerAddress}` : ''}
                   </span>
                 </p>

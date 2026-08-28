@@ -253,13 +253,13 @@ export interface MeetingRoomSettings {
 
 export interface MeetingRoomItem {
   id: string; // e.g. "room-1", "room-2", "room-3"
-  roomCode: string; // e.g. "PH-01", "PH-ĐU-10"
-  title: string; // Tên phòng họp, e.g. "Hội nghị Ban Chấp hành Đảng bộ Sư đoàn 10"
+  roomCode: string; // e.g. "PH-01", "PH-ĐU-95"
+  title: string; // Tên phòng họp, e.g. "Hội nghị Ban Chấp hành Đảng bộ Trung đoàn 95, Sư đoàn 2"
   sessionNumber?: string; // Kỳ họp số, e.g. "Kỳ họp thứ 14 (Khóa XII)"
   chairPerson: string; // Chủ trì
   secretary: string; // Thư ký
   description?: string; // Ghi chú / Mục đích
-  unitTarget?: string; // e.g. "Đảng ủy Sư đoàn 10", "Đảng ủy Trung đoàn 28", ...
+  unitTarget?: string; // e.g. "Đảng ủy Trung đoàn 95", "Đảng ủy Tiểu đoàn 1", ...
   passwordRequired: boolean;
   roomPassword?: string;
   createdByUserId?: number;
@@ -492,6 +492,8 @@ export interface SiteConfig {
   dailyPosters?: DailyWidgetItem[] | Record<string, any>;
   daily_widgets?: DailyWidgetItem[] | Record<string, any>;
   daily_posters?: DailyWidgetItem[] | Record<string, any>;
+  uncleHoImages?: string[];
+  uncle_ho_images?: string[];
   sidebarWidgets?: SidebarWidgetSetting[];
   tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined';
   tickerDays?: number;
@@ -557,6 +559,9 @@ export interface UncleHoSettings {
   autoSelectToday: boolean;
   activeQuoteId?: string;
   folderUploadBatchName?: string;
+  images?: string[]; // Album ảnh slideshow cố định (1 đến 5 ảnh chân dung/tư liệu Bác Hồ)
+  bannerTitle?: string;
+  showQuoteOfTheDay?: boolean;
 }
 
 export type PageView =

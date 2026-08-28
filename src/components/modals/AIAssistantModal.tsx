@@ -29,7 +29,7 @@ interface Message {
 }
 
 const SAMPLE_QUESTIONS = [
-  'Truyền thống vẻ vang của Sư đoàn 10 (Đoàn Mang Yang Anh hùng)?',
+  'Truyền thống vẻ vang của Trung đoàn 95, Sư đoàn 2 (Đoàn Mang Yang Anh hùng)?',
   '10 Lời thề danh dự của quân nhân QĐND Việt Nam?',
   '12 Điều kỷ luật khi quan hệ với nhân dân?',
   'Hướng dẫn học tập và làm theo tư tưởng, phong cách Hồ Chí Minh?',
@@ -45,7 +45,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
     {
       id: 'welcome',
       sender: 'ai',
-      text: 'Xin chào đồng chí! Tôi là Trợ lý AI Chính trị & Pháp luật của Sư đoàn 10 Anh hùng. Đồng chí cần tra cứu thông tin, chỉ thị, điều lệnh hoặc tìm hiểu về truyền thống Sư đoàn?',
+      text: 'Xin chào đồng chí! Tôi là Trợ lý AI Chính trị & Pháp luật của Trung đoàn 95, Sư đoàn 2 Anh hùng. Đồng chí cần tra cứu thông tin, chỉ thị, điều lệnh hoặc tìm hiểu về truyền thống đơn vị?',
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -144,7 +144,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-amber-200/80">
-                Sư đoàn 10 - Đoàn Mang Yang Anh hùng (Bảo mật Server-side qua Gemini 3.7)
+                Trung đoàn 95, Sư đoàn 2 (Bảo mật Server-side qua Gemini 3.7)
               </p>
             </div>
           </div>

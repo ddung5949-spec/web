@@ -36,7 +36,7 @@ export const SoldierProfileModal: React.FC<SoldierProfileModalProps> = ({
   onSave,
   allUsers,
   roles,
-  defaultUnit = 'Ban Tuyên huấn - Phòng Chính trị Sư đoàn 10',
+  defaultUnit = 'Ban Chính trị - Trung đoàn 95, Sư đoàn 2',
 }) => {
   const isEditing = !!profile;
 
@@ -130,7 +130,7 @@ export const SoldierProfileModal: React.FC<SoldierProfileModalProps> = ({
                 {isEditing ? 'Cập nhật Hồ sơ Quân nhân' : 'Thêm mới Hồ sơ Quân nhân'}
               </h2>
               <p className="text-[11px] sm:text-xs text-amber-200/90 font-medium">
-                Sư đoàn 10 • Đồng bộ trực tiếp với dữ liệu tài khoản và phân quyền
+                Trung đoàn 95, Sư đoàn 2 • Đồng bộ trực tiếp với dữ liệu tài khoản và phân quyền
               </p>
             </div>
           </div>

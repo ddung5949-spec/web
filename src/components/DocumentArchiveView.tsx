@@ -153,7 +153,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
         document.body.removeChild(link);
       }
     } else {
-      const blobContent = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nBỘ TƯ LỆNH SƯ ĐOÀN 10 - ĐOÀN MANG YANG\n${doc.issuer.toUpperCase()}\n--------------------\n\nSố/Ký hiệu: ${doc.code}\nNgày ban hành: ${doc.date}\nTiểu mục: ${doc.category || 'Văn bản hành chính quân sự'}\n\nTRÍCH YẾU NỘI DUNG:\n${doc.title}\n\nNỘI DUNG TÓM TẮT & HƯỚNG DẪN:\n${doc.description || 'Văn bản quy định nội bộ phục vụ công tác lãnh đạo, chỉ huy và duy trì nền nếp chính quy trong toàn đơn vị.'}\n\n(Tài liệu lưu trữ tại Kho Văn bản số - Sư đoàn 10 Anh hùng)`;
+      const blobContent = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nCHỈ HUY TRUNG ĐOÀN 95, SƯ ĐOÀN 2\n${doc.issuer.toUpperCase()}\n--------------------\n\nSố/Ký hiệu: ${doc.code}\nNgày ban hành: ${doc.date}\nTiểu mục: ${doc.category || 'Văn bản hành chính quân sự'}\n\nTRÍCH YẾU NỘI DUNG:\n${doc.title}\n\nNỘI DUNG TÓM TẮT & HƯỚNG DẪN:\n${doc.description || 'Văn bản quy định nội bộ phục vụ công tác lãnh đạo, chỉ huy và duy trì nền nếp chính quy trong toàn đơn vị.'}\n\n(Tài liệu lưu trữ tại Kho Văn bản số - Trung đoàn 95, Sư đoàn 2)`;
       const blob = new Blob([blobContent], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -254,7 +254,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   const docSubtitle =
     siteConfig.sections?.doc?.subTitle ||
     siteConfig.sections?.doc?.desc ||
-    'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Sư đoàn 10';
+    'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Trung đoàn 95, Sư đoàn 2';
 
   return (
     <div className="space-y-4">
@@ -909,7 +909,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                   <span>Quy định lưu trữ & khai thác:</span>
                 </div>
                 <p className="text-blue-900/90 leading-relaxed">
-                  Văn bản được số hóa và lưu trữ tại Kho Tư liệu điện tử Sư đoàn 10. Phục vụ công tác tra cứu, học tập và triển khai nhiệm vụ chính trị - quân sự trong toàn đơn vị.
+                  Văn bản được số hóa và lưu trữ tại Kho Tư liệu điện tử Trung đoàn 95, Sư đoàn 2. Phục vụ công tác tra cứu, học tập và triển khai nhiệm vụ chính trị - quân sự trong toàn đơn vị.
                 </p>
               </div>
             </div>

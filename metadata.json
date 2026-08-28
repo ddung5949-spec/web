@@ -1,6 +1,6 @@
 {
-  "name": "Remix Truyền thông Đoàn Mang Yang - Sư đoàn 10 Anh hùng",
-  "description": "Cổng thông tin truyền thông, giáo dục chính trị, thư viện văn bản số và phòng họp số - Trung đoàn 95, Sư đoàn 2, Đoàn Mang Yang anh hùng",
+  "name": "Cổng Thông tin Điện tử Trung đoàn 95, Sư đoàn 2",
+  "description": "Cổng thông tin truyền thông, giáo dục chính trị, thư viện văn bản số và phòng họp Đảng ủy số - Trung đoàn 95, Sư đoàn 2",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -200,7 +200,7 @@ export const defaultRoles: RoleDefinition[] = [
   {
     id: 'user',
     name: 'Cán bộ - Chiến sĩ (User)',
-    description: 'Quân nhân trong toàn Sư đoàn tra cứu thông tin, gửi dự thảo bài viết và tham gia thi trực tuyến',
+    description: 'Quân nhân trong toàn Trung đoàn 95, Sư đoàn 2 tra cứu thông tin, gửi dự thảo bài viết và tham gia thi trực tuyến',
     color: '#0f766e',
     textColor: '#ffffff',
     isSystem: true,
@@ -217,10 +217,10 @@ export const defaultRoles: RoleDefinition[] = [
 ];
 
 export const defaultSiteConfig: SiteConfig = {
-  title: 'TRUYỀN THÔNG ĐOÀN MANG YANG',
-  subtitle: 'TRUNG ĐOÀN 95 • HỆ THỐNG THÔNG TIN TUYÊN TRUYỀN & QUẢN TRỊ VĂN KIỆN NỘI BỘ',
+  title: 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5',
+  subtitle: 'TRUNG ĐOÀN 95, SƯ ĐOÀN 2 • HỆ THỐNG THÔNG TIN TUYÊN TRUYỀN & QUẢN TRỊ VĂN KIỆN NỘI BỘ',
   slogan: 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG',
-  ticker: '★ Sư đoàn 10 - Đoàn Mang Yang anh hùng: Phát huy truyền thống "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG" trong mọi nhiệm vụ SSCĐ và xây dựng đơn vị.',
+  ticker: '★ Trung đoàn 95, Sư đoàn 2: Phát huy truyền thống "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG" trong mọi nhiệm vụ SSCĐ và xây dựng đơn vị.',
   colorRed: '#b91c1c',
   colorGreen: '#143d2b',
   logoType: 'official_vector',
@@ -350,7 +350,7 @@ export const defaultSiteConfig: SiteConfig = {
     doc: {
       title: 'Kho Văn bản - Tài liệu Quân sự',
       shortLabel: 'Văn bản - Chỉ thị',
-      subTitle: 'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Sư đoàn 10',
+      subTitle: 'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Trung đoàn 95, Sư đoàn 2',
       desc: 'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch và hướng dẫn công tác quân sự nội bộ.',
       categories: [
         'Nghị quyết - Chỉ thị',
@@ -365,7 +365,7 @@ export const defaultSiteConfig: SiteConfig = {
     lecture: {
       title: 'Thư viện Bài giảng điện tử & Giáo án số hóa',
       shortLabel: 'Bài giảng số',
-      subTitle: 'Kho lưu trữ slide trình chiếu, giáo án và học liệu đa phương tiện phục vụ huấn luyện toàn Sư đoàn 10',
+      subTitle: 'Kho lưu trữ slide trình chiếu, giáo án và học liệu đa phương tiện phục vụ huấn luyện toàn Trung đoàn 95, Sư đoàn 2',
       desc: 'Kho giáo án điện tử, bài giảng chính trị, kỹ thuật chiến đấu bộ binh phục vụ toàn đơn vị.',
       categories: [
         'Giáo án Chính trị',
@@ -399,10 +399,10 @@ export const defaultSiteConfig: SiteConfig = {
       openNewTab: true,
     },
   ],
-  footerAddress: 'Thành phố Pleiku, Tỉnh Gia Lai (Địa bàn đóng quân Sư đoàn 10)',
+  footerAddress: 'Thị xã An Khê, Tỉnh Gia Lai (Địa bàn đóng quân Trung đoàn 95, Sư đoàn 2)',
   footerHotline: '069.xxx.xxx (Trực ban Tác chiến / Ban Tuyên huấn)',
-  footerEmail: 'tuyenhuan.mangyang@bqp.vn',
-  footerUnitName: 'Sư đoàn 10 - Đoàn Mang Yang anh hùng',
+  footerEmail: 'tuyenhuan.e95@bqp.vn',
+  footerUnitName: 'Trung đoàn 95, Sư đoàn 2',
   footerBgColor: '#143d2b',
   footerSloganBgColor: '#0a2318',
   footerAccentColor: '#fbbf24',
@@ -419,11 +419,11 @@ export const defaultUsers: User[] = [
     id: 1,
     username: 'admin',
     password: '123',
-    fullName: 'Quản trị viên Phòng Chính trị',
+    fullName: 'Quản trị viên Ban Chính trị',
     rankUnit: 'Thiếu tá - Ban Tuyên huấn',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+    avatar: '',
     role: 'admin',
-    militaryCode: 'SQ-10001',
+    militaryCode: 'SQ-95001',
     profileId: 1,
     totalActiveMinutes: 0,
     lastActiveAt: '',
@@ -442,18 +442,18 @@ export const defaultUsers: User[] = [
 export const defaultMilitaryProfiles: MilitaryProfile[] = [
   {
     id: 1,
-    militaryCode: 'SQ-10001',
-    fullName: 'Quản trị viên Phòng Chính trị',
+    militaryCode: 'SQ-95001',
+    fullName: 'Quản trị viên Ban Chính trị',
     birthDate: '1985-05-19',
     rank: 'Thiếu tá',
     position: 'Trợ lý Tuyên huấn',
-    unit: 'Ban Tuyên huấn - Phòng Chính trị Sư đoàn 10',
+    unit: 'Ban Chính trị - Trung đoàn 95, Sư đoàn 2',
     hometown: 'Thị xã An Khê, Tỉnh Gia Lai',
     enlistmentDate: '2004-09-01',
     partyJoinDate: '2007-02-03',
     phoneNumber: '0988.100.001',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    notes: 'Quản trị viên hệ thống mạng nội bộ và Cổng thông tin tuyên truyền.',
+    avatar: '',
+    notes: 'Quản trị viên hệ thống mạng nội bộ và Cổng thông tin tuyên truyền Trung đoàn 95, Sư đoàn 2.',
     status: 'active',
     userId: 1,
     username: 'admin',
@@ -490,7 +490,56 @@ export const categoryOptions: Record<string, string[]> = {
   bac: ['Lời Bác dạy', 'Gương sáng chiến sĩ', 'Kể chuyện Bác Hồ', 'Mô hình hay - Cách làm sáng tạo'],
 };
 
-export const defaultUncleHoQuotes: UncleHoQuote[] = [];
+export const defaultUncleHoQuotes: UncleHoQuote[] = [
+  {
+    id: '08-28',
+    dayMonth: '28/08',
+    yearRecorded: '1945',
+    quote: 'Dân ta xin nhớ chữ đồng: Đồng tình, đồng sức, đồng lòng, đồng minh.',
+    context: 'Lời Bác kêu gọi toàn thể đồng bào và chiến sĩ cả nước phát huy sức mạnh đại đoàn kết dân tộc.',
+    lesson: 'Cán bộ, chiến sĩ Trung đoàn 95, Sư đoàn 2 luôn nêu cao tinh thần đoàn kết nội bộ, đoàn kết quân dân, chung sức đồng lòng vượt qua mọi thử thách, hoàn thành xuất sắc mọi nhiệm vụ được giao.',
+    images: [],
+    publishTime: '06:00',
+    status: 'active',
+    isAutoPublish: true,
+  },
+  {
+    id: '08-19',
+    dayMonth: '19/08',
+    yearRecorded: '1945',
+    quote: 'Dù phải đốt cháy cả dãy Trường Sơn cũng phải kiên quyết giành cho được độc lập!',
+    context: 'Lời Chủ tịch Hồ Chí Minh khẳng định ý chí quật cường, quyết tâm sắt đá của dân tộc ta trong Cách mạng Tháng Tám.',
+    lesson: 'Toàn thể cán bộ, chiến sĩ Trung đoàn 95 không ngừng rèn luyện bản lĩnh chính trị vững vàng, ý chí quyết chiến quyết thắng, sẵn sàng chiến đấu hy sinh bảo vệ vững chắc Tổ quốc.',
+    images: [],
+    publishTime: '06:00',
+    status: 'active',
+    isAutoPublish: true,
+  },
+  {
+    id: '02-09',
+    dayMonth: '02/09',
+    yearRecorded: '1945',
+    quote: 'Nước Việt Nam có quyền hưởng tự do và độc lập, và sự thật đã thành một nước tự do, độc lập. Toàn thể dân tộc Việt Nam quyết đem tất cả tinh thần và lực lượng, tính mạng và của cải để giữ vững quyền tự do, độc lập ấy.',
+    context: 'Trích Tuyên ngôn Độc lập do Chủ tịch Hồ Chí Minh đọc tại Quảng trường Ba Đình lịch sử.',
+    lesson: 'Mỗi quân nhân Trung đoàn 95, Sư đoàn 2 luôn khắc sâu lời thề son sắt với non sông, giữ vững kỷ luật, nâng cao trình độ huấn luyện và khả năng SSCĐ trong mọi tình huống.',
+    images: [],
+    publishTime: '06:00',
+    status: 'active',
+    isAutoPublish: true,
+  },
+  {
+    id: '22-12',
+    dayMonth: '22/12',
+    yearRecorded: '1964',
+    quote: 'Quân đội ta trung với Đảng, hiếu với dân, sẵn sàng chiến đấu hy sinh vì độc lập tự do của Tổ quốc, vì chủ nghĩa xã hội. Nhiệm vụ nào cũng hoàn thành, khó khăn nào cũng vượt qua, kẻ thù nào cũng đánh thắng.',
+    context: 'Lời khen ngợi của Bác Hồ dành cho Quân đội nhân dân Việt Nam nhân dịp kỷ niệm 20 năm Ngày thành lập Quân đội.',
+    lesson: 'Đây là kim chỉ nam cho mọi hành động của cán bộ, chiến sĩ Trung đoàn 95, phát huy phẩm chất "Bộ đội Cụ Hồ", xây dựng đơn vị vững mạnh toàn diện "Mẫu mực, tiêu biểu".',
+    images: [],
+    publishTime: '06:00',
+    status: 'active',
+    isAutoPublish: true,
+  },
+];
 
 export const defaultUncleHoStories: UncleHoStory[] = [];
 
@@ -544,5 +593,8 @@ export const defaultUncleHoSettings: UncleHoSettings = {
   dailyPostTime: '06:00',
   autoSelectToday: true,
   activeQuoteId: '',
-  folderUploadBatchName: 'Thư mục ảnh tư liệu Bác Hồ và Sư đoàn 10',
+  folderUploadBatchName: 'Thư mục ảnh tư liệu Bác Hồ và Trung đoàn 95, Sư đoàn 2',
+  images: [],
+  bannerTitle: 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+  showQuoteOfTheDay: true,
 };

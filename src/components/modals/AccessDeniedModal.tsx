@@ -15,7 +15,7 @@ export const AccessDeniedModal: React.FC<AccessDeniedModalProps> = ({
   isOpen,
   onClose,
   title = 'BẠN CHƯA CÓ QUYỀN TRUY CẬP TÍNH NĂNG NÀY',
-  message = 'Đồng chí chưa được cấp quyền truy cập tính năng/khu vực này. Vui lòng liên hệ Quản trị viên (Ban Biên tập - Sư đoàn 10) hoặc Đăng nhập tài khoản Quản trị viên có thẩm quyền!',
+  message = 'Đồng chí chưa được cấp quyền truy cập tính năng/khu vực này. Vui lòng liên hệ Quản trị viên (Ban Biên tập - Trung đoàn 95, Sư đoàn 2) hoặc Đăng nhập tài khoản Quản trị viên có thẩm quyền!',
   requiredRole = 'Quản trị viên (Admin)',
   onOpenLogin,
   onGoHome,

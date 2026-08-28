@@ -404,13 +404,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const announcements: HomeAnnouncement[] = siteConfig?.homeAnnouncements || [
     {
       id: 'ann-1',
-      title: 'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Sư đoàn 10 nhiệm kỳ 2025-2030 (Tuần thứ 3)',
+      title: 'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Trung đoàn 95 nhiệm kỳ 2025-2030 (Tuần thứ 3)',
       date: '19/08/2026',
       highlight: true,
     },
     {
       id: 'ann-2',
-      title: 'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Sư đoàn 10 nhiệm kỳ 2025-2030 (Tuần thứ nhất)',
+      title: 'Kết quả Cuộc thi tìm hiểu trực tuyến Đại hội XIV của Đảng, Đại hội Đảng bộ Quân đội lần thứ XII và Đại hội Đảng bộ Trung đoàn 95 nhiệm kỳ 2025-2030 (Tuần thứ nhất)',
       date: '12/08/2026',
     },
     {
