@@ -57,6 +57,7 @@ import {
 import { defaultHomeCategoryColumns, defaultSidebarWidgets } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
 import { DailyWidgetsSection } from './DailyWidgetsSection';
+import { DailyPosterWidget } from './DailyPosterWidget';
 import { HomeAnnouncementsWidget } from './HomeAnnouncementsWidget';
 import { HomeLatestNewsWidget } from './HomeLatestNewsWidget';
 import { HomeMiddleFeaturedSlider } from './HomeMiddleFeaturedSlider';
@@ -150,6 +151,48 @@ export const HomeView: React.FC<HomeViewProps> = ({
         : fromConfig && fromConfig.length > 0
         ? fromConfig
         : defaultSidebarWidgets;
+
+    // Check if list has old 'daily_widgets' and lacks 'safety_message', expand it
+    const hasDailyGroup = list.some((w) => w.id === 'daily_widgets');
+    const hasSafety = list.some((w) => w.id === 'safety_message' || w.id === 'widget_safety_message');
+
+    if (hasDailyGroup && !hasSafety) {
+      const dailyGroup = list.find((w) => w.id === 'daily_widgets')!;
+      const expanded: SidebarWidgetSetting[] = [
+        {
+          id: 'safety_message',
+          name: 'Mỗi ngày 1 thông điệp an toàn',
+          side: dailyGroup.side,
+          order: dailyGroup.order,
+          enabled: dailyGroup.enabled,
+        },
+        {
+          id: 'traffic_situation',
+          name: 'Mỗi ngày một tình huống giao thông',
+          side: dailyGroup.side,
+          order: dailyGroup.order + 1,
+          enabled: dailyGroup.enabled,
+        },
+        {
+          id: 'good_deed',
+          name: 'Mỗi ngày một hành động đẹp',
+          side: dailyGroup.side,
+          order: dailyGroup.order + 2,
+          enabled: dailyGroup.enabled,
+        },
+      ];
+
+      const result: SidebarWidgetSetting[] = [];
+      list.forEach((w) => {
+        if (w.id === 'daily_widgets') {
+          result.push(...expanded);
+        } else {
+          result.push(w);
+        }
+      });
+      return result;
+    }
+
     return list;
   }, [siteConfig?.layoutSettings?.sidebarWidgets, siteConfig?.sidebarWidgets]);
 
@@ -413,14 +456,61 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         layout="vertical"
                       />
                     );
-                  case 'daily_widgets':
+                  case 'safety_message':
+                  case 'widget_safety_message':
                     return (
-                      <DailyWidgetsSection
-                        key="widget-daily-widgets"
+                      <DailyPosterWidget
+                        key={`widget-left-safety-${widget.id}`}
+                        widgetId="safety_message"
                         dailyWidgets={siteConfig?.dailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
+                    );
+                  case 'traffic_situation':
+                  case 'widget_traffic_situation':
+                    return (
+                      <DailyPosterWidget
+                        key={`widget-left-traffic-${widget.id}`}
+                        widgetId="traffic_situation"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'good_deed':
+                  case 'widget_good_deed':
+                    return (
+                      <DailyPosterWidget
+                        key={`widget-left-deed-${widget.id}`}
+                        widgetId="good_deed"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'daily_widgets':
+                    return (
+                      <div key="widget-left-daily-widgets-group" className="flex flex-col gap-4">
+                        <DailyPosterWidget
+                          widgetId="safety_message"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                        <DailyPosterWidget
+                          widgetId="traffic_situation"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                        <DailyPosterWidget
+                          widgetId="good_deed"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                      </div>
                     );
                   case 'announcements':
                     return (
@@ -525,14 +615,61 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         layout="vertical"
                       />
                     );
-                  case 'daily_widgets':
+                  case 'safety_message':
+                  case 'widget_safety_message':
                     return (
-                      <DailyWidgetsSection
-                        key="widget-daily-widgets"
+                      <DailyPosterWidget
+                        key={`widget-right-safety-${widget.id}`}
+                        widgetId="safety_message"
                         dailyWidgets={siteConfig?.dailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
+                    );
+                  case 'traffic_situation':
+                  case 'widget_traffic_situation':
+                    return (
+                      <DailyPosterWidget
+                        key={`widget-right-traffic-${widget.id}`}
+                        widgetId="traffic_situation"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'good_deed':
+                  case 'widget_good_deed':
+                    return (
+                      <DailyPosterWidget
+                        key={`widget-right-deed-${widget.id}`}
+                        widgetId="good_deed"
+                        dailyWidgets={siteConfig?.dailyWidgets}
+                        currentUser={currentUser}
+                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                      />
+                    );
+                  case 'daily_widgets':
+                    return (
+                      <div key="widget-right-daily-widgets-group" className="flex flex-col gap-4">
+                        <DailyPosterWidget
+                          widgetId="safety_message"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                        <DailyPosterWidget
+                          widgetId="traffic_situation"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                        <DailyPosterWidget
+                          widgetId="good_deed"
+                          dailyWidgets={siteConfig?.dailyWidgets}
+                          currentUser={currentUser}
+                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+                        />
+                      </div>
                     );
                   case 'announcements':
                     return (

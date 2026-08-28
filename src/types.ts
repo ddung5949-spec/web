@@ -422,7 +422,13 @@ export type RightSidebarWidgetType =
 
 export type SidebarWidgetId =
   | 'uncle_ho' // Khối Lời Bác dạy ngày này năm xưa
-  | 'daily_widgets' // Khối 3 chuyên mục hằng ngày (An toàn, Giao thông, Hành động đẹp)
+  | 'daily_widgets' // Khối gộp (legacy)
+  | 'safety_message' // Khối Mỗi ngày 1 thông điệp an toàn
+  | 'traffic_situation' // Khối Mỗi ngày một tình huống giao thông
+  | 'good_deed' // Khối Mỗi ngày một hành động đẹp
+  | 'widget_safety_message'
+  | 'widget_traffic_situation'
+  | 'widget_good_deed'
   | 'announcements' // Khối Thông báo & Sự kiện quan trọng
   | 'latest_news' // Khối Tin mới nhất
   | 'quick_actions'; // Khối Tiện ích quân nhân
@@ -436,11 +442,12 @@ export interface SidebarWidgetSetting {
 }
 
 export interface DailyWidgetItem {
-  id: string; // 'safety_message' | 'traffic_situation' | 'good_deed'
+  id: string; // 'safety_message' | 'traffic_situation' | 'good_deed' | 'widget_safety_message' | 'widget_traffic_situation' | 'widget_good_deed'
   categoryName: string;
-  title: string;
-  content: string;
+  title?: string;
+  content?: string;
   imageUrl?: string;
+  aspectRatioMode?: 'auto' | 'portrait' | 'landscape';
   updatedAt?: string;
 }
 

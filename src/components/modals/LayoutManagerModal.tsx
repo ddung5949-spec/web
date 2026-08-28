@@ -17,6 +17,8 @@ import {
   BellRing,
   ArrowLeftRight,
   ShieldAlert,
+  Car,
+  HeartHandshake,
   Compass,
   CheckCircle2,
 } from 'lucide-react';
@@ -43,18 +45,67 @@ const DEFAULT_LAYOUT: HomeLayoutSettings = {
   sidebarWidgets: defaultSidebarWidgets,
 };
 
+function normalizeWidgetsList(list?: SidebarWidgetSetting[]): SidebarWidgetSetting[] {
+  if (!list || list.length === 0) return defaultSidebarWidgets;
+  
+  // If list has old 'daily_widgets' and lacks 'safety_message', expand it
+  const hasDailyGroup = list.some((w) => w.id === 'daily_widgets');
+  const hasSafety = list.some((w) => w.id === 'safety_message' || w.id === 'widget_safety_message');
+  
+  if (hasDailyGroup && !hasSafety) {
+    const dailyGroup = list.find((w) => w.id === 'daily_widgets')!;
+    const expanded: SidebarWidgetSetting[] = [
+      {
+        id: 'safety_message',
+        name: 'Mỗi ngày 1 thông điệp an toàn',
+        side: dailyGroup.side,
+        order: dailyGroup.order,
+        enabled: dailyGroup.enabled,
+      },
+      {
+        id: 'traffic_situation',
+        name: 'Mỗi ngày một tình huống giao thông',
+        side: dailyGroup.side,
+        order: dailyGroup.order + 1,
+        enabled: dailyGroup.enabled,
+      },
+      {
+        id: 'good_deed',
+        name: 'Mỗi ngày một hành động đẹp',
+        side: dailyGroup.side,
+        order: dailyGroup.order + 2,
+        enabled: dailyGroup.enabled,
+      },
+    ];
+
+    const result: SidebarWidgetSetting[] = [];
+    list.forEach((w) => {
+      if (w.id === 'daily_widgets') {
+        result.push(...expanded);
+      } else {
+        result.push(w);
+      }
+    });
+    return result;
+  }
+
+  return list;
+}
+
 export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
   isOpen,
   onClose,
   siteConfig,
   onSaveLayout,
 }) => {
-  const currentWidgets: SidebarWidgetSetting[] =
+  const rawWidgets: SidebarWidgetSetting[] =
     siteConfig.layoutSettings?.sidebarWidgets && siteConfig.layoutSettings.sidebarWidgets.length > 0
       ? siteConfig.layoutSettings.sidebarWidgets
       : siteConfig.sidebarWidgets && siteConfig.sidebarWidgets.length > 0
       ? siteConfig.sidebarWidgets
       : defaultSidebarWidgets;
+
+  const currentWidgets = normalizeWidgetsList(rawWidgets);
 
   const currentSettings: HomeLayoutSettings = {
     ...DEFAULT_LAYOUT,
@@ -144,8 +195,16 @@ export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
     switch (id) {
       case 'uncle_ho':
         return Flame;
+      case 'safety_message':
+      case 'widget_safety_message':
       case 'daily_widgets':
         return ShieldAlert;
+      case 'traffic_situation':
+      case 'widget_traffic_situation':
+        return Car;
+      case 'good_deed':
+      case 'widget_good_deed':
+        return HeartHandshake;
       case 'announcements':
         return BellRing;
       case 'latest_news':
@@ -161,6 +220,15 @@ export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
     switch (id) {
       case 'uncle_ho':
         return 'Lời Bác dạy cốt lõi, tư liệu lịch sử, bài học vận dụng và album ảnh tư liệu';
+      case 'safety_message':
+      case 'widget_safety_message':
+        return 'Poster Mỗi ngày 1 thông điệp an toàn trong huấn luyện & công tác';
+      case 'traffic_situation':
+      case 'widget_traffic_situation':
+        return 'Poster Mỗi ngày một tình huống giao thông và quy tắc an toàn';
+      case 'good_deed':
+      case 'widget_good_deed':
+        return 'Poster Mỗi ngày một hành động đẹp, gương sáng Bộ đội Cụ Hồ';
       case 'daily_widgets':
         return '3 chuyên mục: Mỗi ngày 1 thông điệp an toàn, 1 tình huống giao thông, 1 hành động đẹp';
       case 'announcements':
