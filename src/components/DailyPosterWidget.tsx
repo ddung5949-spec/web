@@ -28,10 +28,10 @@ interface DailyPosterWidgetProps {
 
 /**
  * High-performance client-side Canvas image compressor
- * Automatically downscales images (max width 800px, JPEG quality 0.65)
+ * Automatically downscales images (max width 800px, JPEG quality 0.7)
  * Ensuring Base64 payload is ultra-light (< 150KB) for instantaneous Supabase sync
  */
-export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65): Promise<string> {
+export function compressPosterImage(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -101,13 +101,13 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
     aspectRatioMode: 'auto',
   };
 
-  // 1. Instant fallback from localStorage cache if props not yet loaded
+  // 1. Instant fallback from localStorage cache ('daily_posters' or 'daily_posters_cache') if props not yet loaded
   let cachedImg = '';
   let cachedRatio = 'auto';
   let cachedTitle = '';
   let cachedCat = '';
   try {
-    const cachedRaw = localStorage.getItem('daily_posters_cache');
+    const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
     if (cachedRaw) {
       const cacheMap = JSON.parse(cachedRaw);
       const found = cacheMap[posterKey] || cacheMap[cleanId] || cacheMap[widgetId];
@@ -228,8 +228,8 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
     try {
       setIsCompressing(true);
-      // Nén siêu nhẹ: Chiều rộng tối đa 800px, chất lượng JPEG 0.65 (< 150KB)
-      const compressedBase64 = await compressPosterImage(file, 800, 0.65);
+      // Nén ảnh JPEG chất lượng 0.7, chiều rộng 800px bằng Canvas
+      const compressedBase64 = await compressPosterImage(file, 800, 0.7);
       setFormImage(compressedBase64);
     } catch (err) {
       console.error('Error compressing poster image:', err);
@@ -259,14 +259,16 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       };
 
       // -------------------------------------------------------------
-      // Lớp 1 (Supabase): Upsert trực tiếp vào bảng `daily_posters`
+      // 1. Supabase: Lưu chuỗi base64 vào bảng 'daily_posters'
+      //    supabase.from('daily_posters').upsert({ id: posterId, image_data: base64, aspect_ratio: ratio })
       // -------------------------------------------------------------
       const supabase = getSupabase();
       if (supabase) {
         try {
+          const posterId = posterKey; // 'safety' | 'traffic' | 'good_deed'
           const { error: upsertErr } = await supabase.from('daily_posters').upsert(
             {
-              id: posterKey, // 'safety' | 'traffic' | 'good_deed'
+              id: posterId,
               image_data: finalImg,
               aspect_ratio: formAspectRatio,
               category_name: finalCat,
@@ -277,11 +279,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           );
 
           if (upsertErr) {
-            // Thử thêm với alias columns để tương thích tối đa
             await supabase.from('daily_posters').upsert(
               {
-                id: posterKey,
-                key: posterKey,
+                id: posterId,
+                key: posterId,
                 image_data: finalImg,
                 aspect_ratio: formAspectRatio,
                 updated_at: nowIso,
@@ -295,10 +296,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       }
 
       // -------------------------------------------------------------
-      // Lớp 2 (Local Cache): Lưu vào localStorage cache tức thì
+      // 2. LocalStorage: Lưu vào localStorage('daily_posters') để nạp hiển thị ngay lập tức khi mở web
       // -------------------------------------------------------------
       try {
-        const cachedRaw = localStorage.getItem('daily_posters_cache');
+        const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
         const cacheEntry = {
           id: posterKey,
@@ -312,6 +313,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
         cacheMap[cleanId] = cacheEntry;
         if (posterKey === 'safety') cacheMap['safety_message'] = cacheEntry;
         if (posterKey === 'traffic') cacheMap['traffic_situation'] = cacheEntry;
+        localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
         localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
       } catch (cacheErr) {
         console.warn('[DailyPosterWidget] Local cache save error:', cacheErr);

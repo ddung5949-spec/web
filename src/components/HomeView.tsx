@@ -67,6 +67,7 @@ import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
 import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
 import { LayoutManagerModal } from './modals/LayoutManagerModal';
+import { getSupabase } from '../utils/supabase';
 
 interface HomeViewProps {
   articles: Article[];
@@ -133,6 +134,103 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [isSectionManagerModalOpen, setIsSectionManagerModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+
+  // State nạp poster từ bảng 'daily_posters' trên Supabase và cache localStorage
+  const [dailyPosters, setDailyPosters] = useState<Record<string, { image_data: string; aspect_ratio?: string }>>(() => {
+    try {
+      const cached = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      return cached ? JSON.parse(cached) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Tải dữ liệu từ Supabase bảng 'daily_posters' khi khởi tạo và gán vào State
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchDailyPosters = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data, error } = await supabase.from('daily_posters').select('*');
+        if (!error && data && Array.isArray(data) && data.length > 0) {
+          const map: Record<string, { image_data: string; aspect_ratio?: string }> = {};
+          data.forEach((row: any) => {
+            const id = row.id || row.key || row.widget_id;
+            if (id) {
+              map[id] = {
+                image_data: row.image_data || row.imageUrl || row.image || '',
+                aspect_ratio: row.aspect_ratio || row.aspectRatio || 'auto',
+              };
+            }
+          });
+          if (isMounted) {
+            setDailyPosters((prev) => ({ ...prev, ...map }));
+          }
+          try {
+            const currentCache = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+            const mergedCache = currentCache ? { ...JSON.parse(currentCache), ...map } : map;
+            localStorage.setItem('daily_posters', JSON.stringify(mergedCache));
+            localStorage.setItem('daily_posters_cache', JSON.stringify(mergedCache));
+          } catch {
+            // ignore
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching daily_posters in HomeView:', err);
+      }
+    };
+    fetchDailyPosters();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Tổng hợp danh sách dailyWidgets bao gồm dữ liệu từ dailyPosters state
+  const mergedDailyWidgets: DailyWidgetItem[] = React.useMemo(() => {
+    const list: DailyWidgetItem[] = Array.isArray(siteConfig?.dailyWidgets)
+      ? [...siteConfig.dailyWidgets]
+      : [];
+
+    Object.entries(dailyPosters).forEach(([id, poster]) => {
+      const cleanId = id.replace(/^widget_/, '');
+      const posterKey = cleanId === 'safety_message' ? 'safety' : cleanId === 'traffic_situation' ? 'traffic' : cleanId;
+      const targetId = posterKey === 'safety' ? 'safety_message' : posterKey === 'traffic' ? 'traffic_situation' : 'good_deed';
+      const idx = list.findIndex(
+        (w) =>
+          w.id === targetId ||
+          w.id === id ||
+          (posterKey === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
+          (posterKey === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation')) ||
+          (posterKey === 'good_deed' && w.id === 'good_deed')
+      );
+
+      const itemData: DailyWidgetItem = {
+        id: targetId,
+        categoryName:
+          targetId === 'safety_message'
+            ? 'Mỗi ngày 1 thông điệp an toàn'
+            : targetId === 'traffic_situation'
+            ? 'Mỗi ngày một tình huống giao thông'
+            : 'Mỗi ngày một hành động đẹp',
+        title: '',
+        imageUrl: poster.image_data,
+        aspectRatioMode: (poster.aspect_ratio as any) || 'auto',
+      };
+
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx],
+          imageUrl: poster.image_data || list[idx].imageUrl,
+          aspectRatioMode: (poster.aspect_ratio as any) || list[idx].aspectRatioMode,
+        };
+      } else {
+        list.push(itemData);
+      }
+    });
+
+    return list.length > 0 ? list : (siteConfig?.dailyWidgets as any) || [];
+  }, [siteConfig?.dailyWidgets, dailyPosters]);
 
   // Layout Settings
   const layout = siteConfig?.layoutSettings || {};
@@ -462,7 +560,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-left-safety-${widget.id}`}
                         widgetId="safety_message"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -473,7 +571,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-left-traffic-${widget.id}`}
                         widgetId="traffic_situation"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -484,7 +582,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-left-deed-${widget.id}`}
                         widgetId="good_deed"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -494,19 +592,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <div key="widget-left-daily-widgets-group" className="flex flex-col gap-4">
                         <DailyPosterWidget
                           widgetId="safety_message"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="traffic_situation"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="good_deed"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
@@ -621,7 +719,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-right-safety-${widget.id}`}
                         widgetId="safety_message"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -632,7 +730,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-right-traffic-${widget.id}`}
                         widgetId="traffic_situation"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -643,7 +741,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <DailyPosterWidget
                         key={`widget-right-deed-${widget.id}`}
                         widgetId="good_deed"
-                        dailyWidgets={siteConfig?.dailyWidgets}
+                        dailyWidgets={mergedDailyWidgets}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -653,19 +751,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       <div key="widget-right-daily-widgets-group" className="flex flex-col gap-4">
                         <DailyPosterWidget
                           widgetId="safety_message"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="traffic_situation"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="good_deed"
-                          dailyWidgets={siteConfig?.dailyWidgets}
+                          dailyWidgets={mergedDailyWidgets}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
