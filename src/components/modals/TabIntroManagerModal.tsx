@@ -55,20 +55,38 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanShort = shortLabel.trim();
+    const cleanTitle = title.trim();
     const updatedSections: SiteSectionsConfig = {
       ...siteConfig.sections,
       [selectedTab]: {
         ...(siteConfig.sections as any)[selectedTab],
-        title: title.trim(),
-        shortLabel: shortLabel.trim(),
+        title: cleanTitle,
+        shortLabel: cleanShort,
+        short_name: cleanShort,
+        nav_title: cleanShort,
         subTitle: subTitle.trim(),
         desc: desc.trim(),
       },
     };
 
+    // Also update navTabs if corresponding tab is present
+    const updatedNavTabs = (siteConfig.navTabs || []).map((t) => {
+      if (t.id === selectedTab || t.targetPage === selectedTab) {
+        return {
+          ...t,
+          label: cleanShort || cleanTitle || t.label,
+          short_name: cleanShort,
+          nav_title: cleanShort,
+        };
+      }
+      return t;
+    });
+
     onSaveSiteConfig({
       ...siteConfig,
       sections: updatedSections,
+      navTabs: updatedNavTabs.length > 0 ? updatedNavTabs : siteConfig.navTabs,
     });
 
     onClose();

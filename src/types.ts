@@ -277,6 +277,9 @@ export interface SectionConfigItem {
   id: SectionType | string;
   title: string;
   shortLabel: string;
+  short_name?: string;
+  nav_title?: string;
+  name?: string;
   subTitle: string;
   desc: string;
   themeColor: string;
@@ -456,6 +459,10 @@ export interface DailyWidgetItem {
 export interface NavTabItem {
   id: string; // e.g. 'home', 'ctd', 'hl', 'bac', 'doc', 'lecture', 'qdnd', 'qk5' or custom
   label: string;
+  short_name?: string;
+  nav_title?: string;
+  name?: string;
+  title?: string;
   type: 'section' | 'internal' | 'external';
   targetPage?: PageView | string;
   externalUrl?: string;

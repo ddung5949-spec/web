@@ -1025,6 +1025,32 @@ export const supabaseDb = {
             result.dailyWidgets = items;
           }
 
+          // Ensure sections have synchronized shortLabel, short_name, nav_title
+          if (result.sections && typeof result.sections === 'object') {
+            Object.keys(result.sections).forEach((secKey) => {
+              const sec = result.sections[secKey];
+              if (sec) {
+                const effectiveShort = sec.short_name || sec.nav_title || sec.shortLabel || sec.title || '';
+                sec.shortLabel = effectiveShort;
+                sec.short_name = effectiveShort;
+                sec.nav_title = effectiveShort;
+              }
+            });
+          }
+
+          // Ensure navTabs have synchronized short_name and nav_title
+          if (Array.isArray(result.navTabs)) {
+            result.navTabs = result.navTabs.map((t: any) => {
+              const effectiveLabel = t.short_name || t.nav_title || t.name || t.title || t.label || '';
+              return {
+                ...t,
+                label: effectiveLabel,
+                short_name: effectiveLabel,
+                nav_title: effectiveLabel,
+              };
+            });
+          }
+
           return result as SiteConfig;
         }
       }

@@ -57,7 +57,22 @@ export const Navbar: React.FC<NavbarProps> = ({
     return tabs
       .filter((t) => t.enabled !== false)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [siteConfig?.navTabs]);
+  }, [siteConfig?.navTabs, siteConfig?.sections]);
+
+  // Helper to resolve display tab title according to priorities:
+  // tab.short_name || tab.nav_title || tab.name || tab.title || section.shortLabel || section.title || tab.label
+  const getTabLabel = (tab: NavTabItem): string => {
+    const sectionConfig = (siteConfig?.sections as any)?.[tab.id] || (siteConfig?.sections as any)?.[tab.targetPage as string];
+    const resolved =
+      tab.short_name ||
+      tab.nav_title ||
+      tab.name ||
+      tab.title ||
+      (sectionConfig && ((sectionConfig as any).short_name || (sectionConfig as any).nav_title || sectionConfig.shortLabel || sectionConfig.title || (sectionConfig as any).name)) ||
+      tab.label ||
+      tab.id;
+    return resolved;
+  };
 
   const getTabIcon = (tabId: string, type: string) => {
     switch (tabId) {
@@ -165,6 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           {configuredNavTabs.map((tab) => {
             const Icon = getTabIcon(tab.id, tab.type);
+            const displayLabel = getTabLabel(tab);
 
             if (tab.type === 'external') {
               return (
@@ -177,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     title={`Mở liên kết: ${tab.externalUrl}`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
-                    <span>{tab.label}</span>
+                    <span>{displayLabel}</span>
                     <ExternalLink className="w-3 h-3 shrink-0 opacity-75" />
                   </a>
                 </li>
@@ -202,7 +218,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <span>{tab.label}</span>
+                  <span>{displayLabel}</span>
                 </button>
               </li>
             );

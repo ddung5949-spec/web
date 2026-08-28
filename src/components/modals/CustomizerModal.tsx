@@ -268,13 +268,42 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   // Handle section fields change
   const handleSectionFieldChange = (field: string, val: string) => {
-    setSections((prev) => ({
-      ...prev,
-      [selectedSectionKey]: {
-        ...prev[selectedSectionKey],
+    setSections((prev) => {
+      const current = prev[selectedSectionKey] || {};
+      const updatedSection: any = {
+        ...current,
         [field]: val,
-      },
-    }));
+      };
+
+      // If user edits shortLabel or title, keep short_name, nav_title, and shortLabel synchronized
+      if (field === 'shortLabel' || field === 'short_name' || field === 'nav_title') {
+        updatedSection.shortLabel = val;
+        updatedSection.short_name = val;
+        updatedSection.nav_title = val;
+      }
+
+      return {
+        ...prev,
+        [selectedSectionKey]: updatedSection,
+      };
+    });
+
+    // If changing shortLabel or title, immediately update the corresponding nav tab label if it exists
+    if (field === 'shortLabel' || field === 'short_name' || field === 'nav_title') {
+      setNavTabs((prev) =>
+        prev.map((t) => {
+          if (t.id === selectedSectionKey || t.targetPage === selectedSectionKey) {
+            return {
+              ...t,
+              label: val,
+              short_name: val,
+              nav_title: val,
+            };
+          }
+          return t;
+        })
+      );
+    }
   };
 
   // Subcategories logic
@@ -443,8 +472,30 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   const handleUpdateNavTabLabel = (id: string, newLabel: string) => {
     setNavTabs((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, label: newLabel } : t))
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              label: newLabel,
+              short_name: newLabel,
+              nav_title: newLabel,
+            }
+          : t
+      )
     );
+
+    // If this tab corresponds to a section, update the section's shortLabel as well
+    if (sections[id]) {
+      setSections((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          shortLabel: newLabel,
+          short_name: newLabel,
+          nav_title: newLabel,
+        },
+      }));
+    }
   };
 
   const handleResetNavTabs = () => {
