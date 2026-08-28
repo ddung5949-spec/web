@@ -137,28 +137,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <ArrowRight className="w-3 h-3 opacity-60" />
           </button>
 
-          {/* Phòng Họp Đảng ủy */}
-          {canJoinMeeting && (
-            <button
-              type="button"
-              id="sidebar-meeting-link"
-              onClick={() => onSelectPage('meeting')}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 transition-colors text-left cursor-pointer ${
-                currentPage === 'meeting'
-                  ? 'bg-rose-50 text-[#b91c1c] border-l-4 border-[#b91c1c] font-bold'
-                  : 'text-[#b91c1c] hover:bg-rose-50/60 font-semibold border-l-4 border-transparent'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <UsersRound className="w-3.5 h-3.5 shrink-0 text-[#b91c1c]" />
-                <span>{meetingLabel}</span>
-              </span>
-              <span className="text-[10px] bg-[#b91c1c] text-white px-1.5 py-0.5 rounded font-bold">
-                Online
-              </span>
-            </button>
-          )}
-
           {/* Duyệt bài Admin */}
           {isAdmin && (
             <button

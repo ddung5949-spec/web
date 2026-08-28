@@ -371,21 +371,6 @@ export const Header: React.FC<HeaderProps> = ({
                           )}
                         </>
                       )}
-
-                      {/* 3. Họp Đảng ủy (nếu có quyền) */}
-                      {isPartyMember && onSelectPage && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsUserMenuOpen(false);
-                            onSelectPage('meeting');
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-pink-900 hover:bg-pink-50 rounded-lg transition-colors cursor-pointer text-left font-bold"
-                        >
-                          <UsersRound className="w-4 h-4 text-pink-700 shrink-0" />
-                          <span>Vào Phòng Họp Đảng ủy</span>
-                        </button>
-                      )}
                     </div>
 
                     {/* Divider & Logout Button */}

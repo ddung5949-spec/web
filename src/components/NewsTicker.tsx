@@ -197,8 +197,9 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
     return items;
   }, [articles, mode, customDays, customList, tickerText]);
 
-  // Speed duration mapping
-  const animationDuration = speed === 'slow' ? '45s' : speed === 'fast' ? '18s' : '28s';
+  // Speed duration mapping (increased to smooth 32s - 35s as requested)
+  const animationDuration = speed === 'slow' ? '48s' : speed === 'fast' ? '22s' : '34s';
+  const [isTouchPaused, setIsTouchPaused] = React.useState(false);
 
   return (
     <div className="bg-white border-b border-gray-200 py-1.5 shadow-xs select-none relative z-30">
@@ -214,13 +215,24 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
           <span className="tracking-wide font-black">{prefix}</span>
         </div>
 
-        {/* Scrolling Marquee Stream */}
-        <div className="overflow-hidden whitespace-nowrap w-full text-xs md:text-sm text-gray-800 font-medium py-0.5 relative group">
+        {/* Scrolling Marquee Stream Container */}
+        <div
+          onTouchStart={() => setIsTouchPaused(true)}
+          onTouchEnd={() => setIsTouchPaused(false)}
+          className="marquee-container overflow-hidden whitespace-nowrap w-full text-xs md:text-sm text-gray-800 font-medium py-0.5 relative group flex items-center"
+        >
           <div
-            className="inline-block animate-marquee group-hover:[animation-play-state:paused] transition-colors"
-            style={{ animationDuration }}
+            className={`inline-flex items-center animate-marquee transition-colors ${
+              isTouchPaused ? 'marquee-paused' : ''
+            }`}
+            style={{
+              animationDuration,
+              animationTimingFunction: 'linear',
+              paddingLeft: '1rem',
+              paddingRight: '3rem',
+            }}
           >
-            <div className="inline-flex items-center gap-6">
+            <div className="inline-flex items-center gap-6 pr-8">
               {tickerItems.map((item, index) => (
                 <React.Fragment key={item.id}>
                   <div

@@ -420,6 +420,26 @@ export type RightSidebarWidgetType =
   | 'public_survey'
   | 'custom_shortcuts';
 
+export interface DailyWidgetItem {
+  id: string; // 'safety_message' | 'traffic_situation' | 'good_deed'
+  categoryName: string;
+  title: string;
+  content: string;
+  imageUrl?: string;
+  updatedAt?: string;
+}
+
+export interface NavTabItem {
+  id: string; // e.g. 'home', 'ctd', 'hl', 'bac', 'doc', 'lecture', 'qdnd', 'qk5' or custom
+  label: string;
+  type: 'section' | 'internal' | 'external';
+  targetPage?: PageView | string;
+  externalUrl?: string;
+  openNewTab?: boolean;
+  enabled: boolean;
+  order: number;
+}
+
 export interface SiteConfig {
   title: string;
   subtitle: string;
@@ -436,6 +456,8 @@ export interface SiteConfig {
   establishedDate?: string;
   sections: SiteSectionsConfig;
   customMenuItems?: CustomMenuItem[];
+  navTabs?: NavTabItem[];
+  dailyWidgets?: DailyWidgetItem[];
   tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined';
   tickerDays?: number;
   tickerCustomList?: string[];

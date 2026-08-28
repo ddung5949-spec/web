@@ -1,5 +1,6 @@
 import {
   Article,
+  DailyWidgetItem,
   DocumentItem,
   HomeCategoryColumn,
   LectureItem,
@@ -7,6 +8,7 @@ import {
   MeetingRoomItem,
   MeetingRoomSettings,
   MilitaryProfile,
+  NavTabItem,
   RoleDefinition,
   SiteConfig,
   UncleHoCustomCategory,
@@ -17,6 +19,44 @@ import {
   UncleHoStory,
   User,
 } from '../types';
+
+export const defaultNavTabs: NavTabItem[] = [
+  { id: 'home', label: 'Trang chủ', type: 'internal', targetPage: 'home', enabled: true, order: 1 },
+  { id: 'ctd', label: 'CTĐ - CTCT', type: 'internal', targetPage: 'ctd', enabled: true, order: 2 },
+  { id: 'hl', label: 'Huấn luyện - SSCĐ', type: 'internal', targetPage: 'hl', enabled: true, order: 3 },
+  { id: 'bac', label: 'Thực hành theo Bác', type: 'internal', targetPage: 'bac', enabled: true, order: 4 },
+  { id: 'doc', label: 'Văn bản - Chỉ thị', type: 'internal', targetPage: 'doc', enabled: true, order: 5 },
+  { id: 'lecture', label: 'Bài giảng số', type: 'internal', targetPage: 'lecture', enabled: true, order: 6 },
+  { id: 'qdnd', label: 'Báo QĐND', type: 'external', externalUrl: 'https://www.qdnd.vn', openNewTab: true, enabled: true, order: 7 },
+  { id: 'qk5', label: 'Báo Quân khu 5', type: 'external', externalUrl: 'https://baoquankhu5.vn', openNewTab: true, enabled: true, order: 8 },
+];
+
+export const defaultDailyWidgets: DailyWidgetItem[] = [
+  {
+    id: 'safety_message',
+    categoryName: 'Mỗi ngày 1 thông điệp an toàn',
+    title: 'Chấp hành nghiêm quy định an toàn trong huấn luyện và công tác',
+    content: 'An toàn là mệnh lệnh, là kỷ luật. Mọi cán bộ, chiến sĩ tuyệt đối tuân thủ nghiêm ngặt các quy tắc an toàn kỹ thuật, bảo đảm an toàn tuyệt đối về người và vũ khí trang bị kỹ thuật.',
+    imageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80',
+    updatedAt: new Date().toLocaleDateString('vi-VN'),
+  },
+  {
+    id: 'traffic_situation',
+    categoryName: 'Mỗi ngày một tình huống giao thông',
+    title: 'Quy tắc nhường đường tại nơi giao nhau và không lái xe sau khi uống rượu, bia',
+    content: 'Đã uống rượu, bia - Tuyệt đối không lái xe. Khi đến gần đường giao nhau, người điều khiển phương tiện phải chủ động giảm tốc độ và nhường đường theo đúng luật giao thông.',
+    imageUrl: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&auto=format&fit=crop&q=80',
+    updatedAt: new Date().toLocaleDateString('vi-VN'),
+  },
+  {
+    id: 'good_deed',
+    categoryName: 'Mỗi ngày một hành động đẹp',
+    title: 'Gương sáng chiến sĩ: Tận tụy phục vụ nhân dân, thắt chặt tình quân dân',
+    content: 'Tích cực giúp đỡ đồng chí đồng đội, gương mẫu trong học tập và rèn luyện, sẵn sàng xung kích giúp đỡ nhân dân nơi đóng quân, tô thắm phẩm chất cao đẹp Bộ đội Cụ Hồ.',
+    imageUrl: 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=800&auto=format&fit=crop&q=80',
+    updatedAt: new Date().toLocaleDateString('vi-VN'),
+  },
+];
 
 export const defaultRoles: RoleDefinition[] = [
   {
@@ -143,6 +183,8 @@ export const defaultSiteConfig: SiteConfig = {
   tickerSpeed: 'normal',
   tickerPrefix: 'Bản tin nội bộ',
   homeAnnouncements: [],
+  navTabs: defaultNavTabs,
+  dailyWidgets: defaultDailyWidgets,
   quickActionCards: [
     {
       id: 'card-exam',
@@ -185,15 +227,15 @@ export const defaultSiteConfig: SiteConfig = {
       enabled: true,
     },
     {
-      id: 'card-meeting',
-      title: 'HỌP ĐẢNG ỦY & DƯ LUẬN',
-      subtitle: 'Phòng họp trực tuyến & Biểu quyết',
-      iconName: 'meeting',
+      id: 'card-bac',
+      title: 'HỌC TẬP THEO BÁC',
+      subtitle: 'Lời Bác dạy, gương sáng & tư liệu lịch sử',
+      iconName: 'book',
       type: 'internal',
-      targetPage: 'meeting',
-      bgGradient: 'from-rose-900 via-pink-900 to-purple-950',
-      borderColor: 'border-pink-500/30',
-      textColor: 'text-pink-200',
+      targetPage: 'bac',
+      bgGradient: 'from-amber-900 via-red-950 to-orange-950',
+      borderColor: 'border-amber-500/30',
+      textColor: 'text-amber-200',
       heightSize: 'md',
       enabled: true,
     },

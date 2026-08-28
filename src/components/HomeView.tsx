@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import {
   Article,
+  DailyWidgetItem,
   DocumentItem,
   HomeAnnouncement,
   HomeCategoryColumn,
@@ -53,6 +54,7 @@ import {
 } from '../types';
 import { defaultHomeCategoryColumns } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
+import { DailyWidgetsSection } from './DailyWidgetsSection';
 import { HomeAnnouncementsWidget } from './HomeAnnouncementsWidget';
 import { HomeLatestNewsWidget } from './HomeLatestNewsWidget';
 import { HomeMiddleFeaturedSlider } from './HomeMiddleFeaturedSlider';
@@ -82,6 +84,7 @@ interface HomeViewProps {
   onSaveQuickActions?: (cards: QuickActionCard[]) => void;
   onSaveHomeCategoryColumns?: (columns: HomeCategoryColumn[]) => void;
   onSaveLayoutSettings?: (layout: HomeLayoutSettings) => void;
+  onSaveDailyWidgets?: (widgets: DailyWidgetItem[]) => Promise<void> | void;
   onSelectSpotlightArticle?: (articleId: number) => void;
   onOpenAuthModal?: (tab: 'login' | 'register') => void;
   onOpenProfileModal?: () => void;
@@ -113,6 +116,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSaveQuickActions,
   onSaveHomeCategoryColumns,
   onSaveLayoutSettings,
+  onSaveDailyWidgets,
   onSelectSpotlightArticle,
   onOpenAuthModal = () => {},
   onOpenProfileModal = () => {},
@@ -169,13 +173,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
       enabled: true,
     },
     {
-      id: 'card-meeting',
-      title: 'HỌP ĐẢNG ỦY & DƯ LUẬN',
-      subtitle: 'Phòng họp trực tuyến & Biểu quyết',
-      iconName: 'meeting',
+      id: 'card-bac',
+      title: 'HỌC TẬP THEO BÁC',
+      subtitle: 'Lời Bác dạy & tư liệu lịch sử',
+      iconName: 'book',
       type: 'internal',
-      targetPage: 'meeting',
-      bgGradient: 'from-red-950 via-rose-900 to-amber-950',
+      targetPage: 'bac',
+      bgGradient: 'from-amber-900 via-red-950 to-orange-950',
       borderColor: 'border-amber-500/30',
       textColor: 'text-amber-200',
       heightSize: 'md',
@@ -350,36 +354,41 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {(showUncleHo || showAnnouncements || showFeaturedSlider || showSpotlight || showLatestNews || showQuickActions) && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
           {/* LEFT COLUMN: 1 fraction (1/4) */}
-          {(showUncleHo || showAnnouncements) && (
-            <div className="lg:col-span-1 flex flex-col gap-4">
-              {showUncleHo && (
-                <UncleHoDailySection
-                  quotes={uncleHoQuotes}
-                  settings={uncleHoSettings}
-                  currentUser={currentUser}
-                  isLoading={isLoading}
-                  onOpenManager={onOpenUncleHoManager}
-                  onSaveQuotes={onSaveUncleHoQuotes}
-                  layout="vertical"
-                />
-              )}
+          <div className="lg:col-span-1 flex flex-col gap-4">
+            {showUncleHo && (
+              <UncleHoDailySection
+                quotes={uncleHoQuotes}
+                settings={uncleHoSettings}
+                currentUser={currentUser}
+                isLoading={isLoading}
+                onOpenManager={onOpenUncleHoManager}
+                onSaveQuotes={onSaveUncleHoQuotes}
+                layout="vertical"
+              />
+            )}
 
-              {showAnnouncements && (
-                <HomeAnnouncementsWidget
-                  announcements={announcements}
-                  currentUser={currentUser}
-                  articles={approvedArticles}
-                  isLoading={isLoading}
-                  onOpenArticle={onOpenArticle}
-                  onOpenAnnouncementManager={onOpenAnnouncementManager}
-                />
-              )}
-            </div>
-          )}
+            {/* 3 Chuyên mục Hằng ngày (Cột trái): An toàn, Giao thông, Hành động đẹp */}
+            <DailyWidgetsSection
+              dailyWidgets={siteConfig?.dailyWidgets}
+              currentUser={currentUser}
+              onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
+            />
+
+            {showAnnouncements && (
+              <HomeAnnouncementsWidget
+                announcements={announcements}
+                currentUser={currentUser}
+                articles={approvedArticles}
+                isLoading={isLoading}
+                onOpenArticle={onOpenArticle}
+                onOpenAnnouncementManager={onOpenAnnouncementManager}
+              />
+            )}
+          </div>
 
           {/* MIDDLE COLUMN: 2 fractions (2/4 = 1/2) */}
           {(showFeaturedSlider || showSpotlight) && (
-            <div className={`${!showUncleHo && !showAnnouncements ? 'lg:col-span-3' : 'lg:col-span-2'} flex flex-col gap-4`}>
+            <div className="lg:col-span-2 flex flex-col gap-4">
               {showFeaturedSlider && (
                 <HomeMiddleFeaturedSlider
                   articles={approvedArticles}

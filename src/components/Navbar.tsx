@@ -6,16 +6,18 @@ import {
   Crosshair,
   ExternalLink,
   FolderLock,
+  Globe,
   Heart,
   Home,
   Laptop,
   Link as LinkIcon,
+  Newspaper,
   Palette,
   Shield,
   Users,
-  UsersRound,
 } from 'lucide-react';
-import { CustomMenuItem, PageView, SiteConfig, User } from '../types';
+import { NavTabItem, PageView, SiteConfig, User } from '../types';
+import { defaultNavTabs } from '../data/initialData';
 
 interface NavbarProps {
   currentPage: PageView;
@@ -39,28 +41,46 @@ export const Navbar: React.FC<NavbarProps> = ({
   primaryRedColor = '#b91c1c',
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const canJoinMeeting = currentUser?.canJoinPartyMeeting || isAdmin;
 
   const navScrollRef = useRef<HTMLUListElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  const ctdLabel = siteConfig?.sections?.ctd?.shortLabel || 'Công tác Đảng - CTCT';
-  const hlLabel = siteConfig?.sections?.hl?.shortLabel || 'Huấn luyện - SSCĐ';
-  const bacLabel = siteConfig?.sections?.bac?.shortLabel || 'Học tập theo Bác';
-  const docLabel = siteConfig?.sections?.doc?.shortLabel || 'Văn bản - Tài liệu';
-  const lectureLabel = siteConfig?.sections?.lecture?.shortLabel || 'Bài giảng điện tử';
+  // Compute configured nav tabs with order and visibility
+  const configuredNavTabs = React.useMemo<NavTabItem[]>(() => {
+    const tabs: NavTabItem[] =
+      siteConfig?.navTabs && siteConfig.navTabs.length > 0
+        ? [...siteConfig.navTabs]
+        : [...defaultNavTabs];
 
-  const navItems = [
-    { id: 'home' as PageView, label: 'Trang chủ', icon: Home },
-    { id: 'ctd' as PageView, label: ctdLabel, icon: Shield },
-    { id: 'hl' as PageView, label: hlLabel, icon: Crosshair },
-    { id: 'bac' as PageView, label: bacLabel, icon: Heart },
-    { id: 'doc' as PageView, label: docLabel, icon: FolderLock },
-    { id: 'lecture' as PageView, label: lectureLabel, icon: Laptop },
-  ];
+    // Filter enabled tabs and sort by order
+    return tabs
+      .filter((t) => t.enabled !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [siteConfig?.navTabs]);
 
-  const customMenuItems: CustomMenuItem[] = siteConfig?.customMenuItems || [];
+  const getTabIcon = (tabId: string, type: string) => {
+    switch (tabId) {
+      case 'home':
+        return Home;
+      case 'ctd':
+        return Shield;
+      case 'hl':
+        return Crosshair;
+      case 'bac':
+        return Heart;
+      case 'doc':
+        return FolderLock;
+      case 'lecture':
+        return Laptop;
+      case 'qdnd':
+        return Newspaper;
+      case 'qk5':
+        return Globe;
+      default:
+        return type === 'external' ? LinkIcon : Shield;
+    }
+  };
 
   // Check scroll position to update arrow indicators
   const checkScroll = () => {
@@ -82,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         window.removeEventListener('resize', checkScroll);
       };
     }
-  }, [navItems, customMenuItems, canJoinMeeting, isAdmin]);
+  }, [configuredNavTabs, isAdmin]);
 
   // Auto scroll to active button on page change
   useEffect(() => {
@@ -143,15 +163,37 @@ export const Navbar: React.FC<NavbarProps> = ({
           onWheel={handleWheel}
           className="flex items-center flex-nowrap whitespace-nowrap list-none m-0 p-0 overflow-x-auto no-scrollbar scroll-smooth w-full py-0"
         >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
+          {configuredNavTabs.map((tab) => {
+            const Icon = getTabIcon(tab.id, tab.type);
+
+            if (tab.type === 'external') {
+              return (
+                <li key={tab.id} className="shrink-0">
+                  <a
+                    href={tab.externalUrl || '#'}
+                    target={tab.openNewTab !== false ? '_blank' : undefined}
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase text-amber-200 hover:text-amber-100 hover:bg-black/25 transition-colors border-r border-white/10 whitespace-nowrap"
+                    title={`Mở liên kết: ${tab.externalUrl}`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                    <span>{tab.label}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0 opacity-75" />
+                  </a>
+                </li>
+              );
+            }
+
+            // Internal / Section Tab
+            const target = (tab.targetPage || tab.id) as PageView;
+            const isActive = currentPage === target;
+
             return (
-              <li key={item.id} className="shrink-0">
+              <li key={tab.id} className="shrink-0">
                 <button
                   type="button"
-                  id={`nav-${item.id}`}
-                  onClick={() => onSelectPage(item.id)}
+                  id={`nav-${tab.id}`}
+                  onClick={() => onSelectPage(target)}
                   style={{
                     backgroundColor: isActive ? primaryRedColor : 'transparent',
                   }}
@@ -160,72 +202,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
+                  <span>{tab.label}</span>
                 </button>
               </li>
             );
           })}
-
-          {/* Custom Navigation Menu Items Added by Admin */}
-          {customMenuItems.map((item) => {
-            if (item.type === 'internal') {
-              const target = (item.targetPage || 'home') as PageView;
-              const isActive = currentPage === target;
-              return (
-                <li key={item.id} className="shrink-0">
-                  <button
-                    type="button"
-                    id={`nav-${target}`}
-                    onClick={() => onSelectPage(target)}
-                    style={{
-                      backgroundColor: isActive ? primaryRedColor : 'transparent',
-                    }}
-                    className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase transition-colors border-r border-white/10 cursor-pointer whitespace-nowrap ${
-                      isActive ? 'text-white shadow-xs' : 'text-white/90 hover:bg-black/20 hover:text-amber-200'
-                    }`}
-                  >
-                    <LinkIcon className="w-3.5 h-3.5 shrink-0 opacity-80" />
-                    <span>{item.title}</span>
-                  </button>
-                </li>
-              );
-            }
-
-            // External Link
-            return (
-              <li key={item.id} className="shrink-0">
-                <a
-                  href={item.externalUrl || '#'}
-                  target={item.openNewTab !== false ? '_blank' : undefined}
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase text-amber-200 hover:text-amber-100 hover:bg-black/25 transition-colors border-r border-white/10 whitespace-nowrap"
-                  title={`Mở liên kết: ${item.externalUrl}`}
-                >
-                  <span>{item.title}</span>
-                  <ExternalLink className="w-3 h-3 shrink-0 opacity-75" />
-                </a>
-              </li>
-            );
-          })}
-
-          {/* Tab Họp Đảng ủy (Chỉ hiển thị cho Đảng ủy viên hoặc Admin) */}
-          {canJoinMeeting && (
-            <li className="shrink-0">
-              <button
-                type="button"
-                id="nav-meeting"
-                onClick={() => onSelectPage('meeting')}
-                className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-extrabold uppercase transition-colors border-l-2 border-amber-400 cursor-pointer whitespace-nowrap ${
-                  currentPage === 'meeting'
-                    ? 'bg-pink-900 text-amber-200 shadow-inner'
-                    : 'bg-[#831843] hover:bg-[#9d174d] text-amber-200'
-                }`}
-              >
-                <UsersRound className="w-4 h-4 text-amber-300" />
-                <span>Họp Đảng ủy</span>
-              </button>
-            </li>
-          )}
 
           {/* Tab Duyệt Bài (Chỉ dành cho Admin) */}
           {isAdmin && (

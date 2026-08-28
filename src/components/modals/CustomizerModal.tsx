@@ -43,12 +43,13 @@ import {
 import {
   Article,
   CustomMenuItem,
+  NavTabItem,
   PageView,
   SectionConfigItem,
   SectionType,
   SiteConfig,
 } from '../../types';
-import { defaultSiteConfig } from '../../data/initialData';
+import { defaultDailyWidgets, defaultNavTabs, defaultSiteConfig } from '../../data/initialData';
 import { UnitLogo } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 
@@ -116,6 +117,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [newTickerInput, setNewTickerInput] = useState('');
   const [editingTickerIdx, setEditingTickerIdx] = useState<number | null>(null);
   const [editingTickerVal, setEditingTickerVal] = useState('');
+
+  // Nav Tabs Reordering & Visibility state
+  const [navTabs, setNavTabs] = useState<NavTabItem[]>(
+    siteConfig?.navTabs && siteConfig.navTabs.length > 0
+      ? siteConfig.navTabs
+      : defaultNavTabs
+  );
 
   // Custom Menu items state
   const [customMenuItems, setCustomMenuItems] = useState<CustomMenuItem[]>(
@@ -205,6 +213,11 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setEditingTickerIdx(null);
       setCustomMenuItems(
         siteConfig?.customMenuItems || defaultSiteConfig.customMenuItems || []
+      );
+      setNavTabs(
+        siteConfig?.navTabs && siteConfig.navTabs.length > 0
+          ? siteConfig.navTabs
+          : defaultNavTabs
       );
       setSections({
         ...defaultSiteConfig.sections,
@@ -408,6 +421,38 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setCustomMenuItems((prev) => [...prev, newItem]);
   };
 
+  // Nav Tabs Reorder & Toggle Actions
+  const handleMoveNavTab = (index: number, direction: 'up' | 'down') => {
+    const newTabs = [...navTabs];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newTabs.length) return;
+    const temp = newTabs[index];
+    newTabs[index] = newTabs[targetIndex];
+    newTabs[targetIndex] = temp;
+    newTabs.forEach((tab, i) => {
+      tab.order = i + 1;
+    });
+    setNavTabs(newTabs);
+  };
+
+  const handleToggleNavTab = (id: string) => {
+    setNavTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, enabled: !t.enabled } : t))
+    );
+  };
+
+  const handleUpdateNavTabLabel = (id: string, newLabel: string) => {
+    setNavTabs((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, label: newLabel } : t))
+    );
+  };
+
+  const handleResetNavTabs = () => {
+    if (confirm('Khôi phục danh sách và thứ tự các tab menu chính về mặc định của Sư đoàn?')) {
+      setNavTabs(defaultNavTabs);
+    }
+  };
+
   // Color preset applicator
   const applyPreset = (preset: { red: string; green: string; name: string }) => {
     setColorRed(preset.red);
@@ -434,6 +479,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       footerLogoSizePx,
       establishedDate: establishedDate.trim(),
       sections,
+      navTabs,
       customMenuItems,
       tickerMode,
       tickerDays,
@@ -1316,10 +1362,100 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           )}
 
           {/* =========================================================================
-              TAB 3: CUSTOM NAVIGATION MENU ITEMS & LINKS MANAGEMENT
+              TAB 4: CUSTOM NAVIGATION MENU ITEMS & NAVBAR TABS MANAGEMENT
              ========================================================================= */}
           {activeTab === 'menu' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* SẮP XẾP & BẬT/TẮT CÁC TAB ĐIỀU HƯỚNG CHÍNH */}
+              <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-amber-800" />
+                    <h4 className="font-extrabold text-amber-950 text-xs uppercase">
+                      SẮP XẾP THỨ TỰ & BẬT/TẮT CÁC TAB MENU CHÍNH
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetNavTabs}
+                    className="text-[11px] text-amber-800 hover:text-amber-950 underline font-bold cursor-pointer"
+                  >
+                    Khôi phục mặc định
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-900">
+                  Đồng chí có thể đổi tên hiển thị, bật/tắt hoặc nhấn nút mũi tên lên/xuống để thay đổi vị trí các tab trên thanh Menu Header.
+                </p>
+
+                <div className="space-y-2 bg-white p-3 rounded-lg border border-amber-200">
+                  {navTabs.map((tab, idx) => (
+                    <div
+                      key={tab.id}
+                      className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
+                        tab.enabled
+                          ? 'bg-amber-50/40 border-amber-200 text-gray-900'
+                          : 'bg-gray-100 border-gray-200 text-gray-400 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        {/* Up / Down Buttons */}
+                        <div className="flex flex-col gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => handleMoveNavTab(idx, 'up')}
+                            className="p-1 rounded bg-white hover:bg-amber-100 border border-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            title="Di chuyển lên trước"
+                          >
+                            <MoveUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === navTabs.length - 1}
+                            onClick={() => handleMoveNavTab(idx, 'down')}
+                            className="p-1 rounded bg-white hover:bg-amber-100 border border-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                            title="Di chuyển xuống sau"
+                          >
+                            <MoveDown className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <span className="font-mono text-[11px] font-bold text-amber-800 shrink-0 w-6 text-center">
+                          #{tab.order}
+                        </span>
+
+                        {/* Label input */}
+                        <input
+                          type="text"
+                          value={tab.label}
+                          onChange={(e) => handleUpdateNavTabLabel(tab.id, e.target.value)}
+                          className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold bg-white border border-gray-300 rounded focus:border-amber-700 focus:outline-hidden text-gray-900"
+                          placeholder="Tên hiển thị trên menu..."
+                        />
+
+                        <span className="text-[10px] text-gray-400 font-mono shrink-0 hidden sm:inline">
+                          [{tab.targetPage || tab.id}]
+                        </span>
+                      </div>
+
+                      {/* Enable / Disable Toggle */}
+                      <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={tab.enabled}
+                          onChange={() => handleToggleNavTab(tab.id)}
+                          className="w-4 h-4 text-amber-700 rounded cursor-pointer accent-amber-700"
+                        />
+                        <span className="text-xs font-bold text-gray-700 select-none">
+                          {tab.enabled ? 'Hiển thị' : 'Ẩn'}
+                        </span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* THÊM MỤC MỚI VÀO THANH ĐIỀU HƯỚNG NAVBAR */}
               <div className="bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1394,7 +1530,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                         <option value="bac">Học tập và làm theo Bác</option>
                         <option value="doc">Kho Văn bản - Chỉ thị</option>
                         <option value="lecture">Thư viện Bài giảng điện tử</option>
-                        <option value="meeting">Phòng Họp Đảng ủy trực tuyến</option>
                         <option value="approvals">Duyệt tin bài (Admin)</option>
                         <option value="users">Quản trị người dùng (Admin)</option>
                       </select>

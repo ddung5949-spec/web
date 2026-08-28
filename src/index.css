@@ -48,13 +48,22 @@ body {
 }
 
 .animate-marquee {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
-  animation: marquee 25s linear infinite;
+  animation: marquee 32s linear infinite;
+  will-change: transform;
 }
 
-.animate-marquee:hover {
-  animation-play-state: paused;
+.animate-marquee:hover,
+.animate-marquee:active,
+.animate-marquee:focus {
+  animation-play-state: paused !important;
+}
+
+.marquee-container:hover .animate-marquee,
+.marquee-container:active .animate-marquee {
+  animation-play-state: paused !important;
 }
 
 /* User Highlight Mark inside Party Meeting Rich Editor */

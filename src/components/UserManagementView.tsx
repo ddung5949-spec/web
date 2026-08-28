@@ -874,21 +874,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                     <th className="py-3 px-3.5 font-bold text-center">Mật khẩu</th>
                     <th className="py-3 px-3.5 font-bold text-center">Xem VB Mật</th>
                     <th className="py-3 px-3.5 font-bold text-center">Đăng VB Kho</th>
-                    <th className="py-3 px-3.5 font-bold text-center bg-pink-50 text-[#831843]">
-                      Họp Đảng ủy
-                    </th>
-                    <th className="py-3 px-3.5 font-bold text-center bg-pink-50 text-[#831843]">
-                      Tạo Phòng họp
-                    </th>
-                    <th className="py-3 px-3.5 font-bold text-center bg-pink-50 text-[#831843]">
-                      Đăng TL Họp
-                    </th>
-                    <th className="py-3 px-3.5 font-bold text-center bg-pink-50 text-[#831843]">
-                      Xóa TL Họp
-                    </th>
-                    <th className="py-3 px-3.5 font-bold text-center bg-amber-50 text-amber-900">
-                      Sửa cộng tác
-                    </th>
                     <th className="py-3 px-3.5 font-bold text-center">Thao tác</th>
                   </tr>
                 </thead>
@@ -1010,66 +995,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                               onChange={(e) => onTogglePermission(u.id, 'canUploadDoc', e.target.checked)}
                               className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600 disabled:opacity-50"
                               title="Quyền đăng tải văn bản vào Kho văn bản"
-                            />
-                          </td>
-
-                          {/* Checkbox Quyền Họp Đảng Ủy */}
-                          <td className="py-3 px-3.5 text-center bg-pink-50/40">
-                            <input
-                              type="checkbox"
-                              checked={u.canJoinPartyMeeting || isAdmin}
-                              disabled={isAdmin}
-                              onChange={(e) => onTogglePermission(u.id, 'canJoinPartyMeeting', e.target.checked)}
-                              className="w-4 h-4 text-[#831843] rounded cursor-pointer accent-[#831843] disabled:opacity-50"
-                              title="Quyền tham gia phòng họp Đảng ủy trực tuyến"
-                            />
-                          </td>
-
-                          {/* Checkbox Quyền Tạo Phòng Họp Đảng Ủy */}
-                          <td className="py-3 px-3.5 text-center bg-pink-50/60">
-                            <input
-                              type="checkbox"
-                              checked={u.canCreateMeeting ?? isAdmin}
-                              disabled={isAdmin}
-                              onChange={(e) => onTogglePermission(u.id, 'canCreateMeeting', e.target.checked)}
-                              className="w-4 h-4 text-[#831843] rounded cursor-pointer accent-[#831843] disabled:opacity-50"
-                              title="Quyền tạo mới các phòng họp Đảng ủy trực tuyến"
-                            />
-                          </td>
-
-                          {/* Checkbox Quyền Đăng TL Họp Đảng Ủy */}
-                          <td className="py-3 px-3.5 text-center bg-pink-50/40">
-                            <input
-                              type="checkbox"
-                              checked={u.canUploadMeetingDoc ?? (u.canJoinPartyMeeting || isAdmin)}
-                              disabled={isAdmin}
-                              onChange={(e) => onTogglePermission(u.id, 'canUploadMeetingDoc', e.target.checked)}
-                              className="w-4 h-4 text-[#831843] rounded cursor-pointer accent-[#831843] disabled:opacity-50"
-                              title="Quyền đăng tải thêm tài liệu vào phòng họp Đảng ủy"
-                            />
-                          </td>
-
-                          {/* Checkbox Quyền Xóa TL Họp Đảng Ủy */}
-                          <td className="py-3 px-3.5 text-center bg-pink-50/40">
-                            <input
-                              type="checkbox"
-                              checked={u.canDeleteMeetingDoc ?? isAdmin}
-                              disabled={isAdmin}
-                              onChange={(e) => onTogglePermission(u.id, 'canDeleteMeetingDoc', e.target.checked)}
-                              className="w-4 h-4 text-[#831843] rounded cursor-pointer accent-[#831843] disabled:opacity-50"
-                              title="Quyền xóa bớt tài liệu trong phòng họp Đảng ủy"
-                            />
-                          </td>
-
-                          {/* Checkbox Quyền Xem nội dung người khác đang chỉnh sửa */}
-                          <td className="py-3 px-3.5 text-center bg-amber-50/40">
-                            <input
-                              type="checkbox"
-                              checked={u.canViewCollaborativeEdits ?? (u.canJoinPartyMeeting || isAdmin)}
-                              disabled={isAdmin}
-                              onChange={(e) => onTogglePermission(u.id, 'canViewCollaborativeEdits', e.target.checked)}
-                              className="w-4 h-4 text-amber-700 rounded cursor-pointer accent-amber-700 disabled:opacity-50"
-                              title="Quyền xem nội dung và ý kiến người khác đang chỉnh sửa trong phòng họp"
                             />
                           </td>
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Article,
+  DailyWidgetItem,
   DocumentItem,
   HomeAnnouncement,
   HomeCategoryColumn,
@@ -1565,6 +1566,18 @@ export function App() {
     showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
   };
 
+  // Daily Widgets Save Handler
+  const handleSaveDailyWidgets = async (widgets: DailyWidgetItem[]) => {
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      dailyWidgets: widgets,
+    };
+    setSiteConfig(updatedConfig);
+    safeStore.set('mangyang_site_config', updatedConfig);
+    await cloudStorage.saveSiteConfig(updatedConfig);
+    showToast('success', 'Đã cập nhật chuyên mục hằng ngày', 'Nội dung và hình ảnh 3 chuyên mục hằng ngày đã được lưu trữ.');
+  };
+
   // Spotlight Article Select Handler
   const handleSelectSpotlightArticle = async (articleId: number) => {
     const updatedConfig: SiteConfig = {
@@ -1811,6 +1824,7 @@ export function App() {
                 onSaveUncleHoQuotes={handleSaveUncleHoQuotes}
                 onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
                 onSaveQuickActions={handleSaveQuickActions}
+                onSaveDailyWidgets={handleSaveDailyWidgets}
                 onSaveHomeCategoryColumns={handleSaveHomeCategoryColumns}
                 onSaveLayoutSettings={handleSaveLayoutSettings}
                 onSelectSpotlightArticle={handleSelectSpotlightArticle}
