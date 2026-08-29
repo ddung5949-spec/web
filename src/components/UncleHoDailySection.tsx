@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  Info,
   Maximize2,
   Pause,
   Play,
@@ -13,11 +11,19 @@ import {
   Settings2,
   Sparkles,
   Star,
+  Info,
   X,
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings, User } from '../types';
-import { UncleHoSkeleton } from './SkeletonLoader';
 import { getSupabase } from '../utils/supabase';
+
+// Danh sách ảnh mặc định chất lượng cao về Chủ tịch Hồ Chí Minh
+export const DEFAULT_UNCLE_HO_IMAGES = [
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Ho_Chi_Minh_at_Presidential_Palace_Hanoi.jpg/800px-Ho_Chi_Minh_at_Presidential_Palace_Hanoi.jpg', // Bác Hồ ngồi làm việc bên bàn mây tại Phủ Chủ tịch
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Ho_Chi_Minh_1946.jpg/800px-Ho_Chi_Minh_1946.jpg', // Chân dung Chủ tịch Hồ Chí Minh năm 1946
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Ho_Chi_Minh_1960.jpg/800px-Ho_Chi_Minh_1960.jpg', // Chủ tịch Hồ Chí Minh năm 1960
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Ho_Chi_Minh_1954.jpg/800px-Ho_Chi_Minh_1954.jpg', // Bác Hồ nụ cười hiền hậu
+];
 
 interface UncleHoDailySectionProps {
   quotes: UncleHoQuote[];
@@ -108,7 +114,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  // Lấy Album ảnh Slideshow (cố định xuyên suốt mọi ngày)
+  // Lấy Album ảnh Slideshow (luôn đảm bảo có ảnh Bác Hồ chất lượng cao, không bao giờ để trống)
   const albumImages: string[] = useMemo(() => {
     // 1. Kiểm tra trong settings
     if (settings?.images && Array.isArray(settings.images) && settings.images.length > 0) {
@@ -139,7 +145,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           const imgs = parsed.uncle_ho.extra_data.images.filter((img: string) => img && !img.includes('unsplash.com'));
           if (imgs.length > 0) return imgs;
         }
-        if (parsed?.uncle_ho?.image_data) {
+        if (parsed?.uncle_ho?.image_data && !parsed.uncle_ho.image_data.includes('unsplash.com')) {
           return [parsed.uncle_ho.image_data];
         }
       }
@@ -147,15 +153,16 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       // ignore
     }
 
-    return [];
+    // 4. Luôn nạp danh sách 4 ảnh chân thực, chất lượng cao về Bác Hồ
+    return DEFAULT_UNCLE_HO_IMAGES;
   }, [settings?.images, fetchedAlbumImages]);
 
-  // Autoplay Slideshow 4s/lần
+  // Autoplay Slideshow 4.5s/lần
   useEffect(() => {
     if (!isPlaying || albumImages.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentSlideIndex((prev) => (prev + 1) % albumImages.length);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(interval);
   }, [isPlaying, albumImages.length]);
 
@@ -204,10 +211,10 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   return (
     <div
       id="uncle-ho-daily-section"
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] via-[#FFFBF0] to-[#FFF7E6] text-gray-900 shadow-md border-2 border-amber-400/80 flex flex-col justify-between transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}
+      className={`relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] via-[#FFFBF0] to-[#FFF7E6] text-gray-900 shadow-md border-2 border-amber-400/80 flex flex-col justify-between transition-opacity duration-300 ${isLoading ? 'opacity-90' : 'opacity-100'}`}
     >
-      {/* 1. Header Trang trọng */}
-      <div className="bg-red-800 text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-400/60">
+      {/* 1. Header Trang trọng: Nền màu đỏ đều trang trọng bg-[#8B0000] */}
+      <div className="bg-[#8B0000] text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-400/60">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-yellow-400/20 border border-yellow-300/40 flex items-center justify-center shrink-0 shadow-inner">
             <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 animate-pulse" />
@@ -227,7 +234,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           <button
             type="button"
             onClick={onOpenManager}
-            className="flex items-center gap-1 bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-200 hover:text-yellow-100 text-[11px] font-bold px-2 py-1 rounded-md border border-yellow-300/40 transition-all cursor-pointer shadow-xs shrink-0 ml-2"
+            className="flex items-center gap-1 bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-200 hover:text-yellow-100 text-[11px] font-bold px-2.5 py-1 rounded-md border border-yellow-300/40 transition-all cursor-pointer shadow-xs shrink-0 ml-2"
             title="Quản lý Album ảnh và Nội dung Lời Bác dạy"
           >
             <Settings2 className="w-3 h-3" />
@@ -236,126 +243,94 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
         )}
       </div>
 
-      {/* 2. KHUNG ẢNH SLIDESHOW (CỐ ĐỊNH XUYÊN SUỐT TẤT CẢ CÁC NGÀY) */}
+      {/* 2. KHUNG ẢNH SLIDESHOW (Luôn hiển thị ảnh Bác Hồ chất lượng cao, không để trống) */}
       <div className="p-3 pb-2">
         <div
-          className="relative w-full h-48 sm:h-52 md:h-56 rounded-xl overflow-hidden shadow-inner border border-amber-300/70 bg-gradient-to-br from-red-950 via-stone-900 to-neutral-950 group select-none"
+          className="relative w-full h-48 sm:h-52 md:h-56 rounded-xl overflow-hidden shadow-inner border border-amber-300/70 bg-stone-900 group select-none"
           onMouseEnter={() => setIsPlaying(false)}
           onMouseLeave={() => setIsPlaying(true)}
         >
-          {albumImages.length > 0 ? (
-            /* Có ảnh trong Album Slideshow */
+          <img
+            src={albumImages[currentSlideIndex % albumImages.length]}
+            alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
+            className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
+            onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
+          />
+
+          {/* Lớp phủ gradient viền dưới nhẹ */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+
+          {/* Nút mũi tên chuyển slide */}
+          {albumImages.length > 1 && (
             <>
-              <img
-                src={albumImages[currentSlideIndex % albumImages.length]}
-                alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
-                className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
-                onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
-              />
-
-              {/* Lớp phủ gradient viền dưới */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
-
-              {/* Nút mũi tên chuyển slide */}
-              {albumImages.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handlePrevSlide}
-                    aria-label="Ảnh trước"
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 hover:bg-red-800/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 border border-white/30 cursor-pointer shadow-md"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextSlide}
-                    aria-label="Ảnh tiếp theo"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 hover:bg-red-800/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 border border-white/30 cursor-pointer shadow-md"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-
-              {/* Điều khiển phía dưới: Chấm tròn & Nút xem to & Tạm dừng */}
-              <div className="absolute bottom-2 left-0 right-0 px-3 flex items-center justify-between text-white text-[10px]">
-                {/* Chấm tròn chỉ số slide */}
-                <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20">
-                  {albumImages.map((_, idx) => (
-                    <button
-                      key={`dot-${idx}`}
-                      type="button"
-                      onClick={() => setCurrentSlideIndex(idx)}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                        idx === currentSlideIndex % albumImages.length
-                          ? 'w-4 bg-amber-400'
-                          : 'w-1.5 bg-white/50 hover:bg-white/80'
-                      }`}
-                      title={`Xem ảnh ${idx + 1}`}
-                    />
-                  ))}
-                  <span className="text-[9px] font-bold text-amber-300 ml-1">
-                    {currentSlideIndex + 1}/{albumImages.length}
-                  </span>
-                </div>
-
-                {/* Nút thao tác nhanh (Phóng to / Dừng) */}
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="p-1 bg-black/60 hover:bg-black/80 rounded-full border border-white/20 text-amber-200 transition-colors cursor-pointer"
-                    title={isPlaying ? 'Tạm dừng tự động chuyển ảnh' : 'Bật tự động chuyển ảnh'}
-                  >
-                    {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
-                    className="p-1 bg-black/60 hover:bg-black/80 rounded-full border border-white/20 text-white transition-colors cursor-pointer"
-                    title="Xem ảnh phóng to"
-                  >
-                    <Maximize2 className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={handlePrevSlide}
+                aria-label="Ảnh trước"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 hover:bg-red-800/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 border border-white/30 cursor-pointer shadow-md"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextSlide}
+                aria-label="Ảnh tiếp theo"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 hover:bg-red-800/80 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 border border-white/30 cursor-pointer shadow-md"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </>
-          ) : (
-            /* Chưa có ảnh tải lên: Hiển thị Khung Chân Dung Trang Trọng Chuẩn Tôn Kính */
-            <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 bg-gradient-to-b from-red-950 via-stone-900 to-red-950 text-amber-100 relative">
-              {/* Trang trí hoa văn nền */}
-              <div className="w-16 h-16 rounded-full bg-amber-400/10 border-2 border-amber-300/40 flex items-center justify-center mb-2 shadow-lg relative">
-                <Star className="w-8 h-8 text-amber-400 fill-amber-400 drop-shadow-md" />
-                <div className="absolute inset-0 rounded-full border border-amber-400/30 animate-ping opacity-30" />
-              </div>
-              <h3 className="text-sm font-black uppercase text-amber-300 tracking-wider">
-                CHỦ TỊCH HỒ CHÍ MINH
-              </h3>
-              <p className="text-[11px] text-amber-200/80 font-medium italic mt-0.5">
-                (1890 - 1969)
-              </p>
-              <p className="text-[10px] text-amber-100/60 mt-1 max-w-[240px]">
-                Anh hùng giải phóng dân tộc, Danh nhân văn hóa thế giới
-              </p>
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={onOpenManager}
-                  className="mt-2 text-[10px] font-bold bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 px-2.5 py-1 rounded-full border border-amber-300/40 cursor-pointer transition-all"
-                >
-                  + Tải Album ảnh chân dung Bác
-                </button>
-              )}
-            </div>
           )}
+
+          {/* Điều khiển phía dưới: Chấm tròn & Nút xem to & Tạm dừng */}
+          <div className="absolute bottom-2 left-0 right-0 px-3 flex items-center justify-between text-white text-[10px]">
+            {/* Chấm tròn chỉ số slide */}
+            <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20">
+              {albumImages.map((_, idx) => (
+                <button
+                  key={`dot-${idx}`}
+                  type="button"
+                  onClick={() => setCurrentSlideIndex(idx)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    idx === currentSlideIndex % albumImages.length
+                      ? 'w-4 bg-amber-400'
+                      : 'w-1.5 bg-white/50 hover:bg-white/80'
+                  }`}
+                  title={`Xem ảnh ${idx + 1}`}
+                />
+              ))}
+              <span className="text-[9px] font-bold text-amber-300 ml-1">
+                {currentSlideIndex + 1}/{albumImages.length}
+              </span>
+            </div>
+
+            {/* Nút thao tác nhanh (Phóng to / Dừng) */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="p-1 bg-black/60 hover:bg-black/80 rounded-full border border-white/20 text-amber-200 transition-colors cursor-pointer"
+                title={isPlaying ? 'Tạm dừng tự động chuyển ảnh' : 'Bật tự động chuyển ảnh'}
+              >
+                {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
+                className="p-1 bg-black/60 hover:bg-black/80 rounded-full border border-white/20 text-white transition-colors cursor-pointer"
+                title="Xem ảnh phóng to"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 3. BỘ CHỌN NGÀY & ĐIỀU HƯỚNG */}
       <div className="px-3 py-1.5 flex items-center justify-between bg-amber-100/60 border-y border-amber-300/60 text-xs">
         <div className="flex items-center gap-1.5">
-          <Calendar className="w-3.5 h-3.5 text-red-800" />
+          <Calendar className="w-3.5 h-3.5 text-[#8B0000]" />
           <span className="font-bold text-red-950 text-[11px]">
             Ngày {currentQuote.dayMonth}
             {currentQuote.yearRecorded ? ` • Năm ${currentQuote.yearRecorded}` : ''}
@@ -368,7 +343,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
             <button
               type="button"
               onClick={() => setSelectedDayStr(todayStr)}
-              className="text-[10px] font-bold bg-red-800 hover:bg-red-900 text-amber-200 px-2 py-0.5 rounded-full transition-all cursor-pointer shadow-xs"
+              className="text-[10px] font-bold bg-[#8B0000] hover:bg-red-900 text-amber-200 px-2 py-0.5 rounded-full transition-all cursor-pointer shadow-xs"
             >
               Hôm nay ({todayStr})
             </button>
@@ -401,7 +376,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                     }}
                     className={`w-full text-left px-2 py-1 rounded text-xs font-semibold flex items-center justify-between cursor-pointer ${
                       dateStr === selectedDayStr
-                        ? 'bg-red-800 text-amber-200'
+                        ? 'bg-[#8B0000] text-amber-200'
                         : 'text-gray-700 hover:bg-amber-100/60'
                     }`}
                   >
@@ -423,7 +398,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div className="relative bg-gradient-to-br from-amber-50 via-white to-amber-100/50 rounded-xl p-3 sm:p-4 border-2 border-amber-300/80 shadow-xs">
           {/* Biểu tượng dấu ngoặc kép vàng */}
-          <div className="absolute -top-3 left-3 bg-red-900 text-amber-300 rounded-full p-1 border border-amber-300 shadow-xs">
+          <div className="absolute -top-3 left-3 bg-[#8B0000] text-amber-300 rounded-full p-1 border border-amber-300 shadow-xs">
             <Quote className="w-3.5 h-3.5" />
           </div>
 
@@ -440,7 +415,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           <button
             type="button"
             onClick={() => setIsDetailsModalOpen(true)}
-            className="w-full flex items-center justify-center gap-1.5 bg-red-800 hover:bg-red-900 text-yellow-300 hover:text-yellow-200 text-xs sm:text-sm font-bold py-2 px-3 rounded-lg border border-yellow-400 shadow-xs transition-all cursor-pointer active:scale-98"
+            className="w-full flex items-center justify-center gap-1.5 bg-[#8B0000] hover:bg-red-900 text-yellow-300 hover:text-yellow-200 text-xs sm:text-sm font-bold py-2 px-3 rounded-lg border border-yellow-400 shadow-xs transition-all cursor-pointer active:scale-98"
           >
             <BookOpen className="w-3.5 h-3.5 text-yellow-400" />
             <span>Xem Bối cảnh lịch sử & Bài học vận dụng</span>
@@ -448,7 +423,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
         </div>
       </div>
 
-      {/* MODAL CHI TIẾT: BỐI CẢNH LỊCH SỬ & BÀI HỌC VẬN DỤNG */}
+      {/* MODAL CHI TIẾT 3 PHẦN: (1) TOÀN VĂN LỜI DẠY, (2) BỐI CẢNH LỊCH SỬ, (3) BÀI HỌC VẬN DỤNG */}
       {isDetailsModalOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
@@ -459,7 +434,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Modal */}
-            <div className="bg-gradient-to-r from-red-850 via-red-900 to-red-950 text-white px-4 py-3 flex items-center justify-between border-b border-amber-400">
+            <div className="bg-[#8B0000] text-white px-4 py-3 flex items-center justify-between border-b border-amber-400">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
                 <h3 className="text-sm font-black uppercase text-amber-300">
@@ -476,25 +451,25 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
               </button>
             </div>
 
-            {/* Nội dung chi tiết */}
+            {/* Nội dung chi tiết 3 phần */}
             <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-              {/* Lời Bác dạy */}
-              <div className="bg-white rounded-xl p-3.5 border-l-4 border-red-800 shadow-xs">
+              {/* Phần 1: Toàn văn lời dạy */}
+              <div className="bg-white rounded-xl p-3.5 border-l-4 border-[#8B0000] shadow-xs">
                 <h4 className="text-xs font-black uppercase text-red-900 flex items-center gap-1.5 mb-1.5">
-                  <Quote className="w-3.5 h-3.5 text-red-800" />
-                  <span>Lời Bác dạy cốt lõi:</span>
+                  <Quote className="w-3.5 h-3.5 text-[#8B0000]" />
+                  <span>1. Toàn văn lời dạy của Bác:</span>
                 </h4>
                 <p className="text-xs sm:text-[13px] font-bold text-gray-900 leading-relaxed italic select-text">
                   &ldquo;{currentQuote.quote}&rdquo;
                 </p>
               </div>
 
-              {/* Hoàn cảnh lịch sử */}
+              {/* Phần 2: Bối cảnh lịch sử */}
               {currentQuote.context && (
                 <div className="bg-amber-50/80 rounded-xl p-3.5 border border-amber-300/80 shadow-2xs">
                   <h4 className="text-xs font-black uppercase text-amber-900 flex items-center gap-1.5 mb-1.5">
                     <Info className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Hoàn cảnh lịch sử & Nguồn tư liệu:</span>
+                    <span>2. Bối cảnh lịch sử & Nguồn tư liệu:</span>
                   </h4>
                   <p className="text-xs text-gray-800 leading-relaxed select-text">
                     {currentQuote.context}
@@ -502,11 +477,11 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                 </div>
               )}
 
-              {/* Ý nghĩa & Bài học vận dụng */}
+              {/* Phần 3: Bài học vận dụng cho LLVT và đơn vị */}
               <div className="bg-emerald-50/80 rounded-xl p-3.5 border border-emerald-300/80 shadow-2xs">
                 <h4 className="text-xs font-black uppercase text-emerald-950 flex items-center gap-1.5 mb-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Ý nghĩa & Bài học đối với cán bộ, chiến sĩ Trung đoàn 95, Sư đoàn 2:</span>
+                  <span>3. Bài học vận dụng đối với cán bộ, chiến sĩ và đơn vị:</span>
                 </h4>
                 <p className="text-xs text-emerald-950 leading-relaxed font-medium select-text">
                   {currentQuote.lesson ||
@@ -520,7 +495,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
               <button
                 type="button"
                 onClick={() => setIsDetailsModalOpen(false)}
-                className="bg-red-850 hover:bg-red-900 text-amber-200 text-xs font-bold px-4 py-1.5 rounded-lg border border-amber-400 cursor-pointer shadow-xs transition-colors"
+                className="bg-[#8B0000] hover:bg-red-900 text-amber-200 text-xs font-bold px-4 py-1.5 rounded-lg border border-amber-400 cursor-pointer shadow-xs transition-colors"
               >
                 Đóng
               </button>
@@ -558,4 +533,5 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     </div>
   );
 };
+
 export default UncleHoDailySection;
