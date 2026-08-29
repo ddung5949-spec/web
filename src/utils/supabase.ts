@@ -91,24 +91,65 @@ export const supabaseAuth = {
   mapSupabaseUserToAdmin(sbUser: any): User {
     const email = sbUser.email || '';
     const username = email ? email.split('@')[0] : 'admin';
+    const meta = sbUser.user_metadata || {};
+
+    // Kiểm tra cache hồ sơ đã lưu ở localStorage
+    let cachedProfile: any = null;
+    try {
+      const rawCache = localStorage.getItem('user_profile_cache');
+      if (rawCache) {
+        cachedProfile = JSON.parse(rawCache);
+      }
+    } catch {
+      // ignore
+    }
+
     const fullName =
-      sbUser.user_metadata?.full_name ||
-      sbUser.user_metadata?.name ||
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.fullName) ||
+      meta.full_name ||
+      meta.name ||
       username ||
-      'Quản trị viên Hệ thống';
+      'Quân nhân';
+
+    const avatar =
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.avatar) ||
+      meta.avatar_url ||
+      meta.avatar ||
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+
+    const rank =
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.rank) ||
+      meta.rank ||
+      'Sĩ quan';
+
+    const position =
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.position) ||
+      meta.position ||
+      'Quản trị viên';
+
+    const birthDate =
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.birthDate) ||
+      meta.birth_date ||
+      meta.birthDate ||
+      '';
+
+    const rankUnit =
+      (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.rankUnit) ||
+      meta.rank_unit ||
+      `${rank} - ${position}`;
 
     return {
       id: 1,
+      authId: sbUser.id,
       username: username,
       fullName: fullName,
-      role: 'admin',
+      role: meta.role || 'admin',
       email: email,
-      rank: 'Sĩ quan',
-      position: 'Quản trị viên',
-      rankUnit: 'Sĩ quan - Quản trị viên Hệ thống',
-      avatar:
-        sbUser.user_metadata?.avatar_url ||
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      rank: rank,
+      position: position,
+      birthDate: birthDate,
+      rankUnit: rankUnit,
+      avatar: avatar,
       isOnline: true,
       totalActiveMinutes: 120,
       sessionCount: 1,

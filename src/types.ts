@@ -48,6 +48,7 @@ export interface MilitaryProfile {
 
 export interface User {
   id: number;
+  authId?: string; // Supabase Auth UUID
   username: string;
   password?: string;
   fullName: string;

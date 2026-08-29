@@ -949,10 +949,20 @@ export function App() {
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
     cloudStorage.saveUser(updatedUser);
 
+    // Lưu vào user_profile_cache để khi F5 không bị mất
+    try {
+      localStorage.setItem('user_profile_cache', JSON.stringify(updatedUser));
+    } catch {
+      // ignore
+    }
+
     // Sync to linked military profile
     setMilitaryProfiles((prev) =>
       prev.map((p) => {
-        if (p.userId === currentUser.id || p.username?.toLowerCase() === currentUser.username.toLowerCase()) {
+        if (
+          p.userId === currentUser.id ||
+          (p.username && currentUser.username && p.username.toLowerCase() === currentUser.username.toLowerCase())
+        ) {
           return {
             ...p,
             fullName: updatedUser.fullName,
@@ -2566,6 +2576,7 @@ export function App() {
         currentUser={currentUser}
         onClose={() => setProfileModalOpen(false)}
         onSaveProfile={handleSaveProfile}
+        showToast={showToast}
       />
 
       <CustomizerModal

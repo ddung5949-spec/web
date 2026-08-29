@@ -190,6 +190,10 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                     alt="Avatar"
                     className="w-6 h-6 rounded-full object-cover border-2 border-amber-300 shadow-xs"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+                    }}
                   />
                   {/* Chỉ hiển thị tên người dùng khi đã đăng nhập */}
                   <span className="text-xs sm:text-[13px] font-bold text-white max-w-[140px] sm:max-w-[200px] truncate px-1">
@@ -219,6 +223,10 @@ export const Header: React.FC<HeaderProps> = ({
                           }
                           alt="Avatar"
                           className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-md"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-sm font-black text-amber-200 truncate uppercase">
