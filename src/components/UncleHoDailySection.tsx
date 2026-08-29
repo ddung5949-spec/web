@@ -92,6 +92,18 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           if (filtered.length > 0) return filtered;
         }
       }
+
+      const dailyCache = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      if (dailyCache) {
+        const parsed = JSON.parse(dailyCache);
+        if (parsed?.uncle_ho?.extra_data?.images && Array.isArray(parsed.uncle_ho.extra_data.images)) {
+          const imgs = parsed.uncle_ho.extra_data.images.filter((img: string) => img && !img.includes('unsplash.com'));
+          if (imgs.length > 0) return imgs;
+        }
+        if (parsed?.uncle_ho?.image_data) {
+          return [parsed.uncle_ho.image_data];
+        }
+      }
     } catch {
       // ignore
     }

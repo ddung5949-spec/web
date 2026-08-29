@@ -1231,11 +1231,13 @@ export const supabaseDb = {
   },
 
   async upsertDailyPoster(poster: {
-    id: string; // 'safety' | 'traffic' | 'good_deed' | 'safety_message' | 'traffic_situation'
+    id: string; // 'uncle_ho' | 'safety' | 'traffic' | 'good_deed'
     image_data: string;
     aspect_ratio?: string;
     title?: string;
     category_name?: string;
+    content?: string;
+    extra_data?: any;
   }): Promise<{ success: boolean; error?: string }> {
     const supabase = getSupabase();
     if (!supabase) return { success: true };
@@ -1243,7 +1245,9 @@ export const supabaseDb = {
     try {
       const cleanKey = poster.id.replace(/^widget_/, '');
       const standardKey =
-        cleanKey === 'safety_message' || cleanKey === 'safety'
+        cleanKey === 'uncle_ho' || cleanKey === 'uncleHo' || cleanKey === 'bac_ho'
+          ? 'uncle_ho'
+          : cleanKey === 'safety_message' || cleanKey === 'safety'
           ? 'safety'
           : cleanKey === 'traffic_situation' || cleanKey === 'traffic'
           ? 'traffic'
@@ -1253,24 +1257,27 @@ export const supabaseDb = {
 
       // Upsert into dedicated daily_posters table
       try {
-        const payload = {
+        const payload: any = {
           id: standardKey,
-          image_data: poster.image_data,
+          image_data: poster.image_data || '',
           aspect_ratio: poster.aspect_ratio || 'auto',
           title: poster.title || '',
           category_name: poster.category_name || '',
+          content: poster.content || '',
+          extra_data: poster.extra_data || {},
           updated_at: now,
         };
         const { error: upsertErr } = await supabase.from('daily_posters').upsert(payload, { onConflict: 'id' });
         if (upsertErr) {
-          // If onConflict on id has column name differences, try key / widget_id
+          // Fallback if some columns don't exist
           await supabase.from('daily_posters').upsert(
             {
               id: standardKey,
               key: standardKey,
               widget_id: standardKey,
-              image_data: poster.image_data,
+              image_data: poster.image_data || '',
               aspect_ratio: poster.aspect_ratio || 'auto',
+              title: poster.title || '',
               updated_at: now,
             } as any,
             { onConflict: 'id' }
@@ -1287,7 +1294,7 @@ export const supabaseDb = {
     }
   },
 
-  async fetchDailyPosters(): Promise<Record<string, { image_data: string; aspect_ratio: string; updatedAt?: string }> | null> {
+  async fetchDailyPosters(): Promise<Record<string, { image_data: string; aspect_ratio: string; title?: string; category_name?: string; content?: string; extra_data?: any; updatedAt?: string }> | null> {
     const supabase = getSupabase();
     if (!supabase) return null;
 
@@ -1295,11 +1302,13 @@ export const supabaseDb = {
       const { data, error } = await supabase.from('daily_posters').select('*');
       if (error || !data) return null;
 
-      const result: Record<string, { image_data: string; aspect_ratio: string; updatedAt?: string }> = {};
+      const result: Record<string, { image_data: string; aspect_ratio: string; title?: string; category_name?: string; content?: string; extra_data?: any; updatedAt?: string }> = {};
       data.forEach((row: any) => {
         const key = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
         const normKey =
-          key === 'safety_message' || key === 'safety'
+          key === 'uncle_ho' || key === 'uncleHo' || key === 'bac_ho'
+            ? 'uncle_ho'
+            : key === 'safety_message' || key === 'safety'
             ? 'safety'
             : key === 'traffic_situation' || key === 'traffic'
             ? 'traffic'
@@ -1308,6 +1317,10 @@ export const supabaseDb = {
         result[normKey] = {
           image_data: row.image_data || row.imageUrl || row.image || '',
           aspect_ratio: row.aspect_ratio || row.aspectRatio || row.aspectRatioMode || 'auto',
+          title: row.title || '',
+          category_name: row.category_name || row.categoryName || '',
+          content: row.content || '',
+          extra_data: row.extra_data || row.extraData || null,
           updatedAt: row.updated_at || row.updatedAt || '',
         };
       });

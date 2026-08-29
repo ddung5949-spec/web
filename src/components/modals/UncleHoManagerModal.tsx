@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings } from '../../types';
 import { compressImageFile, validateImageFile } from '../../utils/imageUtils';
+import { getSupabase } from '../../utils/supabase';
 
 interface UncleHoManagerModalProps {
   isOpen: boolean;
@@ -100,8 +101,8 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
           alert(validation.error || `Tệp ${file.name} không hợp lệ.`);
           continue;
         }
-        // Nén ảnh nhẹ qua Canvas (chiều rộng tối đa 1000px, chất lượng 0.78)
-        const compressed = await compressImageFile(file, 1000, 1000, 0.78);
+        // Nén ảnh nhẹ qua Canvas (chiều rộng tối đa 800px, chất lượng 0.65)
+        const compressed = await compressImageFile(file, 800, 800, 0.65);
         newUrls.push(compressed);
       }
 
@@ -134,19 +135,53 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
     setSlideshowImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Lưu Album ảnh Slideshow
-  const handleSaveAlbum = () => {
+  // Lưu Album ảnh Slideshow & Đồng bộ Supabase daily_posters
+  const handleSaveAlbum = async () => {
     const updatedSettings: UncleHoSettings = {
       ...settings,
       images: slideshowImages,
     };
     onSaveSettings(updatedSettings);
+
+    const nowIso = new Date().toISOString();
     try {
       localStorage.setItem('uncle_ho_images', JSON.stringify(slideshowImages));
       localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(slideshowImages));
+
+      const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+      cacheMap['uncle_ho'] = {
+        id: 'uncle_ho',
+        title: settings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+        image_data: slideshowImages[0] || '',
+        aspect_ratio: 'auto',
+        extra_data: { images: slideshowImages },
+        updated_at: nowIso,
+      };
+      localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
+      localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
     } catch {
       // ignore
     }
+
+    // Direct Supabase upsert to daily_posters
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('daily_posters').upsert({
+          id: 'uncle_ho',
+          title: settings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+          image_data: slideshowImages[0] || '',
+          aspect_ratio: 'auto',
+          content: 'Album ảnh và Lời Bác Hồ dạy',
+          extra_data: { images: slideshowImages, bannerTitle: settings.bannerTitle },
+          updated_at: nowIso,
+        }, { onConflict: 'id' });
+      } catch (dbErr) {
+        console.warn('[UncleHoManagerModal] Supabase upsert daily_posters error:', dbErr);
+      }
+    }
+
     alert('Đã lưu Album ảnh Slideshow Bác Hồ thành công! Khung ảnh sẽ hiển thị cố định các ảnh này trên toàn bộ hệ thống.');
   };
 
@@ -208,6 +243,30 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
 
     setQuotesList(updatedList);
     onSaveQuotes(updatedList);
+
+    // Sync to daily_posters table
+    const supabase = getSupabase();
+    if (supabase) {
+      (async () => {
+        try {
+          await supabase.from('daily_posters').upsert(
+            {
+              id: 'uncle_ho',
+              title: settings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+              image_data: slideshowImages[0] || '',
+              aspect_ratio: 'auto',
+              content: newItem.quote,
+              extra_data: { images: slideshowImages, quote: newItem, bannerTitle: settings.bannerTitle },
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+        } catch {
+          // ignore
+        }
+      })();
+    }
+
     alert(`Đã lưu Lời Bác dạy ngày ${newItem.dayMonth} thành công!`);
     handleCreateNewQuote();
   };

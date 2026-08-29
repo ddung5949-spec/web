@@ -288,29 +288,51 @@ export function App() {
       }
     }).catch(console.warn);
 
-    // Fetch poster data from dedicated daily_posters table
+    // Fetch poster data from dedicated daily_posters table (accessible by all users)
     supabaseDb.fetchDailyPosters().then((posters) => {
       if (isMounted && posters && Object.keys(posters).length > 0) {
         try {
-          const cachedRaw = localStorage.getItem('daily_posters_cache');
+          const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
           const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
           Object.entries(posters).forEach(([k, val]) => {
             cacheMap[k] = val;
             if (k === 'safety') cacheMap['safety_message'] = val;
             if (k === 'traffic') cacheMap['traffic_situation'] = val;
           });
+          localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
           localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
         } catch {
           // ignore
         }
 
+        // 1. Handle Uncle Ho poster/slideshow synchronization
+        if (posters['uncle_ho']) {
+          const hoData = posters['uncle_ho'];
+          const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
+          if (hoImages.length > 0) {
+            setUncleHoSettings((prev) => ({
+              ...prev,
+              images: hoImages,
+              bannerTitle: hoData.title || prev.bannerTitle,
+            }));
+            try {
+              localStorage.setItem('uncle_ho_images', JSON.stringify(hoImages));
+              localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(hoImages));
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        // 2. Handle 3 daily widgets (safety, traffic, good_deed)
         setSiteConfig((prev) => {
           const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
             ? [...prev.dailyWidgets]
             : [...defaultDailyWidgets];
 
           Object.entries(posters).forEach(([k, rawVal]) => {
-            const val = rawVal as { image_data: string; aspect_ratio: string; updatedAt?: string };
+            if (k === 'uncle_ho') return;
+            const val = rawVal as { image_data: string; aspect_ratio: string; title?: string; category_name?: string; updatedAt?: string };
             const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : k;
             const idx = existingWidgets.findIndex(
               (w) =>
@@ -321,12 +343,13 @@ export function App() {
             const item: DailyWidgetItem = {
               id: cleanKey,
               categoryName:
-                k === 'safety'
+                val.category_name ||
+                (k === 'safety'
                   ? 'Mỗi ngày 1 thông điệp an toàn'
                   : k === 'traffic'
                   ? 'Mỗi ngày một tình huống giao thông'
-                  : 'Mỗi ngày một hành động đẹp',
-              title: '',
+                  : 'Mỗi ngày một hành động đẹp'),
+              title: val.title || '',
               imageUrl: val.image_data,
               aspectRatioMode: (val.aspect_ratio as any) || 'auto',
               updatedAt: val.updatedAt,

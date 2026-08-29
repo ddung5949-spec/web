@@ -28,10 +28,10 @@ interface DailyPosterWidgetProps {
 
 /**
  * High-performance client-side Canvas image compressor
- * Automatically downscales images (max width 800px, JPEG quality 0.7)
- * Ensuring Base64 payload is ultra-light (< 150KB) for instantaneous Supabase sync
+ * Automatically downscales images (max dimension 800px, JPEG quality 0.65)
+ * Ensuring Base64 payload is ultra-light (< 120KB) for instantaneous Supabase sync
  */
-export function compressPosterImage(file: File, maxWidth = 800, quality = 0.7): Promise<string> {
+export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -41,9 +41,14 @@ export function compressPosterImage(file: File, maxWidth = 800, quality = 0.7): 
         let width = img.width;
         let height = img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
         }
 
         canvas.width = width;
@@ -260,7 +265,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
       // -------------------------------------------------------------
       // 1. Supabase: Lưu chuỗi base64 vào bảng 'daily_posters'
-      //    supabase.from('daily_posters').upsert({ id: posterId, image_data: base64, aspect_ratio: ratio })
+      //    supabase.from('daily_posters').upsert({ id, title, image_data, aspect_ratio, content, extra_data, updated_at })
       // -------------------------------------------------------------
       const supabase = getSupabase();
       if (supabase) {
@@ -269,10 +274,11 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           const { error: upsertErr } = await supabase.from('daily_posters').upsert(
             {
               id: posterId,
+              title: finalTitle,
               image_data: finalImg,
               aspect_ratio: formAspectRatio,
-              category_name: finalCat,
-              title: finalTitle,
+              content: finalTitle || '',
+              extra_data: { category_name: finalCat },
               updated_at: nowIso,
             },
             { onConflict: 'id' }
@@ -285,6 +291,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
                 key: posterId,
                 image_data: finalImg,
                 aspect_ratio: formAspectRatio,
+                title: finalTitle,
                 updated_at: nowIso,
               } as any,
               { onConflict: 'id' }
@@ -303,10 +310,12 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
         const cacheEntry = {
           id: posterKey,
+          title: finalTitle,
           image_data: finalImg,
           aspect_ratio: formAspectRatio,
           category_name: finalCat,
-          title: finalTitle,
+          content: finalTitle || '',
+          extra_data: { category_name: finalCat },
           updated_at: nowIso,
         };
         cacheMap[posterKey] = cacheEntry;
