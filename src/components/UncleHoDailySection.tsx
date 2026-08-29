@@ -79,7 +79,10 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       try {
         const supabase = getSupabase();
         if (!supabase) return;
-        const { data } = await supabase.from('daily_posters').select('*').eq('id', 'uncle_ho').single();
+        const { data, error } = await supabase.from('daily_posters').select('*').eq('id', 'uncle_ho').maybeSingle();
+        if (error) {
+          console.warn('[UncleHoDailySection] Notice fetching uncle_ho:', error.message);
+        }
         if (data) {
           const imgs: string[] = [];
           if (data.extra_data?.images && Array.isArray(data.extra_data.images)) {

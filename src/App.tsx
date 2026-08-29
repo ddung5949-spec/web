@@ -239,19 +239,86 @@ export function App() {
     let isMounted = true;
     setIsLoadingData(true);
 
-    // 1. Tải toàn bộ ảnh Poster hàng ngày từ Supabase (bảng daily_posters) - Hoàn toàn công khai
-    const loadPublicDailyPosters = async () => {
+    // 1. Unified fetchGlobalData running for 100% of users (authenticated and anonymous)
+    const fetchGlobalData = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
-        const { data: postersData, error: pErr } = await supabase.from('daily_posters').select('*');
-        if (pErr) {
-          console.warn('[App] Error fetching daily_posters from Supabase:', pErr.message);
+
+        // 1.1 Tải cấu hình Site Config (Thông báo chữ chạy, Tiện ích quân nhân, Album ảnh Bác)
+        const { data: config, error: cfgErr } = await supabase
+          .from('site_config')
+          .select('*')
+          .eq('id', 'default')
+          .maybeSingle();
+
+        if (cfgErr) {
+          console.warn('[App] Error fetching site_config from Supabase:', cfgErr.message);
         }
-        if (postersData && postersData.length > 0 && isMounted) {
-          const postersMap: Record<string, any> = {};
-          postersData.forEach((row: any) => {
-            const id = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+
+        if (config && isMounted) {
+          let parsed = config.config_json || config.config || config.data || config;
+          if (typeof parsed === 'string') {
+            try {
+              parsed = JSON.parse(parsed);
+            } catch {
+              // ignore
+            }
+          }
+          const mergedConfig: any = typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+          if (config.title) mergedConfig.title = config.title;
+          if (config.subtitle) mergedConfig.subtitle = config.subtitle;
+          if (config.unit_name) mergedConfig.footerUnitName = config.unit_name;
+          if (config.theme_color) mergedConfig.colorRed = config.theme_color;
+          if (config.marquee_text) {
+            mergedConfig.ticker = config.marquee_text;
+            mergedConfig.marquee_text = config.marquee_text;
+          }
+
+          const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
+          if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
+            mergedConfig.quickActionCards = rawUtils;
+            mergedConfig.homeQuickActions = rawUtils;
+            mergedConfig.military_utilities = rawUtils;
+          }
+
+          const hoImgs = config.uncle_ho_images || mergedConfig.uncle_ho_images || mergedConfig.uncleHoSettings?.images;
+          if (Array.isArray(hoImgs) && hoImgs.length > 0) {
+            const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
+            setUncleHoSettings((prev) => ({
+              ...prev,
+              ...(mergedConfig.uncleHoSettings || mergedConfig.uncle_ho_settings || {}),
+              images: cleanImgs,
+              bannerTitle: mergedConfig.uncleHoSettings?.bannerTitle || prev.bannerTitle,
+            }));
+            try {
+              localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
+              localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
+            } catch {
+              // ignore
+            }
+          }
+
+          setSiteConfig((prev) => ({
+            ...prev,
+            ...mergedConfig,
+          }));
+          safeStore.set('mangyang_site_config', { ...mergedConfig });
+        }
+
+        // 1.2 Tải 4 chuyên mục Poster hàng ngày (bảng daily_posters)
+        const { data: posters, error: postErr } = await supabase
+          .from('daily_posters')
+          .select('*');
+
+        if (postErr) {
+          console.warn('[App] Error fetching daily_posters from Supabase:', postErr.message);
+        }
+
+        if (posters && posters.length > 0 && isMounted) {
+          const posterMap: Record<string, any> = {};
+          posters.forEach((p: any) => {
+            const id = (p.id || p.key || p.widget_id || '').replace(/^widget_/, '');
             const normKey =
               id === 'uncle_ho' || id === 'uncleHo' || id === 'bac_ho'
                 ? 'uncle_ho'
@@ -265,30 +332,29 @@ export function App() {
 
             const entry = {
               id: normKey,
-              image_data: row.image_data || row.imageUrl || row.image || '',
-              aspect_ratio: row.aspect_ratio || row.aspectRatio || 'auto',
-              title: row.title || '',
-              category_name: row.category_name || row.categoryName || '',
-              content: row.content || '',
-              extra_data: row.extra_data || {},
-              updated_at: row.updated_at || row.updatedAt || '',
+              image_data: p.image_data || p.imageUrl || p.image || '',
+              aspect_ratio: p.aspect_ratio || p.aspectRatio || p.aspectRatioMode || 'auto',
+              title: p.title || '',
+              category_name: p.category_name || p.categoryName || '',
+              content: p.content || '',
+              extra_data: p.extra_data || {},
+              updated_at: p.updated_at || p.updatedAt || '',
             };
-            postersMap[normKey] = entry;
-            postersMap[id] = entry;
-            if (normKey === 'safety') postersMap['safety_message'] = entry;
-            if (normKey === 'traffic') postersMap['traffic_situation'] = entry;
+            posterMap[normKey] = entry;
+            posterMap[id] = entry;
+            if (normKey === 'safety') posterMap['safety_message'] = entry;
+            if (normKey === 'traffic') posterMap['traffic_situation'] = entry;
           });
 
           try {
-            localStorage.setItem('daily_posters', JSON.stringify(postersMap));
-            localStorage.setItem('daily_posters_cache', JSON.stringify(postersMap));
+            localStorage.setItem('daily_posters', JSON.stringify(posterMap));
+            localStorage.setItem('daily_posters_cache', JSON.stringify(posterMap));
           } catch {
             // ignore
           }
 
-          // Handle Uncle Ho album synchronization
-          if (postersMap['uncle_ho']) {
-            const hoData = postersMap['uncle_ho'];
+          if (posterMap['uncle_ho']) {
+            const hoData = posterMap['uncle_ho'];
             const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
             if (Array.isArray(hoImages) && hoImages.length > 0) {
               const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));
@@ -306,7 +372,6 @@ export function App() {
             }
           }
 
-          // Handle 3 daily posters (safety, traffic, good_deed)
           setSiteConfig((prev) => {
             const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
               ? [...prev.dailyWidgets]
@@ -314,7 +379,7 @@ export function App() {
 
             ['safety', 'traffic', 'good_deed'].forEach((k) => {
               const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
-              const val = postersMap[k] || postersMap[cleanKey];
+              const val = posterMap[k] || posterMap[cleanKey];
               if (val && val.image_data) {
                 const idx = existingWidgets.findIndex(
                   (w) =>
@@ -352,56 +417,13 @@ export function App() {
           });
         }
       } catch (err) {
-        console.warn('[App] loadPublicDailyPosters error:', err);
+        console.warn('[App] fetchGlobalData error:', err);
       }
     };
-    loadPublicDailyPosters();
 
-    // 2. Tải cấu hình chung và tiện ích quân nhân từ Supabase (bảng site_config) - Hoàn toàn công khai
-    const loadPublicSiteConfig = async () => {
-      try {
-        const supabase = getSupabase();
-        if (!supabase) return;
-        const { data: configData, error: cErr } = await supabase
-          .from('site_config')
-          .select('*')
-          .eq('id', 'default')
-          .maybeSingle();
+    fetchGlobalData();
 
-        if (cErr) {
-          console.warn('[App] Error fetching site_config from Supabase:', cErr.message);
-        }
-        if (configData && isMounted) {
-          let parsed = configData.config_json || configData.config || configData.data || configData;
-          if (typeof parsed === 'string') {
-            try {
-              parsed = JSON.parse(parsed);
-            } catch {
-              // ignore
-            }
-          }
-          if (parsed && typeof parsed === 'object') {
-            setSiteConfig((prev) => ({ ...prev, ...parsed }));
-            if (parsed.uncleHoSettings || parsed.uncle_ho_settings || parsed.uncle_ho_images) {
-              const hoImgs = parsed.uncle_ho_images || parsed.uncleHoSettings?.images;
-              if (Array.isArray(hoImgs) && hoImgs.length > 0) {
-                const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
-                setUncleHoSettings((prev) => ({
-                  ...prev,
-                  ...(parsed.uncleHoSettings || parsed.uncle_ho_settings || {}),
-                  images: cleanImgs,
-                }));
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[App] loadPublicSiteConfig error:', err);
-      }
-    };
-    loadPublicSiteConfig();
-
-    // 3. Tải dữ liệu bài viết trực tiếp từ Supabase (bảng articles)
+    // 2. Tải dữ liệu bài viết trực tiếp từ Supabase (bảng articles)
     cloudStorage
       .loadArticles([])
       .then((data) => {
@@ -430,10 +452,6 @@ export function App() {
 
     cloudStorage.loadUncleHoQuotes([]).then((data) => {
       if (isMounted && data) setUncleHoQuotes(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadUncleHoSettings(defaultUncleHoSettings).then((data) => {
-      if (isMounted && data) setUncleHoSettings(data);
     }).catch(console.warn);
 
     cloudStorage.loadMeetingRooms([]).then((data) => {
@@ -1753,13 +1771,50 @@ export function App() {
     // 1. Cập nhật tức thì lên State và LocalStorage (Optimistic UI)
     setSiteConfig(newConfig);
     safeStore.set('mangyang_site_config', newConfig);
-    showToast('success', 'Đã lưu tùy chỉnh hệ thống', 'Cấu hình giao diện, tiêu đề, khẩu hiệu và màu sắc đã được cập nhật.');
 
-    // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm (không làm gián đoạn Admin)
+    // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm Supabase
+    const nowIso = new Date().toISOString();
+    const supabase = getSupabase();
+    let saveSuccess = true;
+
+    if (supabase) {
+      try {
+        const { error: cfgErr } = await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            title: newConfig.title,
+            subtitle: newConfig.subtitle,
+            marquee_text: newConfig.ticker || newConfig.marquee_text,
+            theme_color: newConfig.colorRed,
+            unit_name: newConfig.footerUnitName,
+            military_utilities: newConfig.quickActionCards || newConfig.military_utilities,
+            config_json: newConfig,
+            config: newConfig,
+            data: newConfig,
+            updated_at: nowIso,
+          },
+          { onConflict: 'id' }
+        );
+        if (cfgErr) {
+          console.error('[App] Supabase site_config upsert error:', cfgErr);
+          saveSuccess = false;
+        }
+      } catch (e) {
+        console.warn('handleSaveCustomizer caught error:', e);
+        saveSuccess = false;
+      }
+    }
+
     try {
       await cloudStorage.saveSiteConfig(newConfig);
     } catch (e) {
-      console.warn('handleSaveCustomizer caught error (saved to state & local):', e);
+      console.warn('cloudStorage.saveSiteConfig error:', e);
+    }
+
+    if (saveSuccess) {
+      showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Cấu hình giao diện và dòng chữ chạy đã được cập nhật.');
+    } else {
+      showToast('info', 'Đã lưu cục bộ', 'Dữ liệu đã được lưu trên thiết bị của bạn.');
     }
 
     if (categoryRenames && categoryRenames.length > 0) {
@@ -1802,7 +1857,7 @@ export function App() {
     };
     setSiteConfig(updatedConfig);
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã lưu danh sách thông báo', 'Nội dung thông báo đã được lưu thành công.');
+    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Nội dung thông báo đã được lưu thành công.');
   };
 
   // Quick Action Cards Save Handler
@@ -1811,10 +1866,35 @@ export function App() {
       ...siteConfig,
       quickActionCards: cards,
       homeQuickActions: cards,
+      military_utilities: cards,
+      quick_links: cards,
     };
     setSiteConfig(updatedConfig);
+    safeStore.set('mangyang_site_config', updatedConfig);
+
+    const nowIso = new Date().toISOString();
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            military_utilities: cards,
+            quick_links: cards,
+            config_json: updatedConfig,
+            config: updatedConfig,
+            data: updatedConfig,
+            updated_at: nowIso,
+          },
+          { onConflict: 'id' }
+        );
+      } catch (err) {
+        console.error('[App] Supabase error saving quick actions:', err);
+      }
+    }
+
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã lưu tiện ích truy cập nhanh', 'Danh sách tiện ích đã được cập nhật.');
+    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Danh sách Tiện ích quân nhân đã được cập nhật.');
   };
 
   // Daily Widgets & Posters Save Handler (2-layer sync: Supabase + LocalStorage Cache)
@@ -1891,7 +1971,7 @@ export function App() {
       }
     }
 
-    showToast('success', 'Đã lưu thành công lên máy chủ hệ thống!', 'Poster hàng ngày đã được đồng bộ cho tất cả người dùng.');
+    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Poster 4 chuyên mục hàng ngày đã được đồng bộ cho tất cả người dùng.');
   };
 
   // Spotlight Article Select Handler
@@ -2179,7 +2259,7 @@ export function App() {
       {/* 3. News Ticker */}
       <NewsTicker
         siteConfig={siteConfig}
-        tickerText={siteConfig.ticker}
+        tickerText={siteConfig.ticker || siteConfig.marquee_text}
         articles={articles}
         primaryRedColor={siteConfig.colorRed}
         onOpenArticle={handleOpenArticle}

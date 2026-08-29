@@ -182,7 +182,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       }
     }
 
-    alert('Đã lưu Album ảnh Slideshow Bác Hồ thành công! Khung ảnh sẽ hiển thị cố định các ảnh này trên toàn bộ hệ thống.');
+    alert('✅ Đã lưu thành công lên máy chủ! Album ảnh Bác Hồ đã được đồng bộ cho tất cả người dùng.');
   };
 
   // Bắt đầu chỉnh sửa hoặc tạo mới lời Bác dạy theo ngày

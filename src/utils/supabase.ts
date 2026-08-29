@@ -626,7 +626,7 @@ export const supabaseDb = {
         .from('meeting_settings')
         .select('*')
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.warn('Supabase fetchMeetingSettings error:', error.message);
@@ -963,11 +963,26 @@ export const supabaseDb = {
         }
         if (config && typeof config === 'object') {
           const result: any = { ...config };
-          if (row.title && !result.title) result.title = row.title;
-          if (row.subtitle && !result.subtitle) result.subtitle = row.subtitle;
-          if (row.marquee_text && !result.ticker) result.ticker = row.marquee_text;
-          if (row.theme_color && !result.colorRed) result.colorRed = row.theme_color;
-          if (row.unit_name && !result.footerUnitName) result.footerUnitName = row.unit_name;
+          if (row.title) result.title = row.title;
+          if (row.subtitle) result.subtitle = row.subtitle;
+          if (row.marquee_text) {
+            result.ticker = row.marquee_text;
+            result.marquee_text = row.marquee_text;
+          }
+          if (row.theme_color) result.colorRed = row.theme_color;
+          if (row.unit_name) result.footerUnitName = row.unit_name;
+
+          const rawMilitaryUtils = row.military_utilities || row.quick_links || result.quickActionCards || result.military_utilities;
+          if (rawMilitaryUtils && Array.isArray(rawMilitaryUtils) && rawMilitaryUtils.length > 0) {
+            result.quickActionCards = rawMilitaryUtils;
+            result.military_utilities = rawMilitaryUtils;
+            result.homeQuickActions = rawMilitaryUtils;
+          }
+
+          const rawUncleHoImgs = row.uncle_ho_images || result.uncle_ho_images;
+          if (rawUncleHoImgs && Array.isArray(rawUncleHoImgs) && rawUncleHoImgs.length > 0) {
+            result.uncle_ho_images = rawUncleHoImgs;
+          }
 
           // Check direct column daily_widgets or daily_posters on row if not inside json
           const rowDaily = row.daily_widgets || row.daily_posters || row.dailyWidgets;

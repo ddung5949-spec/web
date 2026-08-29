@@ -28,10 +28,10 @@ interface DailyPosterWidgetProps {
 
 /**
  * High-performance client-side Canvas image compressor
- * Automatically downscales images (max dimension 700px, JPEG quality 0.6)
- * Ensuring Base64 payload is ultra-light (< 100KB) for instantaneous Supabase sync
+ * Automatically downscales images (max dimension 800px, JPEG quality 0.65)
+ * Ensuring Base64 payload is ultra-light (< 120KB) for instantaneous Supabase sync
  */
-export function compressPosterImage(file: File, maxWidth = 700, quality = 0.6): Promise<string> {
+export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {

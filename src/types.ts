@@ -484,6 +484,7 @@ export interface SiteConfig {
   subtitle: string;
   slogan: string;
   ticker: string;
+  marquee_text?: string;
   colorRed: string;
   colorGreen: string;
   fontSettings?: FontSettings;
@@ -515,6 +516,8 @@ export interface SiteConfig {
   homeAnnouncements?: HomeAnnouncement[];
   quickActionCards?: QuickActionCard[];
   homeQuickActions?: QuickActionCard[];
+  military_utilities?: QuickActionCard[];
+  quick_links?: QuickActionCard[];
   homeCategoryColumns?: HomeCategoryColumn[];
   spotlightArticleId?: number;
   spotlightArticleIds?: number[];
