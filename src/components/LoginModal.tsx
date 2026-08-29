@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import {
   AlertCircle,
-  CheckCircle2,
   Eye,
   EyeOff,
-  KeyRound,
   Loader2,
   Lock,
   LogIn,
   Mail,
   ShieldCheck,
-  User,
   X,
 } from 'lucide-react';
 import { supabase, supabaseAuth } from '../utils/supabase';
@@ -53,25 +50,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsLoading(true);
 
     try {
-      // Direct Supabase Auth signInWithPassword call
+      // Direct 100% Supabase Auth signInWithPassword call
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
 
       if (error) {
-        // If user entered username without @, or standard invalid credential error
         console.warn('[LoginModal] Supabase Auth Error:', error.message);
-        setErrorMessage('Email hoặc mật khẩu không chính xác!');
+        setErrorMessage('Email hoặc mật khẩu không đúng!');
         if (showToast) {
-          showToast('error', 'Đăng nhập thất bại', 'Email hoặc mật khẩu không chính xác!');
+          showToast('error', 'Đăng nhập thất bại', 'Email hoặc mật khẩu không đúng!');
         }
         setIsLoading(false);
         return;
       }
 
       if (data && data.user) {
-        // Map to Admin user
+        // Map to Admin user with permissions
         const adminUser = supabaseAuth.mapSupabaseUserToAdmin(data.user);
 
         if (showToast) {
@@ -94,9 +90,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       }
     } catch (err: any) {
       console.error('[LoginModal] Unexpected error:', err);
-      setErrorMessage('Email hoặc mật khẩu không chính xác!');
+      setErrorMessage('Email hoặc mật khẩu không đúng!');
       if (showToast) {
-        showToast('error', 'Đăng nhập thất bại', 'Email hoặc mật khẩu không chính xác!');
+        showToast('error', 'Đăng nhập thất bại', 'Email hoặc mật khẩu không đúng!');
       }
     } finally {
       setIsLoading(false);

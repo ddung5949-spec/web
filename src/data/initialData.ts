@@ -421,54 +421,9 @@ export const defaultSiteConfig: SiteConfig = {
   footerShowBackToTop: true,
 };
 
-export const defaultUsers: User[] = [
-  {
-    id: 1,
-    username: 'admin',
-    password: '123',
-    fullName: 'Quản trị viên Ban Chính trị',
-    rankUnit: 'Thiếu tá - Ban Tuyên huấn',
-    avatar: '',
-    role: 'admin',
-    militaryCode: 'SQ-95001',
-    profileId: 1,
-    totalActiveMinutes: 0,
-    lastActiveAt: '',
-    sessionCount: 1,
-    isOnline: true,
-    canViewDoc: true,
-    canUploadDoc: true,
-    canJoinPartyMeeting: true,
-    canUploadMeetingDoc: true,
-    canDeleteMeetingDoc: true,
-    canViewCollaborativeEdits: true,
-    canCreateMeeting: true,
-  },
-];
+export const defaultUsers: User[] = [];
 
-export const defaultMilitaryProfiles: MilitaryProfile[] = [
-  {
-    id: 1,
-    militaryCode: 'SQ-95001',
-    fullName: 'Quản trị viên Ban Chính trị',
-    birthDate: '1985-05-19',
-    rank: 'Thiếu tá',
-    position: 'Trợ lý Tuyên huấn',
-    unit: 'Ban Chính trị - Trung đoàn 95, Sư đoàn 2',
-    hometown: 'Thị xã An Khê, Tỉnh Gia Lai',
-    enlistmentDate: '2004-09-01',
-    partyJoinDate: '2007-02-03',
-    phoneNumber: '0988.100.001',
-    avatar: '',
-    notes: 'Quản trị viên hệ thống mạng nội bộ và Cổng thông tin tuyên truyền Trung đoàn 95, Sư đoàn 2.',
-    status: 'active',
-    userId: 1,
-    username: 'admin',
-    totalActiveMinutes: 0,
-    sessionCount: 1,
-    isOnline: true,
-  },
-];
+export const defaultMilitaryProfiles: MilitaryProfile[] = [];
 
 export const defaultArticles: Article[] = [];
 

@@ -54,7 +54,6 @@ import { UserManagementView } from './components/UserManagementView';
 import { Footer } from './components/Footer';
 
 // Modals
-import { AuthModal } from './components/modals/AuthModal';
 import { LoginModal } from './components/LoginModal';
 import { ProfileModal } from './components/modals/ProfileModal';
 import { CustomizerModal } from './components/modals/CustomizerModal';
@@ -134,9 +133,7 @@ export function App() {
     safeStore.get('mangyang_users', defaultUsers)
   );
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() =>
-    safeStore.get('mangyang_current_user', null)
-  );
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [articles, setArticles] = useState<Article[]>([]);
 
@@ -233,6 +230,33 @@ export function App() {
 
   // Global sync and loading state
   const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+
+  // 1. Quản lý phiên đăng nhập thực tế từ Supabase Auth (Session & onAuthStateChange)
+  useEffect(() => {
+    // 1. Kiểm tra phiên đăng nhập hiện tại từ Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    // 2. Lắng nghe sự kiện Đăng nhập / Đăng xuất
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Initial Database-First fetch & Realtime subscription
   useEffect(() => {
@@ -587,10 +611,6 @@ export function App() {
   useEffect(() => {
     safeStore.set('mangyang_users', users);
   }, [users]);
-
-  useEffect(() => {
-    safeStore.set('mangyang_current_user', currentUser);
-  }, [currentUser]);
 
   useEffect(() => {
     safeStore.set('mangyang_uncle_ho_quotes', uncleHoQuotes);
@@ -2496,12 +2516,13 @@ export function App() {
       />
 
       {/* 6. Modals */}
-      <AuthModal
+      <LoginModal
         isOpen={authModal.isOpen}
-        initialTab={authModal.tab}
         onClose={() => setAuthModal({ isOpen: false, tab: 'login' })}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+        }}
+        showToast={showToast}
       />
 
       <ProfileModal
