@@ -31,18 +31,8 @@ export const ArticleList: React.FC<ArticleListProps> = ({
   onResetFilter,
   onOpenPostModal,
 }) => {
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <ArticleCardSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 transition-opacity duration-300 ${isLoading && articles.length === 0 ? 'opacity-70' : 'opacity-100'}`}>
       {articles.length > 0 ? (
         articles.map((article) => (
           <ArticleCard

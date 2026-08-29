@@ -201,14 +201,10 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     return Array.from(new Set(dates));
   }, [quotes, todayStr]);
 
-  if (isLoading) {
-    return <UncleHoSkeleton />;
-  }
-
   return (
     <div
       id="uncle-ho-daily-section"
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] via-[#FFFBF0] to-[#FFF7E6] text-gray-900 shadow-md border-2 border-amber-400/80 flex flex-col justify-between"
+      className={`relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] via-[#FFFBF0] to-[#FFF7E6] text-gray-900 shadow-md border-2 border-amber-400/80 flex flex-col justify-between transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}
     >
       {/* 1. Header Trang trọng */}
       <div className="bg-red-800 text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-400/60">

@@ -46,10 +46,6 @@ export const HomeMiddleFeaturedSlider: React.FC<
     return () => clearInterval(interval);
   }, [featuredArticles.length, isHovered]);
 
-  if (isLoading) {
-    return <SliderSkeleton />;
-  }
-
   const currentArticle = featuredArticles[currentIndex] || featuredArticles[0];
 
   const handlePrev = (e: React.MouseEvent) => {
@@ -64,10 +60,22 @@ export const HomeMiddleFeaturedSlider: React.FC<
     setCurrentIndex((prev) => (prev + 1) % featuredArticles.length);
   };
 
+  if (!currentArticle) {
+    return (
+      <div className={`bg-gradient-to-br from-red-900 to-amber-900 text-white rounded-xl shadow-md p-8 text-center min-h-[220px] flex flex-col items-center justify-center transition-opacity duration-300 ${isLoading ? 'opacity-70' : 'opacity-100'}`}>
+        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center mb-3">
+          <Flag className="w-6 h-6 text-amber-300" />
+        </div>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-amber-200">Đang cập nhật tin nổi bật</h3>
+        <p className="text-xs text-white/80 mt-1">Các bài viết mới sẽ được cập nhật liên tục.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       id="home-middle-featured-slider"
-      className="bg-white rounded-xl shadow-md overflow-hidden relative group flex flex-col w-full"
+      className={`bg-white rounded-xl shadow-md overflow-hidden relative group flex flex-col w-full transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

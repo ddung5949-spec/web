@@ -75,11 +75,37 @@ import { HomeLatestNewsWidget } from './components/HomeLatestNewsWidget';
 import { HomeQuickActionsWidget } from './components/HomeQuickActionsWidget';
 
 export function App() {
-  // State initialization with localStorage persistence and instant daily_posters_cache hydration
+  // State initialization with instant cache hydration from localStorage
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => {
-    const initial = safeStore.get('mangyang_site_config', defaultSiteConfig);
+    let cachedObj: any = null;
     try {
-      const cachedRaw = localStorage.getItem('daily_posters_cache');
+      const cached = localStorage.getItem('site_config_cache') || localStorage.getItem('mangyang_site_config');
+      if (cached) cachedObj = JSON.parse(cached);
+    } catch {
+      cachedObj = null;
+    }
+
+    const initial: SiteConfig = {
+      ...defaultSiteConfig,
+      ...(cachedObj && typeof cachedObj === 'object' ? cachedObj : {}),
+    };
+
+    // Ensure titles are consistent with standardized branding
+    if (!initial.title || initial.title === 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5') {
+      initial.title = 'TRUYỀN THÔNG ĐOÀN MANG YANG';
+    }
+    if (!initial.subtitle || initial.subtitle.includes('HỆ THỐNG THÔNG TIN')) {
+      initial.subtitle = 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5';
+    }
+    if (!initial.marquee_text) {
+      initial.marquee_text = 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG';
+    }
+    if (!initial.ticker) {
+      initial.ticker = '★ Đoàn Mang Yang: "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG"';
+    }
+
+    try {
+      const cachedRaw = localStorage.getItem('daily_posters_cache') || localStorage.getItem('daily_posters');
       if (cachedRaw) {
         const cacheMap = JSON.parse(cachedRaw);
         const existingWidgets: DailyWidgetItem[] = Array.isArray(initial.dailyWidgets)
@@ -104,10 +130,10 @@ export function App() {
               categoryName:
                 entry.category_name ||
                 (key === 'safety'
-                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
                   : key === 'traffic'
-                  ? 'Mỗi ngày một tình huống giao thông'
-                  : 'Mỗi ngày một hành động đẹp'),
+                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
               title: entry.title || '',
               imageUrl: entry.image_data || entry.imageUrl,
               aspectRatioMode: entry.aspect_ratio || entry.aspectRatio || 'auto',
@@ -135,7 +161,9 @@ export function App() {
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<Article[]>(() =>
+    safeStore.get('mangyang_articles', [])
+  );
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
@@ -229,7 +257,7 @@ export function App() {
   };
 
   // Global sync and loading state
-  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
 
   // 1. Quản lý phiên đăng nhập thực tế từ Supabase Auth (Session & onAuthStateChange)
   useEffect(() => {
@@ -328,6 +356,11 @@ export function App() {
             ...mergedConfig,
           }));
           safeStore.set('mangyang_site_config', { ...mergedConfig });
+          try {
+            localStorage.setItem('site_config_cache', JSON.stringify(mergedConfig));
+          } catch {
+            // ignore
+          }
         }
 
         // 1.2 Tải 4 chuyên mục Poster hàng ngày (bảng daily_posters)
@@ -451,8 +484,11 @@ export function App() {
     cloudStorage
       .loadArticles([])
       .then((data) => {
-        if (isMounted) {
-          setArticles(data || []);
+        if (isMounted && data) {
+          setArticles(data);
+          if (data.length > 0) {
+            safeStore.set('mangyang_articles', data);
+          }
         }
       })
       .catch((err) => {

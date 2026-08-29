@@ -40,10 +40,6 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   const isAdmin = currentUser?.role === 'admin';
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
 
-  if (isLoading) {
-    return <SpotlightSkeleton />;
-  }
-
   // Find the primary spotlight article from real articles
   const primaryArticle =
     (spotlightArticleId ? articles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
@@ -56,7 +52,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
 
   if (!primaryArticle) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center text-gray-500">
+      <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center text-gray-500 transition-opacity duration-300 ${isLoading ? 'opacity-70' : 'opacity-100'}`}>
         <div className="w-10 h-10 rounded-full bg-red-50 text-red-700 flex items-center justify-center mx-auto mb-2">
           <Flame className="w-5 h-5" />
         </div>
@@ -67,7 +63,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col justify-between">
+    <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col justify-between transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}>
       {/* Header bar */}
       <div className="bg-linear-to-r from-red-800 via-red-900 to-amber-950 text-white px-4 py-2.5 flex items-center justify-between shadow-xs border-b-2 border-amber-400">
         <div className="flex items-center gap-2">

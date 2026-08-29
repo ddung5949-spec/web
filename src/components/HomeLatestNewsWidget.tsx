@@ -16,14 +16,10 @@ export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
   onOpenArticle,
   onSelectSection,
 }) => {
-  if (isLoading) {
-    return <LatestNewsSkeleton />;
-  }
-
   const latestArticles = articles.slice(0, 5);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden flex flex-col justify-between h-full min-h-[340px]">
+    <div className={`bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden flex flex-col justify-between h-full min-h-[340px] transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}>
       {/* Header Bar */}
       <div className="px-3.5 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">

@@ -74,12 +74,12 @@ export const defaultSidebarWidgets: SidebarWidgetSetting[] = [
 ];
 
 export const defaultNavTabs: NavTabItem[] = [
-  { id: 'home', label: 'Trang chủ', type: 'internal', targetPage: 'home', enabled: true, order: 1 },
-  { id: 'ctd', label: 'CTĐ - CTCT', type: 'internal', targetPage: 'ctd', enabled: true, order: 2 },
-  { id: 'hl', label: 'Huấn luyện - SSCĐ', type: 'internal', targetPage: 'hl', enabled: true, order: 3 },
-  { id: 'bac', label: 'Thực hành theo Bác', type: 'internal', targetPage: 'bac', enabled: true, order: 4 },
-  { id: 'doc', label: 'Văn bản - Chỉ thị', type: 'internal', targetPage: 'doc', enabled: true, order: 5 },
-  { id: 'lecture', label: 'Bài giảng số', type: 'internal', targetPage: 'lecture', enabled: true, order: 6 },
+  { id: 'home', label: 'TRANG CHỦ', short_name: 'TRANG CHỦ', type: 'internal', targetPage: 'home', enabled: true, order: 1 },
+  { id: 'bac', label: 'THỰC HÀNH THEO BÁC', short_name: 'THỰC HÀNH THEO BÁC', type: 'internal', targetPage: 'bac', enabled: true, order: 2 },
+  { id: 'ctd', label: 'CTĐ - CTCT', short_name: 'CTĐ - CTCT', type: 'internal', targetPage: 'ctd', enabled: true, order: 3 },
+  { id: 'hl', label: 'HUẤN LUYỆN - SSCĐ', short_name: 'HUẤN LUYỆN - SSCĐ', type: 'internal', targetPage: 'hl', enabled: true, order: 4 },
+  { id: 'doc', label: 'VĂN BẢN - CHỈ THỊ', short_name: 'VĂN BẢN - CHỈ THỊ', type: 'internal', targetPage: 'doc', enabled: true, order: 5 },
+  { id: 'lecture', label: 'BÀI GIẢNG SỐ', short_name: 'BÀI GIẢNG SỐ', type: 'internal', targetPage: 'lecture', enabled: true, order: 6 },
   { id: 'qdnd', label: 'Báo QĐND', type: 'external', externalUrl: 'https://www.qdnd.vn', openNewTab: true, enabled: true, order: 7 },
   { id: 'qk5', label: 'Báo Quân khu 5', type: 'external', externalUrl: 'https://baoquankhu5.vn', openNewTab: true, enabled: true, order: 8 },
 ];
@@ -217,10 +217,11 @@ export const defaultRoles: RoleDefinition[] = [
 ];
 
 export const defaultSiteConfig: SiteConfig = {
-  title: 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5',
-  subtitle: 'TRUNG ĐOÀN 95, SƯ ĐOÀN 2 • HỆ THỐNG THÔNG TIN TUYÊN TRUYỀN & QUẢN TRỊ VĂN KIỆN NỘI BỘ',
+  title: 'TRUYỀN THÔNG ĐOÀN MANG YANG',
+  subtitle: 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5',
   slogan: 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG',
-  ticker: '★ Trung đoàn 95, Sư đoàn 2: Phát huy truyền thống "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG" trong mọi nhiệm vụ SSCĐ và xây dựng đơn vị.',
+  marquee_text: 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG',
+  ticker: '★ Đoàn Mang Yang: "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG"',
   colorRed: '#b91c1c',
   colorGreen: '#143d2b',
   fontSettings: {

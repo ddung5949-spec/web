@@ -22,10 +22,6 @@ export const HomeAnnouncementsWidget: React.FC<HomeAnnouncementsWidgetProps> = (
 }) => {
   const isAdmin = currentUser?.role === 'admin';
 
-  if (isLoading) {
-    return <AnnouncementsSkeleton />;
-  }
-
   const handleClickItem = (ann: HomeAnnouncement) => {
     if (ann.link) {
       if (ann.link.startsWith('http')) {
@@ -38,7 +34,7 @@ export const HomeAnnouncementsWidget: React.FC<HomeAnnouncementsWidgetProps> = (
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-amber-300 shadow-sm overflow-hidden flex flex-col justify-between">
+    <div className={`bg-white rounded-2xl border border-amber-300 shadow-sm overflow-hidden flex flex-col justify-between transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}>
       {/* Header Bar */}
       <div className="bg-linear-to-r from-amber-600 via-amber-700 to-red-800 text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-2 min-w-0">
