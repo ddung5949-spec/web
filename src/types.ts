@@ -502,6 +502,8 @@ export interface SiteConfig {
   dailyPosters?: DailyWidgetItem[] | Record<string, any>;
   daily_widgets?: DailyWidgetItem[] | Record<string, any>;
   daily_posters?: DailyWidgetItem[] | Record<string, any>;
+  uncleHoSettings?: UncleHoSettings;
+  uncle_ho_settings?: UncleHoSettings;
   uncleHoImages?: string[];
   uncle_ho_images?: string[];
   sidebarWidgets?: SidebarWidgetSetting[];

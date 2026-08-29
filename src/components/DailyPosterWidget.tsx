@@ -28,10 +28,10 @@ interface DailyPosterWidgetProps {
 
 /**
  * High-performance client-side Canvas image compressor
- * Automatically downscales images (max dimension 800px, JPEG quality 0.65)
- * Ensuring Base64 payload is ultra-light (< 120KB) for instantaneous Supabase sync
+ * Automatically downscales images (max dimension 700px, JPEG quality 0.6)
+ * Ensuring Base64 payload is ultra-light (< 100KB) for instantaneous Supabase sync
  */
-export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65): Promise<string> {
+export function compressPosterImage(file: File, maxWidth = 700, quality = 0.6): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -58,6 +58,8 @@ export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65):
           resolve(e.target?.result as string);
           return;
         }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
         ctx.drawImage(img, 0, 0, width, height);
         const dataUrl = canvas.toDataURL('image/jpeg', quality);
         resolve(dataUrl);
@@ -277,6 +279,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
               title: finalTitle,
               image_data: finalImg,
               aspect_ratio: formAspectRatio,
+              category_name: finalCat,
               content: finalTitle || '',
               extra_data: { category_name: finalCat },
               updated_at: nowIso,
@@ -285,20 +288,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           );
 
           if (upsertErr) {
-            await supabase.from('daily_posters').upsert(
-              {
-                id: posterId,
-                key: posterId,
-                image_data: finalImg,
-                aspect_ratio: formAspectRatio,
-                title: finalTitle,
-                updated_at: nowIso,
-              } as any,
-              { onConflict: 'id' }
-            );
+            console.error('[DailyPosterWidget] Supabase direct upsert error:', upsertErr);
           }
         } catch (dbErr) {
-          console.warn('[DailyPosterWidget] Supabase direct upsert error:', dbErr);
+          console.error('[DailyPosterWidget] Supabase error:', dbErr);
         }
       }
 
@@ -350,6 +343,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
       await onSaveDailyWidgets(finalList);
       setIsEditModalOpen(false);
+      alert('✅ Đã lưu thành công lên máy chủ hệ thống!');
     } catch (err) {
       console.error('Save daily poster widget error:', err);
       alert('Lỗi khi lưu poster. Vui lòng thử lại!');

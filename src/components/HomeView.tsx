@@ -136,7 +136,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
 
   // State nạp poster từ bảng 'daily_posters' trên Supabase và cache localStorage
-  const [dailyPosters, setDailyPosters] = useState<Record<string, { image_data: string; aspect_ratio?: string }>>(() => {
+  const [dailyPosters, setDailyPosters] = useState<Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }>>(() => {
     try {
       const cached = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
       return cached ? JSON.parse(cached) : {};
@@ -145,7 +145,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
   });
 
-  // Tải dữ liệu từ Supabase bảng 'daily_posters' khi khởi tạo và gán vào State
+  // Tải dữ liệu từ Supabase bảng 'daily_posters' khi khởi tạo và gán vào State (Không phụ thuộc đăng nhập)
   React.useEffect(() => {
     let isMounted = true;
     const fetchDailyPosters = async () => {
@@ -154,14 +154,31 @@ export const HomeView: React.FC<HomeViewProps> = ({
         if (!supabase) return;
         const { data, error } = await supabase.from('daily_posters').select('*');
         if (!error && data && Array.isArray(data) && data.length > 0) {
-          const map: Record<string, { image_data: string; aspect_ratio?: string }> = {};
+          const map: Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }> = {};
           data.forEach((row: any) => {
-            const id = row.id || row.key || row.widget_id;
-            if (id) {
-              map[id] = {
+            const rawId = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+            const normKey =
+              rawId === 'uncle_ho' || rawId === 'uncleHo' || rawId === 'bac_ho'
+                ? 'uncle_ho'
+                : rawId === 'safety_message' || rawId === 'safety'
+                ? 'safety'
+                : rawId === 'traffic_situation' || rawId === 'traffic'
+                ? 'traffic'
+                : rawId === 'good_deed'
+                ? 'good_deed'
+                : rawId;
+
+            if (normKey) {
+              const entry = {
                 image_data: row.image_data || row.imageUrl || row.image || '',
-                aspect_ratio: row.aspect_ratio || row.aspectRatio || 'auto',
+                aspect_ratio: row.aspect_ratio || row.aspectRatio || row.aspectRatioMode || 'auto',
+                title: row.title || '',
+                category_name: row.category_name || row.categoryName || '',
               };
+              map[normKey] = entry;
+              map[rawId] = entry;
+              if (normKey === 'safety') map['safety_message'] = entry;
+              if (normKey === 'traffic') map['traffic_situation'] = entry;
             }
           });
           if (isMounted) {
@@ -196,6 +213,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
       const cleanId = id.replace(/^widget_/, '');
       const posterKey = cleanId === 'safety_message' ? 'safety' : cleanId === 'traffic_situation' ? 'traffic' : cleanId;
       const targetId = posterKey === 'safety' ? 'safety_message' : posterKey === 'traffic' ? 'traffic_situation' : 'good_deed';
+      const defaultCategory =
+        targetId === 'safety_message'
+          ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
+          : targetId === 'traffic_situation'
+          ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+          : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP';
+
       const idx = list.findIndex(
         (w) =>
           w.id === targetId ||
@@ -207,13 +231,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       const itemData: DailyWidgetItem = {
         id: targetId,
-        categoryName:
-          targetId === 'safety_message'
-            ? 'Mỗi ngày 1 thông điệp an toàn'
-            : targetId === 'traffic_situation'
-            ? 'Mỗi ngày một tình huống giao thông'
-            : 'Mỗi ngày một hành động đẹp',
-        title: '',
+        categoryName: poster.category_name || defaultCategory,
+        title: poster.title || '',
         imageUrl: poster.image_data,
         aspectRatioMode: (poster.aspect_ratio as any) || 'auto',
       };
@@ -221,6 +240,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
       if (idx >= 0) {
         list[idx] = {
           ...list[idx],
+          categoryName: poster.category_name || list[idx].categoryName || defaultCategory,
+          title: poster.title || list[idx].title || '',
           imageUrl: poster.image_data || list[idx].imageUrl,
           aspectRatioMode: (poster.aspect_ratio as any) || list[idx].aspectRatioMode,
         };

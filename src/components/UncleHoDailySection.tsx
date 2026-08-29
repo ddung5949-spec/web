@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings, User } from '../types';
 import { UncleHoSkeleton } from './SkeletonLoader';
+import { getSupabase } from '../utils/supabase';
 
 interface UncleHoDailySectionProps {
   quotes: UncleHoQuote[];
@@ -69,6 +70,36 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [fetchedAlbumImages, setFetchedAlbumImages] = useState<string[]>([]);
+
+  // Tải trực tiếp ảnh Bác Hồ từ Supabase bảng 'daily_posters' (id: 'uncle_ho') để luôn đồng bộ cho mọi người dùng
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUncleHoFromSupabase = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data } = await supabase.from('daily_posters').select('*').eq('id', 'uncle_ho').single();
+        if (data) {
+          const imgs: string[] = [];
+          if (data.extra_data?.images && Array.isArray(data.extra_data.images)) {
+            imgs.push(...data.extra_data.images.filter((img: string) => img && !img.includes('unsplash.com')));
+          } else if (data.image_data && !data.image_data.includes('unsplash.com')) {
+            imgs.push(data.image_data);
+          }
+          if (imgs.length > 0 && isMounted) {
+            setFetchedAlbumImages(imgs);
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching uncle_ho images from Supabase:', err);
+      }
+    };
+    fetchUncleHoFromSupabase();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // State xem nhanh Bối cảnh lịch sử & Bài học vận dụng
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -82,7 +113,12 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       if (filtered.length > 0) return filtered;
     }
 
-    // 2. Kiểm tra cache localStorage
+    // 2. Kiểm tra ảnh vừa nạp từ Supabase
+    if (fetchedAlbumImages.length > 0) {
+      return fetchedAlbumImages;
+    }
+
+    // 3. Kiểm tra cache localStorage
     try {
       const cached = localStorage.getItem('uncle_ho_images') || localStorage.getItem('mangyang_uncle_ho_images');
       if (cached) {
@@ -109,7 +145,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     }
 
     return [];
-  }, [settings?.images]);
+  }, [settings?.images, fetchedAlbumImages]);
 
   // Autoplay Slideshow 4s/lần
   useEffect(() => {

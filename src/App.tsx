@@ -67,7 +67,7 @@ import { TabIntroManagerModal } from './components/modals/TabIntroManagerModal';
 import { QuickActionManagerModal } from './components/modals/QuickActionManagerModal';
 import { AccessDeniedModal } from './components/modals/AccessDeniedModal';
 import { LayoutManagerModal } from './components/modals/LayoutManagerModal';
-import { supabase, supabaseAuth, supabaseDb } from './utils/supabase';
+import { getSupabase, supabase, supabaseAuth, supabaseDb } from './utils/supabase';
 
 // Home Widgets for 3-Column Layout
 import { UncleHoDailySection } from './components/UncleHoDailySection';
@@ -239,7 +239,169 @@ export function App() {
     let isMounted = true;
     setIsLoadingData(true);
 
-    // 1. Tải dữ liệu bài viết trực tiếp từ Supabase
+    // 1. Tải toàn bộ ảnh Poster hàng ngày từ Supabase (bảng daily_posters) - Hoàn toàn công khai
+    const loadPublicDailyPosters = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data: postersData, error: pErr } = await supabase.from('daily_posters').select('*');
+        if (pErr) {
+          console.warn('[App] Error fetching daily_posters from Supabase:', pErr.message);
+        }
+        if (postersData && postersData.length > 0 && isMounted) {
+          const postersMap: Record<string, any> = {};
+          postersData.forEach((row: any) => {
+            const id = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+            const normKey =
+              id === 'uncle_ho' || id === 'uncleHo' || id === 'bac_ho'
+                ? 'uncle_ho'
+                : id === 'safety_message' || id === 'safety'
+                ? 'safety'
+                : id === 'traffic_situation' || id === 'traffic'
+                ? 'traffic'
+                : id === 'good_deed'
+                ? 'good_deed'
+                : id;
+
+            const entry = {
+              id: normKey,
+              image_data: row.image_data || row.imageUrl || row.image || '',
+              aspect_ratio: row.aspect_ratio || row.aspectRatio || 'auto',
+              title: row.title || '',
+              category_name: row.category_name || row.categoryName || '',
+              content: row.content || '',
+              extra_data: row.extra_data || {},
+              updated_at: row.updated_at || row.updatedAt || '',
+            };
+            postersMap[normKey] = entry;
+            postersMap[id] = entry;
+            if (normKey === 'safety') postersMap['safety_message'] = entry;
+            if (normKey === 'traffic') postersMap['traffic_situation'] = entry;
+          });
+
+          try {
+            localStorage.setItem('daily_posters', JSON.stringify(postersMap));
+            localStorage.setItem('daily_posters_cache', JSON.stringify(postersMap));
+          } catch {
+            // ignore
+          }
+
+          // Handle Uncle Ho album synchronization
+          if (postersMap['uncle_ho']) {
+            const hoData = postersMap['uncle_ho'];
+            const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
+            if (Array.isArray(hoImages) && hoImages.length > 0) {
+              const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));
+              setUncleHoSettings((prev) => ({
+                ...prev,
+                images: cleanImages,
+                bannerTitle: hoData.title || prev.bannerTitle,
+              }));
+              try {
+                localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImages));
+                localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImages));
+              } catch {
+                // ignore
+              }
+            }
+          }
+
+          // Handle 3 daily posters (safety, traffic, good_deed)
+          setSiteConfig((prev) => {
+            const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
+              ? [...prev.dailyWidgets]
+              : [...defaultDailyWidgets];
+
+            ['safety', 'traffic', 'good_deed'].forEach((k) => {
+              const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
+              const val = postersMap[k] || postersMap[cleanKey];
+              if (val && val.image_data) {
+                const idx = existingWidgets.findIndex(
+                  (w) =>
+                    w.id === cleanKey ||
+                    (k === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
+                    (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation'))
+                );
+                const item: DailyWidgetItem = {
+                  id: cleanKey,
+                  categoryName:
+                    val.category_name ||
+                    (k === 'safety'
+                      ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
+                      : k === 'traffic'
+                      ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+                      : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
+                  title: val.title || '',
+                  imageUrl: val.image_data,
+                  aspectRatioMode: (val.aspect_ratio as any) || 'auto',
+                  updatedAt: val.updated_at,
+                };
+                if (idx >= 0) {
+                  existingWidgets[idx] = { ...existingWidgets[idx], ...item };
+                } else {
+                  existingWidgets.push(item);
+                }
+              }
+            });
+
+            return {
+              ...prev,
+              dailyWidgets: existingWidgets,
+              dailyPosters: existingWidgets,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('[App] loadPublicDailyPosters error:', err);
+      }
+    };
+    loadPublicDailyPosters();
+
+    // 2. Tải cấu hình chung và tiện ích quân nhân từ Supabase (bảng site_config) - Hoàn toàn công khai
+    const loadPublicSiteConfig = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data: configData, error: cErr } = await supabase
+          .from('site_config')
+          .select('*')
+          .eq('id', 'default')
+          .maybeSingle();
+
+        if (cErr) {
+          console.warn('[App] Error fetching site_config from Supabase:', cErr.message);
+        }
+        if (configData && isMounted) {
+          let parsed = configData.config_json || configData.config || configData.data || configData;
+          if (typeof parsed === 'string') {
+            try {
+              parsed = JSON.parse(parsed);
+            } catch {
+              // ignore
+            }
+          }
+          if (parsed && typeof parsed === 'object') {
+            setSiteConfig((prev) => ({ ...prev, ...parsed }));
+            if (parsed.uncleHoSettings || parsed.uncle_ho_settings || parsed.uncle_ho_images) {
+              const hoImgs = parsed.uncle_ho_images || parsed.uncleHoSettings?.images;
+              if (Array.isArray(hoImgs) && hoImgs.length > 0) {
+                const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
+                setUncleHoSettings((prev) => ({
+                  ...prev,
+                  ...(parsed.uncleHoSettings || parsed.uncle_ho_settings || {}),
+                  images: cleanImgs,
+                }));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[App] loadPublicSiteConfig error:', err);
+      }
+    };
+    loadPublicSiteConfig();
+
+    // 3. Tải dữ liệu bài viết trực tiếp từ Supabase (bảng articles)
     cloudStorage
       .loadArticles([])
       .then((data) => {
@@ -253,122 +415,6 @@ export function App() {
       .finally(() => {
         if (isMounted) setIsLoadingData(false);
       });
-
-    // 2. Tải các cấu hình và dữ liệu khác độc lập
-    cloudStorage.loadSiteConfig(defaultSiteConfig).then((data) => {
-      if (isMounted && data) {
-        setSiteConfig(data);
-        if (data.dailyWidgets && Array.isArray(data.dailyWidgets)) {
-          try {
-            const cacheMap: Record<string, any> = {};
-            data.dailyWidgets.forEach((w) => {
-              const k = (w.id || '').replace(/^widget_/, '');
-              const normKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
-              if (w.imageUrl) {
-                cacheMap[normKey] = {
-                  id: normKey,
-                  image_data: w.imageUrl,
-                  aspect_ratio: w.aspectRatioMode || 'auto',
-                  category_name: w.categoryName,
-                  title: w.title,
-                  updated_at: w.updatedAt || '',
-                };
-                cacheMap[w.id] = cacheMap[normKey];
-              }
-            });
-            if (Object.keys(cacheMap).length > 0) {
-              const existingCacheRaw = localStorage.getItem('daily_posters_cache');
-              const existingCache = existingCacheRaw ? JSON.parse(existingCacheRaw) : {};
-              localStorage.setItem('daily_posters_cache', JSON.stringify({ ...existingCache, ...cacheMap }));
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-    }).catch(console.warn);
-
-    // Fetch poster data from dedicated daily_posters table (accessible by all users)
-    supabaseDb.fetchDailyPosters().then((posters) => {
-      if (isMounted && posters && Object.keys(posters).length > 0) {
-        try {
-          const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
-          const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
-          Object.entries(posters).forEach(([k, val]) => {
-            cacheMap[k] = val;
-            if (k === 'safety') cacheMap['safety_message'] = val;
-            if (k === 'traffic') cacheMap['traffic_situation'] = val;
-          });
-          localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
-          localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
-        } catch {
-          // ignore
-        }
-
-        // 1. Handle Uncle Ho poster/slideshow synchronization
-        if (posters['uncle_ho']) {
-          const hoData = posters['uncle_ho'];
-          const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
-          if (hoImages.length > 0) {
-            setUncleHoSettings((prev) => ({
-              ...prev,
-              images: hoImages,
-              bannerTitle: hoData.title || prev.bannerTitle,
-            }));
-            try {
-              localStorage.setItem('uncle_ho_images', JSON.stringify(hoImages));
-              localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(hoImages));
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        // 2. Handle 3 daily widgets (safety, traffic, good_deed)
-        setSiteConfig((prev) => {
-          const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
-            ? [...prev.dailyWidgets]
-            : [...defaultDailyWidgets];
-
-          Object.entries(posters).forEach(([k, rawVal]) => {
-            if (k === 'uncle_ho') return;
-            const val = rawVal as { image_data: string; aspect_ratio: string; title?: string; category_name?: string; updatedAt?: string };
-            const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : k;
-            const idx = existingWidgets.findIndex(
-              (w) =>
-                w.id === cleanKey ||
-                (k === 'safety' && w.id === 'safety') ||
-                (k === 'traffic' && w.id === 'traffic')
-            );
-            const item: DailyWidgetItem = {
-              id: cleanKey,
-              categoryName:
-                val.category_name ||
-                (k === 'safety'
-                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-                  : k === 'traffic'
-                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
-                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
-              title: val.title || '',
-              imageUrl: val.image_data,
-              aspectRatioMode: (val.aspect_ratio as any) || 'auto',
-              updatedAt: val.updatedAt,
-            };
-            if (idx >= 0) {
-              existingWidgets[idx] = { ...existingWidgets[idx], ...item };
-            } else {
-              existingWidgets.push(item);
-            }
-          });
-
-          return {
-            ...prev,
-            dailyWidgets: existingWidgets,
-            dailyPosters: existingWidgets,
-          };
-        });
-      }
-    }).catch(console.warn);
 
     cloudStorage.loadUsers(defaultUsers).then((data) => {
       if (isMounted && data && data.length > 0) setUsers(data);
@@ -1785,7 +1831,7 @@ export function App() {
 
     // Update LocalStorage cache immediately
     try {
-      const cachedRaw = localStorage.getItem('daily_posters_cache');
+      const cachedRaw = localStorage.getItem('daily_posters_cache') || localStorage.getItem('daily_posters');
       const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
       widgets.forEach((w) => {
         const k = (w.id || '').replace(/^widget_/, '');
@@ -1805,33 +1851,47 @@ export function App() {
           if (normKey === 'traffic') cacheMap['traffic_situation'] = entry;
         }
       });
+      localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
       localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
     } catch (e) {
       console.warn('Error caching daily posters:', e);
     }
 
-    // Save siteConfig and individual poster rows
+    // Save siteConfig directly to Supabase
     await cloudStorage.saveSiteConfig(updatedConfig);
 
-    // Also upsert rows in daily_posters table
-    try {
-      for (const w of widgets) {
-        if (w.imageUrl) {
-          const k = (w.id || '').replace(/^widget_/, '');
-          await supabaseDb.upsertDailyPoster({
-            id: k,
-            image_data: w.imageUrl,
-            aspect_ratio: w.aspectRatioMode || 'auto',
-            category_name: w.categoryName,
-            title: w.title,
-          });
+    // Direct upsert to daily_posters table
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const nowIso = new Date().toISOString();
+        for (const w of widgets) {
+          if (w.imageUrl) {
+            const k = (w.id || '').replace(/^widget_/, '');
+            const standardKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
+            const { error: upsertErr } = await supabase.from('daily_posters').upsert(
+              {
+                id: standardKey,
+                title: w.title || w.categoryName || '',
+                image_data: w.imageUrl,
+                aspect_ratio: w.aspectRatioMode || 'auto',
+                category_name: w.categoryName || '',
+                content: w.title || '',
+                updated_at: nowIso,
+              },
+              { onConflict: 'id' }
+            );
+            if (upsertErr) {
+              console.error('[App] Supabase daily_posters upsert error for', standardKey, upsertErr);
+            }
+          }
         }
+      } catch (e) {
+        console.error('[App] Error saving poster rows to Supabase daily_posters:', e);
       }
-    } catch (e) {
-      console.warn('Error saving poster rows to Supabase:', e);
     }
 
-    showToast('success', 'Đã cập nhật ảnh poster thành công!', 'Poster đã được nén tối ưu và lưu đồng bộ 2 lớp.');
+    showToast('success', 'Đã lưu thành công lên máy chủ hệ thống!', 'Poster hàng ngày đã được đồng bộ cho tất cả người dùng.');
   };
 
   // Spotlight Article Select Handler
@@ -1956,6 +2016,75 @@ export function App() {
   const handleSaveUncleHoSettings = async (newSettings: UncleHoSettings) => {
     setUncleHoSettings(newSettings);
     await cloudStorage.saveUncleHoSettings(newSettings);
+
+    const nowIso = new Date().toISOString();
+    const imgs = newSettings.images || [];
+
+    // Cache to localStorage
+    try {
+      localStorage.setItem('uncle_ho_images', JSON.stringify(imgs));
+      localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(imgs));
+      const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+      cacheMap['uncle_ho'] = {
+        id: 'uncle_ho',
+        title: newSettings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+        image_data: imgs[0] || '',
+        aspect_ratio: 'auto',
+        extra_data: { images: imgs, bannerTitle: newSettings.bannerTitle },
+        updated_at: nowIso,
+      };
+      localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
+      localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+    } catch {
+      // ignore
+    }
+
+    // Direct upsert to Supabase daily_posters
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error: pErr } = await supabase.from('daily_posters').upsert(
+          {
+            id: 'uncle_ho',
+            title: newSettings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
+            image_data: imgs[0] || '',
+            aspect_ratio: 'auto',
+            content: 'Album ảnh và Lời Bác Hồ dạy',
+            extra_data: { images: imgs, bannerTitle: newSettings.bannerTitle },
+            updated_at: nowIso,
+          },
+          { onConflict: 'id' }
+        );
+        if (pErr) {
+          console.error('[App] Supabase daily_posters upsert uncle_ho error:', pErr);
+        }
+
+        // Direct upsert to site_config
+        const updatedConfig: SiteConfig = {
+          ...siteConfig,
+          uncleHoSettings: newSettings,
+          uncle_ho_images: imgs,
+        };
+        const { error: cErr } = await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            config_json: updatedConfig,
+            config: updatedConfig,
+            data: updatedConfig,
+            updated_at: nowIso,
+          },
+          { onConflict: 'id' }
+        );
+        if (cErr) {
+          console.error('[App] Supabase site_config upsert error:', cErr);
+        }
+      } catch (dbErr) {
+        console.error('[App] Supabase direct save error:', dbErr);
+      }
+    }
+
+    showToast('success', 'Đã lưu thành công lên máy chủ hệ thống!', 'Album ảnh và cấu hình Lời Bác dạy đã được đồng bộ.');
   };
 
   const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
