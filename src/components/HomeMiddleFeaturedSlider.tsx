@@ -65,17 +65,17 @@ export const HomeMiddleFeaturedSlider: React.FC<
 
   return (
     <div
-      className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden relative group flex flex-col justify-between h-full min-h-[340px]"
+      className="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden relative group flex flex-col justify-between h-full min-h-[420px] sm:min-h-[440px] md:min-h-[460px] lg:h-[460px] xl:h-[480px]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {currentArticle ? (
         <div
           onClick={() => onOpenArticle(currentArticle)}
-          className="cursor-pointer relative overflow-hidden flex-1 flex flex-col justify-between"
+          className="cursor-pointer relative overflow-hidden flex-1 flex flex-col justify-between h-full"
         >
           {/* Background image filling container */}
-          <div className="relative w-full h-full min-h-[340px] overflow-hidden bg-slate-900 flex flex-col justify-between">
+          <div className="relative w-full h-full min-h-[420px] sm:min-h-[440px] md:min-h-[460px] overflow-hidden bg-slate-900 flex flex-col justify-between flex-1">
             <img
               src={
                 currentArticle.image ||
@@ -87,12 +87,12 @@ export const HomeMiddleFeaturedSlider: React.FC<
             />
 
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-black/25 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/30 pointer-events-none" />
 
             {/* Top Bar on Image: Category Badge & Admin Controls */}
-            <div className="relative z-10 p-3 flex items-center justify-between gap-2">
-              <span className="bg-red-700/95 text-amber-300 text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-md border border-red-500/40 backdrop-blur-xs flex items-center gap-1">
-                <Flag className="w-3 h-3 text-amber-300 fill-amber-300" />
+            <div className="relative z-10 p-3 sm:p-4 flex items-center justify-between gap-2">
+              <span className="bg-red-700/95 text-amber-300 text-[11px] sm:text-xs font-black uppercase px-3 py-1.5 rounded-md shadow-md border border-red-500/50 backdrop-blur-xs flex items-center gap-1.5 tracking-wider">
+                <Flag className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
                 <span>{currentArticle.category || 'TIÊU ĐIỂM HOẠT ĐỘNG'}</span>
               </span>
 
@@ -105,10 +105,10 @@ export const HomeMiddleFeaturedSlider: React.FC<
                         e.stopPropagation();
                         onEditArticle(currentArticle);
                       }}
-                      className="bg-black/75 hover:bg-amber-600 text-amber-200 hover:text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 backdrop-blur-xs transition-colors cursor-pointer"
+                      className="bg-black/75 hover:bg-amber-600 text-amber-200 hover:text-white px-2.5 py-1.5 rounded text-[11px] font-bold flex items-center gap-1 backdrop-blur-xs transition-colors cursor-pointer shadow-sm"
                       title="Sửa bài viết tiêu điểm"
                     >
-                      <Edit3 className="w-3 h-3" />
+                      <Edit3 className="w-3.5 h-3.5" />
                       <span>Sửa</span>
                     </button>
                   )}
@@ -125,10 +125,10 @@ export const HomeMiddleFeaturedSlider: React.FC<
                           onDeleteArticle(currentArticle.id);
                         }
                       }}
-                      className="bg-black/75 hover:bg-red-600 text-red-200 hover:text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 backdrop-blur-xs transition-colors cursor-pointer"
+                      className="bg-black/75 hover:bg-red-600 text-red-200 hover:text-white px-2.5 py-1.5 rounded text-[11px] font-bold flex items-center gap-1 backdrop-blur-xs transition-colors cursor-pointer shadow-sm"
                       title="Xóa bài viết tiêu điểm"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                       <span>Xóa</span>
                     </button>
                   )}
@@ -142,40 +142,40 @@ export const HomeMiddleFeaturedSlider: React.FC<
                 <button
                   type="button"
                   onClick={handlePrev}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-md z-20"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-lg z-20 backdrop-blur-xs hover:scale-105"
                   title="Tin trước"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-md z-20"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-lg z-20 backdrop-blur-xs hover:scale-105"
                   title="Tin kế tiếp"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </>
             )}
 
             {/* Bottom Captions Overlay */}
-            <div className="relative z-10 p-4 sm:p-5 space-y-2">
-              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition-colors leading-snug drop-shadow-md line-clamp-2">
+            <div className="relative z-10 p-5 sm:p-6 space-y-2.5">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white group-hover:text-amber-300 transition-colors leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] line-clamp-2">
                 {currentArticle.title}
               </h3>
-              <p className="text-xs text-white/85 line-clamp-2 leading-relaxed">
+              <p className="text-sm sm:text-base md:text-lg text-white/95 line-clamp-2 sm:line-clamp-3 leading-relaxed drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)] font-medium">
                 {currentArticle.excerpt}
               </p>
 
-              <div className="flex items-center justify-between text-[11px] text-white/75 pt-2 border-t border-white/20">
-                <span className="flex items-center gap-1.5 font-medium text-white/90">
-                  <UserPen className="w-3 h-3 text-amber-300" />
+              <div className="flex items-center justify-between text-xs sm:text-sm text-white/80 pt-3 border-t border-white/20">
+                <span className="flex items-center gap-2 font-medium text-white/90">
+                  <UserPen className="w-4 h-4 text-amber-300" />
                   <span>{currentArticle.author}</span>
-                  <span className="text-white/30">•</span>
+                  <span className="text-white/40">•</span>
                   <span>{currentArticle.date}</span>
                 </span>
-                <span className="flex items-center gap-1 text-white/85 font-medium">
-                  <Eye className="w-3 h-3 text-amber-300" />
+                <span className="flex items-center gap-1.5 text-white/90 font-medium">
+                  <Eye className="w-4 h-4 text-amber-300" />
                   <span>{currentArticle.views || 0} lượt xem</span>
                 </span>
               </div>
@@ -184,7 +184,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
 
           {/* Slider Dots */}
           {featuredArticles.length > 1 && (
-            <div className="bg-slate-950 py-1.5 flex items-center justify-center gap-1.5 border-t border-white/10 shrink-0">
+            <div className="bg-slate-950 py-2 flex items-center justify-center gap-2 border-t border-white/10 shrink-0">
               {featuredArticles.map((_, idx) => (
                 <button
                   key={idx}
@@ -193,10 +193,10 @@ export const HomeMiddleFeaturedSlider: React.FC<
                     e.stopPropagation();
                     setCurrentIndex(idx);
                   }}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
                     idx === currentIndex
-                      ? 'w-6 bg-amber-400'
-                      : 'w-2 bg-white/40 hover:bg-white/70'
+                      ? 'w-8 bg-amber-400 shadow-xs'
+                      : 'w-2.5 bg-white/40 hover:bg-white/70'
                   }`}
                   title={`Chuyển đến tin ${idx + 1}`}
                 />

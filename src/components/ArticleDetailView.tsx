@@ -16,6 +16,7 @@ import {
   Share2,
   Tag,
   Trash2,
+  Type,
   UserPen,
   Volume2,
   X,
@@ -54,6 +55,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [readerFontScale, setReaderFontScale] = useState<number>(100);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
 
   // Dynamic SEO update when article mounts
@@ -244,17 +246,62 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
         </button>
       </div>
 
-      {/* AI Voice Reader */}
-      <div className="space-y-2.5">
-        <AIVoiceReader
-          title="Đọc bài viết báo chí"
-          textToRead={`${article.title}. ${article.excerpt}. ${paragraphs.join('. ')}`}
-          sourceType="article"
-        />
+      {/* 4. Reading Tools Bar: AI Voice Reader & Font Size Scaler */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex-1">
+          <AIVoiceReader
+            title="Đọc bài viết báo chí"
+            textToRead={`${article.title}. ${article.excerpt}. ${paragraphs.join('. ')}`}
+            sourceType="article"
+          />
+        </div>
+
+        {/* Quick Reader Font Scaler (A- / A+) */}
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 px-2 py-1 bg-white rounded-md border border-gray-200 shadow-2xs">
+          <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
+            <Type className="w-3.5 h-3.5 text-gray-700" />
+            <span>Cỡ chữ:</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setReaderFontScale((s) => Math.max(85, s - 10))}
+              className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
+              title="Giảm cỡ chữ (A-)"
+            >
+              A-
+            </button>
+            <button
+              type="button"
+              onClick={() => setReaderFontScale(100)}
+              className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition-colors ${
+                readerFontScale === 100
+                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
+              title="Cỡ chữ mặc định 100%"
+            >
+              {readerFontScale}%
+            </button>
+            <button
+              type="button"
+              onClick={() => setReaderFontScale((s) => Math.min(150, s + 10))}
+              className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
+              title="Tăng cỡ chữ (A+)"
+            >
+              A+
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 4. Sapo / Lead Paragraph */}
-      <div className="text-sm md:text-base font-bold text-gray-800 leading-relaxed bg-amber-50/70 p-4 rounded-md border-l-4 border-red-700">
+      <div
+        className="font-bold text-gray-800 leading-relaxed bg-amber-50/70 p-4 rounded-md border-l-4 border-red-700 transition-all duration-200"
+        style={{
+          fontSize: `${(15.5 * readerFontScale) / 100}px`,
+        }}
+      >
         {article.excerpt}
       </div>
 
@@ -298,7 +345,12 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
       )}
 
       {/* 6. Body Content with interleaved Images & Floats */}
-      <div className="text-sm md:text-[15px] leading-relaxed text-gray-800 space-y-4 text-justify font-normal clear-both">
+      <div
+        className="leading-relaxed text-gray-800 space-y-4 text-justify font-normal clear-both transition-all duration-200"
+        style={{
+          fontSize: `${(15 * readerFontScale) / 100}px`,
+        }}
+      >
         {/* Float Right Image if any */}
         {floatRightImages.map((img) => (
           <div

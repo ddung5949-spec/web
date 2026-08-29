@@ -106,58 +106,58 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="p-3.5 sm:p-4 space-y-3.5 flex-1 flex flex-col justify-between">
+      <div className="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between">
         {/* Top: Primary Featured Spotlight Card */}
         <div
           onClick={() => onOpenArticle(primaryArticle)}
-          className="group grid grid-cols-1 md:grid-cols-12 gap-3.5 bg-amber-50/30 hover:bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 transition-all duration-200 cursor-pointer"
+          className="group grid grid-cols-1 md:grid-cols-12 gap-4 bg-amber-50/40 hover:bg-amber-50/80 p-3.5 sm:p-4 rounded-xl border border-amber-200/90 transition-all duration-200 cursor-pointer shadow-xs"
         >
           {/* Featured Image with Ratio */}
-          <div className="md:col-span-5 relative rounded-lg overflow-hidden bg-slate-900 aspect-16/10 shadow-xs">
+          <div className="md:col-span-5 relative rounded-lg overflow-hidden bg-slate-900 aspect-16/10 sm:aspect-4/3 md:aspect-16/10 shadow-sm">
             <img
               src={primaryArticle.image}
               alt={primaryArticle.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
             />
-            <div className="absolute top-2 left-2">
-              <span className="bg-red-700 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-xs">
+            <div className="absolute top-2.5 left-2.5">
+              <span className="bg-red-700 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-sm">
                 {primaryArticle.category}
               </span>
             </div>
           </div>
 
           {/* Featured Details */}
-          <div className="md:col-span-7 flex flex-col justify-between space-y-2">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
-                <span className="flex items-center gap-1 text-red-800 font-bold">
-                  <Calendar className="w-3 h-3 text-red-700" />
+          <div className="md:col-span-7 flex flex-col justify-between space-y-2.5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                <span className="flex items-center gap-1.5 text-red-800 font-bold">
+                  <Calendar className="w-3.5 h-3.5 text-red-700" />
                   <span>{primaryArticle.date}</span>
                 </span>
                 <span>•</span>
-                <span className="flex items-center gap-1">
-                  <UserPen className="w-3 h-3 text-gray-400" />
+                <span className="flex items-center gap-1.5">
+                  <UserPen className="w-3.5 h-3.5 text-gray-400" />
                   <span>{primaryArticle.author}</span>
                 </span>
               </div>
 
-              <h4 className="text-sm font-black text-gray-900 group-hover:text-red-700 transition-colors leading-snug line-clamp-2">
+              <h4 className="text-base sm:text-lg md:text-xl font-black text-gray-900 group-hover:text-red-700 transition-colors leading-snug line-clamp-2">
                 {primaryArticle.title}
               </h4>
 
-              <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed line-clamp-3">
                 {primaryArticle.excerpt}
               </p>
             </div>
 
-            <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between text-[11px]">
-              <span className="text-red-700 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+            <div className="pt-2.5 border-t border-amber-200/70 flex items-center justify-between text-xs">
+              <span className="text-red-700 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1.5">
                 <span>Đọc toàn văn bài viết</span>
-                <ArrowRight className="w-3 h-3" />
+                <ArrowRight className="w-3.5 h-3.5" />
               </span>
-              <span className="text-gray-400 flex items-center gap-1 text-[10px]">
-                <Eye className="w-3 h-3" />
+              <span className="text-gray-400 flex items-center gap-1 text-[11px]">
+                <Eye className="w-3.5 h-3.5" />
                 <span>{primaryArticle.views || 0} lượt đọc</span>
               </span>
             </div>
@@ -166,14 +166,14 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
 
         {/* Bottom: Sub-articles grid if available */}
         {subArticles.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {subArticles.map((art) => (
               <div
                 key={art.id}
                 onClick={() => onOpenArticle(art)}
-                className="group p-2.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-red-300 transition-all flex items-start gap-2.5 cursor-pointer shadow-2xs"
+                className="group p-3 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-red-300 transition-all flex items-start gap-3 cursor-pointer shadow-xs"
               >
-                <div className="w-16 h-14 rounded-lg overflow-hidden bg-slate-900 shrink-0">
+                <div className="w-20 h-16 rounded-lg overflow-hidden bg-slate-900 shrink-0">
                   <img
                     src={art.image}
                     alt={art.title}
@@ -181,11 +181,11 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <h5 className="text-[11px] font-bold text-gray-800 group-hover:text-red-700 leading-tight line-clamp-2 transition-colors">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h5 className="text-xs sm:text-sm font-bold text-gray-800 group-hover:text-red-700 leading-snug line-clamp-2 transition-colors">
                     {art.title}
                   </h5>
-                  <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
                     <span className="text-red-700 font-semibold">{art.category}</span>
                     <span>•</span>
                     <span>{art.date}</span>

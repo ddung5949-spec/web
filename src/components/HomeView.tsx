@@ -525,20 +525,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
           - Intelligent auto-expansion (50% Center with both, 75% Center with one side, 100% Center without sidebars)
          ======================================================== */}
       {(hasLeftColumn || hasMiddleColumn || hasRightColumn) && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full">
+        <div
+          className={`grid grid-cols-1 gap-4 lg:gap-5 items-start w-full ${
+            hasLeftColumn && hasMiddleColumn && hasRightColumn
+              ? 'lg:grid-cols-[21.5%_1fr_21.5%]'
+              : hasLeftColumn && hasMiddleColumn && !hasRightColumn
+              ? 'lg:grid-cols-[23%_1fr]'
+              : !hasLeftColumn && hasMiddleColumn && hasRightColumn
+              ? 'lg:grid-cols-[1fr_23%]'
+              : hasLeftColumn && !hasMiddleColumn && hasRightColumn
+              ? 'lg:grid-cols-2'
+              : 'grid-cols-1'
+          }`}
+        >
           {/* LEFT COLUMN */}
           {hasLeftColumn && (
-            <div
-              className={`flex flex-col gap-4 ${
-                hasMiddleColumn && hasRightColumn
-                  ? 'lg:col-span-3'
-                  : hasMiddleColumn && !hasRightColumn
-                  ? 'lg:col-span-3'
-                  : !hasMiddleColumn && hasRightColumn
-                  ? 'lg:col-span-6'
-                  : 'lg:col-span-12'
-              }`}
-            >
+            <div className="flex flex-col gap-4 w-full">
               {leftWidgets.map((widget) => {
                 switch (widget.id) {
                   case 'uncle_ho':
@@ -651,15 +653,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           {/* MIDDLE COLUMN: Auto-expand depending on active sidebars */}
           {hasMiddleColumn && (
-            <div
-              className={`flex flex-col gap-4 ${
-                hasLeftColumn && hasRightColumn
-                  ? 'lg:col-span-6'
-                  : (hasLeftColumn && !hasRightColumn) || (!hasLeftColumn && hasRightColumn)
-                  ? 'lg:col-span-9'
-                  : 'lg:col-span-12'
-              }`}
-            >
+            <div className="flex flex-col gap-4.5 w-full min-w-0">
               {showFeaturedSlider && (
                 <HomeMiddleFeaturedSlider
                   articles={approvedArticles}
@@ -687,17 +681,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           {/* RIGHT COLUMN */}
           {hasRightColumn && (
-            <div
-              className={`flex flex-col gap-4 ${
-                hasMiddleColumn && hasLeftColumn
-                  ? 'lg:col-span-3'
-                  : hasMiddleColumn && !hasLeftColumn
-                  ? 'lg:col-span-3'
-                  : !hasMiddleColumn && hasLeftColumn
-                  ? 'lg:col-span-6'
-                  : 'lg:col-span-12'
-              }`}
-            >
+            <div className="flex flex-col gap-4 w-full">
               {rightWidgets.map((widget) => {
                 switch (widget.id) {
                   case 'uncle_ho':

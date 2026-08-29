@@ -36,6 +36,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Type,
   UploadCloud,
   UsersRound,
   X,
@@ -64,7 +65,7 @@ interface CustomizerModalProps {
   ) => void;
 }
 
-type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'footer' | 'backup';
+type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'typography' | 'footer' | 'backup';
 
 export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   isOpen,
@@ -97,6 +98,23 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [enableLogoGlow, setEnableLogoGlow] = useState(siteConfig?.enableLogoGlow !== false);
   const [logoSizePx, setLogoSizePx] = useState(siteConfig?.logoSizePx || 48);
   const [footerLogoSizePx, setFooterLogoSizePx] = useState(siteConfig?.footerLogoSizePx || 38);
+
+  // Font Size & Typography Settings
+  const [scalePreset, setScalePreset] = useState<'standard' | 'large' | 'very_large' | 'maximum' | 'custom'>(
+    siteConfig?.fontSettings?.scalePreset || siteConfig?.font_settings?.scalePreset || 'standard'
+  );
+  const [globalScale, setGlobalScale] = useState<number>(
+    siteConfig?.fontSettings?.globalScale ?? siteConfig?.font_settings?.globalScale ?? 100
+  );
+  const [headingScale, setHeadingScale] = useState<number>(
+    siteConfig?.fontSettings?.headingScale ?? siteConfig?.font_settings?.headingScale ?? 100
+  );
+  const [bodyScale, setBodyScale] = useState<number>(
+    siteConfig?.fontSettings?.bodyScale ?? siteConfig?.font_settings?.bodyScale ?? 100
+  );
+  const [navWidgetScale, setNavWidgetScale] = useState<number>(
+    siteConfig?.fontSettings?.navWidgetScale ?? siteConfig?.font_settings?.navWidgetScale ?? 100
+  );
 
   // Ticker states
   const [tickerMode, setTickerMode] = useState<'manual' | 'auto_today' | 'auto_days' | 'combined'>(
@@ -240,6 +258,12 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setFooterShowContact(siteConfig?.footerShowContact !== false);
       setFooterShowSlogan(siteConfig?.footerShowSlogan !== false);
       setFooterShowBackToTop(siteConfig?.footerShowBackToTop !== false);
+      const fSettings = siteConfig?.fontSettings || siteConfig?.font_settings;
+      setScalePreset(fSettings?.scalePreset || 'standard');
+      setGlobalScale(fSettings?.globalScale ?? 100);
+      setHeadingScale(fSettings?.headingScale ?? 100);
+      setBodyScale(fSettings?.bodyScale ?? 100);
+      setNavWidgetScale(fSettings?.navWidgetScale ?? 100);
       setPendingRenames([]);
       setEditingCategoryIndex(null);
       setNewCategoryInput('');
@@ -550,6 +574,20 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       footerShowContact,
       footerShowSlogan,
       footerShowBackToTop,
+      fontSettings: {
+        scalePreset,
+        globalScale,
+        headingScale,
+        bodyScale,
+        navWidgetScale,
+      },
+      font_settings: {
+        scalePreset,
+        globalScale,
+        headingScale,
+        bodyScale,
+        navWidgetScale,
+      },
     };
 
     onSave(updatedConfig, pendingRenames);
@@ -685,6 +723,23 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             <span>5. Tông màu Giao diện</span>
           </button>
 
+          {/* TAB 6: TYPOGRAPHY & FONT SIZE SETTINGS */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('typography')}
+            className={`px-3.5 py-3 flex items-center gap-1.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'typography'
+                ? 'border-red-700 text-red-700 bg-white shadow-2xs font-extrabold'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+            }`}
+          >
+            <Type className="w-4 h-4 text-purple-600" />
+            <span>6. Cỡ chữ & Hiển thị</span>
+            <span className="bg-purple-700 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black">
+              {globalScale}%
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('footer')}
@@ -695,7 +750,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             }`}
           >
             <Info className="w-4 h-4 text-teal-700" />
-            <span>6. Chân trang & Liên hệ</span>
+            <span>7. Chân trang & Liên hệ</span>
           </button>
 
           <button
@@ -708,7 +763,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             }`}
           >
             <Database className="w-4 h-4 text-amber-600" />
-            <span>7. Sao lưu & Phục hồi Dữ liệu</span>
+            <span>8. Sao lưu & Phục hồi Dữ liệu</span>
           </button>
         </div>
 
@@ -1820,7 +1875,337 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             </div>
           )}
 
-          {/* TAB 5: FOOTER & CONTACT INFO */}
+          {/* TAB 6: TYPOGRAPHY & FONT SIZE CUSTOMIZER */}
+          {activeTab === 'typography' && (
+            <div className="space-y-5">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-4 rounded-xl border border-purple-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-400/30">
+                    <Type className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm sm:text-base text-purple-200 uppercase tracking-wide flex items-center gap-2">
+                      <span>TÙY CHỈNH CỠ CHỮ TOÀN TRANG & BÀI VIẾT</span>
+                      <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded font-black">
+                        DYNAMIC SCALE
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-purple-200/80 mt-0.5">
+                      Phóng to / thu nhỏ toàn bộ cỡ chữ giao diện, tiêu đề bài viết và nội dung đọc để phù hợp với mọi kích thước màn hình
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScalePreset('standard');
+                    setGlobalScale(100);
+                    setHeadingScale(100);
+                    setBodyScale(100);
+                    setNavWidgetScale(100);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Khôi phục chuẩn 100%</span>
+                </button>
+              </div>
+
+              {/* 1. PRESET BUTTONS */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-gray-900 uppercase text-xs flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>1. Chọn nhanh Mức cỡ chữ cài sẵn (Presets):</span>
+                  </label>
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    Đang áp dụng: <strong className="text-purple-700 font-bold">{globalScale}%</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    {
+                      id: 'standard',
+                      name: 'Tiêu chuẩn',
+                      scale: 100,
+                      desc: 'Chuẩn mặc định (100%)',
+                      tag: 'Chuẩn',
+                    },
+                    {
+                      id: 'large',
+                      name: 'Lớn vừa',
+                      scale: 115,
+                      desc: 'Dễ đọc, rõ nét (115%)',
+                      tag: 'Khuyên dùng',
+                    },
+                    {
+                      id: 'very_large',
+                      name: 'Rất lớn',
+                      scale: 130,
+                      desc: 'Màn hình máy tính lớn (130%)',
+                      tag: 'Nổi bật',
+                    },
+                    {
+                      id: 'maximum',
+                      name: 'Cực lớn',
+                      scale: 145,
+                      desc: 'Tối đa, dễ quan sát (145%)',
+                      tag: 'Đặc biệt',
+                    },
+                  ].map((p) => {
+                    const isSelected = scalePreset === p.id && globalScale === p.scale;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setScalePreset(p.id as any);
+                          setGlobalScale(p.scale);
+                          setHeadingScale(p.scale);
+                          setBodyScale(p.scale);
+                          setNavWidgetScale(p.scale);
+                        }}
+                        className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all flex flex-col justify-between relative ${
+                          isSelected
+                            ? 'border-purple-600 bg-purple-50/80 shadow-md ring-2 ring-purple-400/40'
+                            : 'border-gray-200 bg-white hover:border-purple-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span
+                            className={`font-black text-xs ${
+                              isSelected ? 'text-purple-900' : 'text-gray-900'
+                            }`}
+                          >
+                            {p.name}
+                          </span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              isSelected
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {p.tag}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-1 my-1">
+                          <span className="text-xl font-extrabold text-purple-700">{p.scale}%</span>
+                          <span className="text-[10px] text-gray-500 font-medium">quy mô</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 leading-tight mt-1">{p.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. MASTER GLOBAL SLIDER */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div>
+                    <label className="font-bold text-gray-900 text-xs flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-purple-600" />
+                      <span>2. Cỡ chữ Tổng thể toàn trang (Global Font Scale):</span>
+                    </label>
+                    <p className="text-[11px] text-gray-500">
+                      Tác động trực tiếp lên toàn bộ font chữ của hệ thống (Menu, bài viết, sidebar, bảng tin).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScalePreset('custom');
+                        setGlobalScale((prev) => Math.max(90, prev - 5));
+                      }}
+                      className="px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-xs cursor-pointer transition-colors"
+                      title="Giảm 5%"
+                    >
+                      -5%
+                    </button>
+                    <span className="px-3 py-1 bg-purple-700 text-white rounded-md font-mono font-black text-sm min-w-[62px] text-center shadow-xs">
+                      {globalScale}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScalePreset('custom');
+                        setGlobalScale((prev) => Math.min(150, prev + 5));
+                      }}
+                      className="px-2.5 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-xs cursor-pointer transition-colors"
+                      title="Tăng 5%"
+                    >
+                      +5%
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <input
+                    type="range"
+                    min={90}
+                    max={150}
+                    step={1}
+                    value={globalScale}
+                    onChange={(e) => {
+                      setScalePreset('custom');
+                      setGlobalScale(Number(e.target.value));
+                    }}
+                    className="w-full h-2.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-700"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-500 font-medium px-1">
+                    <span>90% (Nhỏ gọn)</span>
+                    <span className="font-bold text-gray-700">100% (Mặc định)</span>
+                    <span>115% (Lớn vừa)</span>
+                    <span>130% (Rất lớn)</span>
+                    <span>150% (Tối đa)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. GRANULAR DETAILED ADJUSTMENTS */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                <label className="font-black text-gray-900 uppercase text-xs flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  <span>3. Tinh chỉnh chi tiết từng khu vực (Nâng cao):</span>
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Heading Scale */}
+                  <div className="bg-white p-3.5 rounded-lg border border-gray-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800 text-[11px]">Tiêu đề (Headings)</span>
+                      <span className="font-mono font-bold text-indigo-700 text-xs bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                        {headingScale}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={90}
+                      max={150}
+                      step={1}
+                      value={headingScale}
+                      onChange={(e) => {
+                        setScalePreset('custom');
+                        setHeadingScale(Number(e.target.value));
+                      }}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      Tăng độ nổi bật cho tiêu đề bài viết và các đầu mục chuyên đề.
+                    </p>
+                  </div>
+
+                  {/* Body Scale */}
+                  <div className="bg-white p-3.5 rounded-lg border border-gray-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800 text-[11px]">Nội dung đọc (Body Text)</span>
+                      <span className="font-mono font-bold text-emerald-700 text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {bodyScale}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={90}
+                      max={150}
+                      step={1}
+                      value={bodyScale}
+                      onChange={(e) => {
+                        setScalePreset('custom');
+                        setBodyScale(Number(e.target.value));
+                      }}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      Cỡ chữ thân bài đọc chi tiết, trích dẫn Lời Bác và văn bản.
+                    </p>
+                  </div>
+
+                  {/* Nav & Widgets Scale */}
+                  <div className="bg-white p-3.5 rounded-lg border border-gray-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-800 text-[11px]">Menu & Khối Tiện ích</span>
+                      <span className="font-mono font-bold text-amber-700 text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        {navWidgetScale}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={90}
+                      max={150}
+                      step={1}
+                      value={navWidgetScale}
+                      onChange={(e) => {
+                        setScalePreset('custom');
+                        setNavWidgetScale(Number(e.target.value));
+                      }}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      Kích thước thanh điều hướng, các nút bấm thao tác và thẻ bên cột.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. LIVE PREVIEW BOX */}
+              <div className="bg-white p-4 rounded-xl border-2 border-purple-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h5 className="font-black text-gray-900 uppercase text-xs">
+                      Khung mô phỏng hiển thị trực tiếp (Live Preview):
+                    </h5>
+                  </div>
+                  <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded font-mono font-bold">
+                    Tổng thể: {globalScale}% | Tiêu đề: {headingScale}% | Thân bài: {bodyScale}%
+                  </span>
+                </div>
+
+                {/* Simulated Article Box applying font scaling */}
+                <div
+                  className="p-4 rounded-xl bg-gray-50 border border-gray-300 transition-all duration-200 shadow-inner"
+                  style={{
+                    fontSize: `${(15 * globalScale) / 100}px`,
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="bg-red-700 text-white font-bold px-2.5 py-0.5 rounded uppercase tracking-wider shadow-2xs"
+                      style={{ fontSize: `${(10 * navWidgetScale) / 100}px` }}
+                    >
+                      BẢN TIN TIÊU ĐIỂM
+                    </span>
+                    <span
+                      className="text-gray-500 font-medium"
+                      style={{ fontSize: `${(12 * navWidgetScale) / 100}px` }}
+                    >
+                      • Ngày 23 tháng 8 năm 2026
+                    </span>
+                  </div>
+
+                  <h3
+                    className="font-extrabold text-gray-950 font-serif leading-tight mb-2 hover:text-red-700 transition-colors"
+                    style={{ fontSize: `${(20 * (headingScale / 100) * (globalScale / 100))}px` }}
+                  >
+                    Trung đoàn 95 phát động đợt thi đua cao điểm: "Phát huy truyền thống, cống hiến tài năng, xứng danh Bộ đội Cụ Hồ"
+                  </h3>
+
+                  <p
+                    className="text-gray-700 leading-relaxed font-sans"
+                    style={{ fontSize: `${(15 * (bodyScale / 100) * (globalScale / 100))}px` }}
+                  >
+                    Toàn thể cán bộ, chiến sĩ trong toàn Trung đoàn quyết tâm giữ vững kỷ luật, nâng cao chất lượng huấn luyện sẵn sàng chiến đấu, chủ động khắc phục khó khăn, hoàn thành xuất sắc mọi nhiệm vụ được giao.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: FOOTER & CONTACT INFO */}
           {activeTab === 'footer' && (
             <div className="space-y-4">
               {/* 1. Bố cục Chân trang */}

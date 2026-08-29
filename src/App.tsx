@@ -483,6 +483,20 @@ export function App() {
     safeStore.set('mangyang_site_config', siteConfig);
   }, [siteConfig]);
 
+  // Dynamic Global Font Scaling based on Admin configuration
+  useEffect(() => {
+    const settings = siteConfig?.fontSettings || siteConfig?.font_settings;
+    const globalScale = (settings?.globalScale ?? 100) / 100;
+    const headingScale = (settings?.headingScale ?? 100) / 100;
+    const bodyScale = (settings?.bodyScale ?? 100) / 100;
+    const navWidgetScale = (settings?.navWidgetScale ?? 100) / 100;
+
+    document.documentElement.style.setProperty('--app-font-scale', globalScale.toString());
+    document.documentElement.style.setProperty('--heading-font-scale', headingScale.toString());
+    document.documentElement.style.setProperty('--body-font-scale', bodyScale.toString());
+    document.documentElement.style.setProperty('--nav-widget-scale', navWidgetScale.toString());
+  }, [siteConfig?.fontSettings, siteConfig?.font_settings]);
+
   useEffect(() => {
     safeStore.set('mangyang_users', users);
   }, [users]);

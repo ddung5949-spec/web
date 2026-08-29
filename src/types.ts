@@ -471,6 +471,14 @@ export interface NavTabItem {
   order: number;
 }
 
+export interface FontSettings {
+  scalePreset?: 'standard' | 'large' | 'very_large' | 'maximum' | 'custom'; // 100%, 115%, 130%, 145%
+  globalScale: number; // 90 to 150 (percentage, default: 100)
+  headingScale?: number; // 90 to 150 (percentage, default: 100)
+  bodyScale?: number; // 90 to 150 (percentage, default: 100)
+  navWidgetScale?: number; // 90 to 150 (percentage, default: 100)
+}
+
 export interface SiteConfig {
   title: string;
   subtitle: string;
@@ -478,6 +486,8 @@ export interface SiteConfig {
   ticker: string;
   colorRed: string;
   colorGreen: string;
+  fontSettings?: FontSettings;
+  font_settings?: FontSettings;
   logoType?: 'official_vector' | 'custom_image';
   customLogoUrl?: string;
   enableLogoBeam?: boolean;

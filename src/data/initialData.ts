@@ -223,6 +223,13 @@ export const defaultSiteConfig: SiteConfig = {
   ticker: '★ Trung đoàn 95, Sư đoàn 2: Phát huy truyền thống "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG" trong mọi nhiệm vụ SSCĐ và xây dựng đơn vị.',
   colorRed: '#b91c1c',
   colorGreen: '#143d2b',
+  fontSettings: {
+    scalePreset: 'standard',
+    globalScale: 100,
+    headingScale: 100,
+    bodyScale: 100,
+    navWidgetScale: 100,
+  },
   logoType: 'official_vector',
   customLogoUrl: '',
   enableLogoBeam: true,

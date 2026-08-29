@@ -21,6 +21,18 @@
   --border: #e2e8f0;
   --text-dark: #0f172a;
   --text-muted: #64748b;
+  --app-font-scale: 1;
+  --heading-font-scale: 1;
+  --body-font-scale: 1;
+  --nav-widget-scale: 1;
+}
+
+html {
+  font-size: calc(16px * var(--app-font-scale, 1));
+  font-family: 'Be Vietnam Pro', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
