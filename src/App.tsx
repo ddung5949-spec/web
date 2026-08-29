@@ -345,10 +345,10 @@ export function App() {
               categoryName:
                 val.category_name ||
                 (k === 'safety'
-                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
                   : k === 'traffic'
-                  ? 'Mỗi ngày một tình huống giao thông'
-                  : 'Mỗi ngày một hành động đẹp'),
+                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
               title: val.title || '',
               imageUrl: val.image_data,
               aspectRatioMode: (val.aspect_ratio as any) || 'auto',

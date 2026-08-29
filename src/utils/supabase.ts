@@ -987,11 +987,11 @@ export const supabaseDb = {
                 categoryName:
                   val?.categoryName ||
                   (key === 'safety_message'
-                    ? 'Mỗi ngày 1 thông điệp an toàn'
+                    ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
                     : key === 'traffic_situation'
-                    ? 'Mỗi ngày một tình huống giao thông'
+                    ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
                     : key === 'good_deed'
-                    ? 'Mỗi ngày một hành động đẹp'
+                    ? 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'
                     : 'Chuyên mục hằng ngày'),
                 title: val?.title || '',
                 content: val?.content || '',
@@ -1010,11 +1010,11 @@ export const supabaseDb = {
               categoryName:
                 val?.categoryName ||
                 (key === 'safety_message'
-                  ? 'Mỗi ngày 1 thông điệp an toàn'
+                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
                   : key === 'traffic_situation'
-                  ? 'Mỗi ngày một tình huống giao thông'
+                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
                   : key === 'good_deed'
-                  ? 'Mỗi ngày một hành động đẹp'
+                  ? 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'
                   : 'Chuyên mục hằng ngày'),
               title: val?.title || '',
               content: val?.content || '',
@@ -1041,11 +1041,11 @@ export const supabaseDb = {
                   pRow.category_name ||
                   pRow.categoryName ||
                   (key === 'safety_message' || key === 'safety'
-                    ? 'Mỗi ngày 1 thông điệp an toàn'
+                    ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
                     : key === 'traffic_situation' || key === 'traffic'
-                    ? 'Mỗi ngày một tình huống giao thông'
+                    ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
                     : key === 'good_deed'
-                    ? 'Mỗi ngày một hành động đẹp'
+                    ? 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'
                     : 'Chuyên mục hằng ngày');
                 const title = pRow.title || catName;
                 const updatedAt = pRow.updated_at || pRow.updatedAt || '';

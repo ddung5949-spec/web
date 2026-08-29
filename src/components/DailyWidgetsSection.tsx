@@ -144,7 +144,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
           headerBg: 'bg-gradient-to-r from-red-800 to-rose-900',
           borderColor: 'border-red-200 hover:border-red-400',
           titleColor: 'text-red-900',
-          defaultCategory: 'Mỗi ngày 1 thông điệp an toàn',
+          defaultCategory: 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
         };
       case 'traffic_situation':
         return {
@@ -153,7 +153,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
           headerBg: 'bg-gradient-to-r from-amber-700 to-yellow-800',
           borderColor: 'border-amber-200 hover:border-amber-400',
           titleColor: 'text-amber-950',
-          defaultCategory: 'Mỗi ngày một tình huống giao thông',
+          defaultCategory: 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
         };
       case 'good_deed':
       default:
@@ -163,7 +163,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
           headerBg: 'bg-gradient-to-r from-emerald-800 to-teal-900',
           borderColor: 'border-emerald-200 hover:border-emerald-400',
           titleColor: 'text-emerald-950',
-          defaultCategory: 'Mỗi ngày một hành động đẹp',
+          defaultCategory: 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP',
         };
     }
   };
@@ -181,12 +181,12 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
             className={`bg-white rounded-xl border ${config.borderColor} shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col`}
           >
             {/* Widget Header */}
-            <div className={`${config.headerBg} text-white px-3 py-2 flex items-center justify-between`}>
+            <div className={`${config.headerBg} text-white px-3.5 py-2.5 flex items-center justify-between`}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="p-1 rounded bg-white/20 shrink-0">
                   <IconComponent className="w-4 h-4 text-amber-300" />
                 </span>
-                <span className="font-extrabold text-xs tracking-wide uppercase truncate">
+                <span className="font-bold text-sm sm:text-base tracking-wide uppercase text-white truncate">
                   {widget.categoryName || config.defaultCategory}
                 </span>
               </div>

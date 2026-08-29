@@ -180,7 +180,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
             {/* Tiêu đề bài viết: Tăng cỡ chữ to, rõ ràng, in hoa đậm */}
             <h3
               onClick={() => onOpenArticle(currentArticle)}
-              className="text-xl sm:text-2xl font-bold text-gray-900 hover:text-red-700 transition-colors line-clamp-2 leading-snug cursor-pointer uppercase font-serif"
+              className="text-xl sm:text-2xl font-bold text-gray-900 hover:text-red-700 transition-colors line-clamp-2 leading-snug cursor-pointer uppercase font-sans"
             >
               {currentArticle.title}
             </h3>

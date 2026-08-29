@@ -92,10 +92,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   // Find default fallback
   const defaultCategoryTitle =
     posterKey === 'safety'
-      ? 'Mỗi ngày 1 thông điệp an toàn'
+      ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
       : posterKey === 'traffic'
-      ? 'Mỗi ngày một tình huống giao thông'
-      : 'Mỗi ngày một hành động đẹp';
+      ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+      : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP';
 
   const defaultItem: DailyWidgetItem = {
     id: cleanId,
@@ -176,7 +176,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           badgeColor: 'bg-red-700 text-white',
           headerBg: 'bg-gradient-to-r from-red-800 to-rose-900',
           borderColor: 'border-red-200 hover:border-red-400',
-          defaultCategory: 'Mỗi ngày 1 thông điệp an toàn',
+          defaultCategory: 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
         };
       case 'traffic':
       case 'traffic_situation':
@@ -186,7 +186,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           badgeColor: 'bg-amber-600 text-white',
           headerBg: 'bg-gradient-to-r from-amber-700 to-yellow-800',
           borderColor: 'border-amber-200 hover:border-amber-400',
-          defaultCategory: 'Mỗi ngày một tình huống giao thông',
+          defaultCategory: 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
         };
       case 'good_deed':
       case 'widget_good_deed':
@@ -196,7 +196,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           badgeColor: 'bg-emerald-700 text-white',
           headerBg: 'bg-gradient-to-r from-emerald-800 to-teal-900',
           borderColor: 'border-emerald-200 hover:border-emerald-400',
-          defaultCategory: 'Mỗi ngày một hành động đẹp',
+          defaultCategory: 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP',
         };
     }
   };
@@ -379,12 +379,12 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
         className={`bg-white rounded-xl border ${styleConfig.borderColor} shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col`}
       >
         {/* 1. Header: Title + Icon + Admin Edit Button */}
-        <div className={`${styleConfig.headerBg} text-white px-3 py-2 flex items-center justify-between shadow-2xs`}>
+        <div className={`${styleConfig.headerBg} text-white px-3.5 py-2.5 flex items-center justify-between shadow-2xs`}>
           <div className="flex items-center gap-2 min-w-0">
             <span className="p-1 rounded-md bg-white/20 shrink-0 shadow-inner">
               <IconComponent className="w-4 h-4 text-amber-300" />
             </span>
-            <span className="font-black text-xs tracking-wide uppercase truncate">
+            <span className="font-bold text-sm sm:text-base tracking-wide uppercase text-white truncate">
               {currentItem.categoryName || styleConfig.defaultCategory}
             </span>
           </div>

@@ -24,28 +24,28 @@ import {
 export const defaultSidebarWidgets: SidebarWidgetSetting[] = [
   {
     id: 'uncle_ho',
-    name: 'Lời Bác dạy ngày này năm xưa',
+    name: 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
     side: 'left',
     order: 1,
     enabled: true,
   },
   {
     id: 'safety_message',
-    name: 'Mỗi ngày 1 thông điệp an toàn',
+    name: 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
     side: 'left',
     order: 2,
     enabled: true,
   },
   {
     id: 'traffic_situation',
-    name: 'Mỗi ngày một tình huống giao thông',
+    name: 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
     side: 'left',
     order: 3,
     enabled: true,
   },
   {
     id: 'good_deed',
-    name: 'Mỗi ngày một hành động đẹp',
+    name: 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP',
     side: 'left',
     order: 4,
     enabled: true,
@@ -87,7 +87,7 @@ export const defaultNavTabs: NavTabItem[] = [
 export const defaultDailyWidgets: DailyWidgetItem[] = [
   {
     id: 'safety_message',
-    categoryName: 'Mỗi ngày 1 thông điệp an toàn',
+    categoryName: 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
     title: '',
     content: '',
     imageUrl: '',
@@ -95,7 +95,7 @@ export const defaultDailyWidgets: DailyWidgetItem[] = [
   },
   {
     id: 'traffic_situation',
-    categoryName: 'Mỗi ngày một tình huống giao thông',
+    categoryName: 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
     title: '',
     content: '',
     imageUrl: '',
@@ -103,7 +103,7 @@ export const defaultDailyWidgets: DailyWidgetItem[] = [
   },
   {
     id: 'good_deed',
-    categoryName: 'Mỗi ngày một hành động đẹp',
+    categoryName: 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP',
     title: '',
     content: '',
     imageUrl: '',

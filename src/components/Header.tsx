@@ -392,25 +392,16 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
             ) : (
-              /* Chưa đăng nhập: Hiển thị các nút Đăng nhập / Đăng ký rõ ràng */
+              /* Chưa đăng nhập: Chỉ giữ lại duy nhất nút "ĐĂNG NHẬP" nền đỏ viền vàng */
               <div className="flex items-center gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   id="header-login-btn"
                   onClick={() => onOpenAuth('login')}
-                  className="bg-black/25 hover:bg-black/40 text-white px-3 sm:px-3.5 py-1.5 rounded-lg border border-white/30 flex items-center gap-1.5 font-bold transition-all cursor-pointer text-xs shadow-xs"
+                  className="bg-red-800 hover:bg-red-700 text-amber-200 hover:text-white px-3 sm:px-4 py-1.5 rounded-lg border-2 border-amber-400 font-extrabold flex items-center gap-1.5 transition-all cursor-pointer text-xs uppercase shadow-xs tracking-wide"
                 >
                   <Lock className="w-3.5 h-3.5 text-amber-300" />
                   <span>ĐĂNG NHẬP</span>
-                </button>
-                <button
-                  type="button"
-                  id="header-register-btn"
-                  onClick={() => onOpenAuth('register')}
-                  className="bg-amber-400 hover:bg-amber-300 text-red-950 px-3 sm:px-3.5 py-1.5 rounded-lg font-extrabold flex items-center gap-1 transition-all cursor-pointer text-xs uppercase shadow-xs border border-amber-300"
-                >
-                  <UserPlus className="w-3.5 h-3.5 text-red-900" />
-                  <span>ĐĂNG KÝ</span>
                 </button>
               </div>
             )}

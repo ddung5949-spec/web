@@ -2188,7 +2188,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                   </div>
 
                   <h3
-                    className="font-extrabold text-gray-950 font-serif leading-tight mb-2 hover:text-red-700 transition-colors"
+                    className="font-extrabold text-gray-950 font-sans leading-tight mb-2 hover:text-red-700 transition-colors"
                     style={{ fontSize: `${(20 * (headingScale / 100) * (globalScale / 100))}px` }}
                   >
                     Trung đoàn 95 phát động đợt thi đua cao điểm: "Phát huy truyền thống, cống hiến tài năng, xứng danh Bộ đội Cụ Hồ"

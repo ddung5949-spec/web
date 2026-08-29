@@ -176,7 +176,7 @@ export const HomeMiddleFeatured: React.FC<HomeMiddleFeaturedProps> = ({
               {/* Tiêu đề bài viết */}
               <h3
                 onClick={() => onOpenArticle(currentArticle)}
-                className="text-xl sm:text-2xl font-bold text-gray-900 hover:text-red-700 transition-colors line-clamp-2 leading-snug cursor-pointer uppercase font-serif"
+                className="text-xl sm:text-2xl font-bold text-gray-900 hover:text-red-700 transition-colors line-clamp-2 leading-snug cursor-pointer uppercase font-sans"
               >
                 {currentArticle.title}
               </h3>

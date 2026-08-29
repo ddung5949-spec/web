@@ -172,17 +172,17 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#FFFDF5] via-[#FFFBF0] to-[#FFF7E6] text-gray-900 shadow-md border-2 border-amber-400/80 flex flex-col justify-between"
     >
       {/* 1. Header Trang trọng */}
-      <div className="bg-gradient-to-r from-red-850 via-red-900 to-red-950 text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-400/60">
+      <div className="bg-red-800 text-white px-3.5 py-2.5 flex items-center justify-between shadow-xs border-b border-amber-400/60">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0 shadow-inner">
-            <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300 animate-pulse" />
+          <div className="w-6 h-6 rounded-full bg-yellow-400/20 border border-yellow-300/40 flex items-center justify-center shrink-0 shadow-inner">
+            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 animate-pulse" />
           </div>
           <div>
-            <h2 className="text-xs sm:text-[13px] font-black uppercase tracking-wide text-amber-300 leading-none">
+            <h2 className="text-xs sm:text-[14px] font-black uppercase tracking-wide text-yellow-400 leading-none">
               {settings?.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA'}
             </h2>
-            <p className="text-[10px] text-amber-100/80 font-medium tracking-tight mt-0.5">
-              Học tập và làm theo tư tưởng, đạo đức, phong cách Hồ Chí Minh
+            <p className="text-xs sm:text-sm text-yellow-100 font-medium tracking-tight mt-1 leading-snug">
+              Học tập, thực hành tư tưởng, đạo đức, phương pháp, phong cách Hồ Chí Minh trong giai đoạn phát triển mới
             </p>
           </div>
         </div>
@@ -192,7 +192,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           <button
             type="button"
             onClick={onOpenManager}
-            className="flex items-center gap-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 hover:text-amber-100 text-[11px] font-bold px-2 py-1 rounded-md border border-amber-300/40 transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1 bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-200 hover:text-yellow-100 text-[11px] font-bold px-2 py-1 rounded-md border border-yellow-300/40 transition-all cursor-pointer shadow-xs shrink-0 ml-2"
             title="Quản lý Album ảnh và Nội dung Lời Bác dạy"
           >
             <Settings2 className="w-3 h-3" />
@@ -405,9 +405,9 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           <button
             type="button"
             onClick={() => setIsDetailsModalOpen(true)}
-            className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-850 to-red-900 hover:from-red-900 hover:to-red-950 text-amber-200 hover:text-amber-100 text-xs font-bold py-1.5 px-3 rounded-lg border border-amber-400/60 shadow-xs transition-all cursor-pointer active:scale-98"
+            className="w-full flex items-center justify-center gap-1.5 bg-red-800 hover:bg-red-900 text-yellow-300 hover:text-yellow-200 text-xs sm:text-sm font-bold py-2 px-3 rounded-lg border border-yellow-400 shadow-xs transition-all cursor-pointer active:scale-98"
           >
-            <BookOpen className="w-3.5 h-3.5 text-amber-300" />
+            <BookOpen className="w-3.5 h-3.5 text-yellow-400" />
             <span>Xem Bối cảnh lịch sử & Bài học vận dụng</span>
           </button>
         </div>

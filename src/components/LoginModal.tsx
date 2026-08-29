@@ -110,7 +110,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <div className="bg-[#143d2b] text-white p-3.5 px-5 flex items-center justify-between border-b-2 border-[#fbbf24]">
           <div className="flex items-center gap-3 font-bold text-amber-300 text-sm tracking-wide">
             <UnitLogo size="sm" withGlow withRotatingBeam />
-            <span className="uppercase">ĐĂNG NHẬP HỆ THỐNG QUẢN TRỊ</span>
+            <span className="uppercase">TRUYỀN THÔNG ĐOÀN MANG YANG</span>
           </div>
           <button
             type="button"
@@ -152,17 +152,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-gray-500" />
-                <span>Email tài khoản (*):</span>
+                <span>Email hoặc tên tài khoản (*):</span>
               </label>
               <input
-                type="email"
+                type="text"
                 id="login-email-input"
                 value={emailInput}
                 onChange={(e) => {
                   setEmailInput(e.target.value);
                   if (errorMessage) setErrorMessage(null);
                 }}
-                placeholder="Nhập địa chỉ email đăng nhập (ví dụ: ddung5949@gmail.com)..."
+                placeholder="Nhập email hoặc tên tài khoản..."
                 className="w-full text-xs p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-hidden transition-all placeholder:text-gray-400"
                 required
                 autoFocus
