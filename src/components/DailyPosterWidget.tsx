@@ -6,14 +6,10 @@ import {
   Edit3,
   Image as ImageIcon,
   Upload,
-  Sparkles,
   Loader2,
   Maximize2,
   X,
   Check,
-  RotateCcw,
-  Sliders,
-  ExternalLink,
 } from 'lucide-react';
 import { DailyWidgetItem, User } from '../types';
 import { defaultDailyWidgets } from '../data/initialData';

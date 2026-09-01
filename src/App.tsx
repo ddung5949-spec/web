@@ -53,19 +53,45 @@ import { ApprovalsView } from './components/ApprovalsView';
 import { UserManagementView } from './components/UserManagementView';
 import { Footer } from './components/Footer';
 
-// Modals
+// Modals - Code-Split using React.lazy & Suspense for fast initial bundle
 import { LoginModal } from './components/LoginModal';
-import { ProfileModal } from './components/modals/ProfileModal';
-import { CustomizerModal } from './components/modals/CustomizerModal';
-import { PostArticleModal } from './components/modals/PostArticleModal';
-import { AddDocModal } from './components/modals/AddDocModal';
-import { AddLectureModal } from './components/modals/AddLectureModal';
-import { UncleHoManagerModal } from './components/modals/UncleHoManagerModal';
-import { HomeAnnouncementManagerModal } from './components/modals/HomeAnnouncementManagerModal';
-import { TabIntroManagerModal } from './components/modals/TabIntroManagerModal';
-import { QuickActionManagerModal } from './components/modals/QuickActionManagerModal';
-import { AccessDeniedModal } from './components/modals/AccessDeniedModal';
-import { LayoutManagerModal } from './components/modals/LayoutManagerModal';
+const ProfileModal = React.lazy(() =>
+  import('./components/modals/ProfileModal').then((m) => ({ default: m.ProfileModal }))
+);
+const CustomizerModal = React.lazy(() =>
+  import('./components/modals/CustomizerModal').then((m) => ({ default: m.CustomizerModal }))
+);
+const PostArticleModal = React.lazy(() =>
+  import('./components/modals/PostArticleModal').then((m) => ({ default: m.PostArticleModal }))
+);
+const AddDocModal = React.lazy(() =>
+  import('./components/modals/AddDocModal').then((m) => ({ default: m.AddDocModal }))
+);
+const AddLectureModal = React.lazy(() =>
+  import('./components/modals/AddLectureModal').then((m) => ({ default: m.AddLectureModal }))
+);
+const UncleHoManagerModal = React.lazy(() =>
+  import('./components/modals/UncleHoManagerModal').then((m) => ({ default: m.UncleHoManagerModal }))
+);
+const HomeAnnouncementManagerModal = React.lazy(() =>
+  import('./components/modals/HomeAnnouncementManagerModal').then((m) => ({
+    default: m.HomeAnnouncementManagerModal,
+  }))
+);
+const TabIntroManagerModal = React.lazy(() =>
+  import('./components/modals/TabIntroManagerModal').then((m) => ({ default: m.TabIntroManagerModal }))
+);
+const QuickActionManagerModal = React.lazy(() =>
+  import('./components/modals/QuickActionManagerModal').then((m) => ({
+    default: m.QuickActionManagerModal,
+  }))
+);
+const AccessDeniedModal = React.lazy(() =>
+  import('./components/modals/AccessDeniedModal').then((m) => ({ default: m.AccessDeniedModal }))
+);
+const LayoutManagerModal = React.lazy(() =>
+  import('./components/modals/LayoutManagerModal').then((m) => ({ default: m.LayoutManagerModal }))
+);
 import { getSupabase, supabase, supabaseAuth, supabaseDb } from './utils/supabase';
 
 // Home Widgets for 3-Column Layout
@@ -2649,7 +2675,7 @@ export function App() {
         onSelectPage={handleSelectPage}
       />
 
-      {/* 6. Modals */}
+      {/* 6. Modals (Suspense Code-Splitting) */}
       <LoginModal
         isOpen={authModal.isOpen}
         onClose={() => setAuthModal({ isOpen: false, tab: 'login' })}
@@ -2659,111 +2685,129 @@ export function App() {
         showToast={showToast}
       />
 
-      <ProfileModal
-        isOpen={profileModalOpen}
-        currentUser={currentUser}
-        onClose={() => setProfileModalOpen(false)}
-        onSaveProfile={handleSaveProfile}
-        showToast={showToast}
-      />
+      <React.Suspense fallback={null}>
+        {profileModalOpen && (
+          <ProfileModal
+            isOpen={profileModalOpen}
+            currentUser={currentUser}
+            onClose={() => setProfileModalOpen(false)}
+            onSaveProfile={handleSaveProfile}
+            showToast={showToast}
+          />
+        )}
 
-      <CustomizerModal
-        isOpen={customizerModalOpen}
-        siteConfig={siteConfig}
-        articles={articles}
-        onClose={() => setCustomizerModalOpen(false)}
-        onSave={handleSaveCustomizer}
-      />
+        {customizerModalOpen && (
+          <CustomizerModal
+            isOpen={customizerModalOpen}
+            siteConfig={siteConfig}
+            articles={articles}
+            onClose={() => setCustomizerModalOpen(false)}
+            onSave={handleSaveCustomizer}
+          />
+        )}
 
-      <PostArticleModal
-        isOpen={postModal.isOpen}
-        sectionKey={postModal.section}
-        articleToEdit={postModal.articleToEdit}
-        currentUser={currentUser}
-        siteConfig={siteConfig}
-        onClose={() => setPostModal({ isOpen: false, section: 'ctd', articleToEdit: null })}
-        onSubmitArticle={handlePostArticle}
-        onUpdateArticle={handleUpdateArticle}
-        onDeleteArticle={handleDeleteArticle}
-      />
+        {postModal.isOpen && (
+          <PostArticleModal
+            isOpen={postModal.isOpen}
+            sectionKey={postModal.section}
+            articleToEdit={postModal.articleToEdit}
+            currentUser={currentUser}
+            siteConfig={siteConfig}
+            onClose={() => setPostModal({ isOpen: false, section: 'ctd', articleToEdit: null })}
+            onSubmitArticle={handlePostArticle}
+            onUpdateArticle={handleUpdateArticle}
+            onDeleteArticle={handleDeleteArticle}
+          />
+        )}
 
-      <AddDocModal
-        isOpen={addDocModalOpen}
-        onClose={() => setAddDocModalOpen(false)}
-        onAddDoc={handleAddDoc}
-      />
+        {addDocModalOpen && (
+          <AddDocModal
+            isOpen={addDocModalOpen}
+            onClose={() => setAddDocModalOpen(false)}
+            onAddDoc={handleAddDoc}
+          />
+        )}
 
-      <AddLectureModal
-        isOpen={lectureModal.isOpen}
-        currentUser={currentUser}
-        lectureToEdit={lectureModal.lectureToEdit}
-        onClose={() => setLectureModal({ isOpen: false, lectureToEdit: null })}
-        onAddLecture={handleAddLecture}
-        onUpdateLecture={handleUpdateLecture}
-      />
+        {lectureModal.isOpen && (
+          <AddLectureModal
+            isOpen={lectureModal.isOpen}
+            currentUser={currentUser}
+            lectureToEdit={lectureModal.lectureToEdit}
+            onClose={() => setLectureModal({ isOpen: false, lectureToEdit: null })}
+            onAddLecture={handleAddLecture}
+            onUpdateLecture={handleUpdateLecture}
+          />
+        )}
 
-      <UncleHoManagerModal
-        isOpen={uncleHoManagerOpen}
-        onClose={() => setUncleHoManagerOpen(false)}
-        quotes={uncleHoQuotes}
-        settings={uncleHoSettings}
-        onSaveQuotes={handleSaveUncleHoQuotes}
-        onSaveSettings={handleSaveUncleHoSettings}
-      />
+        {uncleHoManagerOpen && (
+          <UncleHoManagerModal
+            isOpen={uncleHoManagerOpen}
+            onClose={() => setUncleHoManagerOpen(false)}
+            quotes={uncleHoQuotes}
+            settings={uncleHoSettings}
+            onSaveQuotes={handleSaveUncleHoQuotes}
+            onSaveSettings={handleSaveUncleHoSettings}
+          />
+        )}
 
-      <HomeAnnouncementManagerModal
-        isOpen={announcementManagerOpen}
-        announcements={siteConfig.homeAnnouncements || []}
-        onClose={() => setAnnouncementManagerOpen(false)}
-        onSaveAnnouncements={handleSaveAnnouncements}
-      />
+        {announcementManagerOpen && (
+          <HomeAnnouncementManagerModal
+            isOpen={announcementManagerOpen}
+            announcements={siteConfig.homeAnnouncements || []}
+            onClose={() => setAnnouncementManagerOpen(false)}
+            onSaveAnnouncements={handleSaveAnnouncements}
+          />
+        )}
 
-      <TabIntroManagerModal
-        isOpen={tabIntroModal.isOpen}
-        initialTab={tabIntroModal.tabKey}
-        siteConfig={siteConfig}
-        onClose={() => setTabIntroModal({ isOpen: false, tabKey: 'doc' })}
-        onSaveSiteConfig={handleSaveCustomizer}
-      />
+        {tabIntroModal.isOpen && (
+          <TabIntroManagerModal
+            isOpen={tabIntroModal.isOpen}
+            initialTab={tabIntroModal.tabKey}
+            siteConfig={siteConfig}
+            onClose={() => setTabIntroModal({ isOpen: false, tabKey: 'doc' })}
+            onSaveSiteConfig={handleSaveCustomizer}
+          />
+        )}
 
-      {isQuickActionModalOpen && (
-        <QuickActionManagerModal
-          cards={
-            siteConfig.quickActionCards ||
-            siteConfig.homeQuickActions ||
-            defaultQuickActionCards
-          }
-          onClose={() => setIsQuickActionModalOpen(false)}
-          onSave={handleSaveQuickActions}
-        />
-      )}
+        {isQuickActionModalOpen && (
+          <QuickActionManagerModal
+            cards={
+              siteConfig.quickActionCards ||
+              siteConfig.homeQuickActions ||
+              defaultQuickActionCards
+            }
+            onClose={() => setIsQuickActionModalOpen(false)}
+            onSave={handleSaveQuickActions}
+          />
+        )}
 
-      {/* Layout Manager Modal */}
-      {isLayoutModalOpen && (
-        <LayoutManagerModal
-          isOpen={isLayoutModalOpen}
-          siteConfig={siteConfig}
-          onClose={() => setIsLayoutModalOpen(false)}
-          onSaveLayout={handleSaveLayoutSettings}
-        />
-      )}
+        {isLayoutModalOpen && (
+          <LayoutManagerModal
+            isOpen={isLayoutModalOpen}
+            siteConfig={siteConfig}
+            onClose={() => setIsLayoutModalOpen(false)}
+            onSaveLayout={handleSaveLayoutSettings}
+          />
+        )}
 
-      {/* Access Denied Warning Modal */}
-      <AccessDeniedModal
-        isOpen={accessDeniedModal.isOpen}
-        title={accessDeniedModal.title}
-        message={accessDeniedModal.message}
-        requiredRole={accessDeniedModal.requiredRole}
-        onClose={() => setAccessDeniedModal({ isOpen: false })}
-        onOpenLogin={() => {
-          setAccessDeniedModal({ isOpen: false });
-          setAuthModal({ isOpen: true, tab: 'login' });
-        }}
-        onGoHome={() => {
-          setAccessDeniedModal({ isOpen: false });
-          setCurrentPage('home');
-        }}
-      />
+        {accessDeniedModal.isOpen && (
+          <AccessDeniedModal
+            isOpen={accessDeniedModal.isOpen}
+            title={accessDeniedModal.title}
+            message={accessDeniedModal.message}
+            requiredRole={accessDeniedModal.requiredRole}
+            onClose={() => setAccessDeniedModal({ isOpen: false })}
+            onOpenLogin={() => {
+              setAccessDeniedModal({ isOpen: false });
+              setAuthModal({ isOpen: true, tab: 'login' });
+            }}
+            onGoHome={() => {
+              setAccessDeniedModal({ isOpen: false });
+              setCurrentPage('home');
+            }}
+          />
+        )}
+      </React.Suspense>
 
       {/* 7. Real-time Toast Notification Feedback */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

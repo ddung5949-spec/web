@@ -366,15 +366,12 @@ export const supabaseDb = {
     if (!supabase) return null;
 
     try {
-      // 1. ĐƠN GIẢN HÓA VÀ NỚI LỎNG CÂU LỆNH TRUY VẤN (BỎ HẾT ĐIỀU KIỆN CHẶN CỨNG)
       let { data, error } = await supabase
         .from('articles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Fallback nếu cột created_at không tồn tại hoặc lỗi sắp xếp
       if (error) {
-        console.warn('Truy vấn order created_at thất bại, thử sắp xếp theo id:', error.message);
         const resId = await supabase
           .from('articles')
           .select('*')
@@ -390,11 +387,7 @@ export const supabaseDb = {
         }
       }
 
-      // Log kiểm tra dữ liệu từ Supabase theo yêu cầu
-      console.log("Danh sách articles từ Supabase:", data, error);
-
       if (error) {
-        console.error("Lỗi khi lấy dữ liệu articles từ Supabase:", error);
         return null;
       }
 
@@ -402,10 +395,8 @@ export const supabaseDb = {
         return [];
       }
 
-      // Map toàn bộ rows từ Supabase sang kiểu Article với phân loại tự động
       return data.map((item: any): Article => supabaseDb.mapRowToArticle(item));
-    } catch (e) {
-      console.error('Lỗi khi fetchArticles từ Supabase:', e);
+    } catch {
       return null;
     }
   },
