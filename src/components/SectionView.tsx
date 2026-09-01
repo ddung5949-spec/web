@@ -117,11 +117,16 @@ export const SectionView: React.FC<SectionViewProps> = ({
     },
   }[sectionKey];
 
-  const customSec = siteConfig?.sections?.[sectionKey as keyof typeof siteConfig.sections];
-  const sectionTitle = customSec?.title || baseConfig.title;
-  const sectionSubtitle = customSec?.subTitle || customSec?.desc || baseConfig.subTitle;
+  const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
+  const configuredCategory = Array.isArray(categoriesList)
+    ? categoriesList.find((c: any) => c.id === sectionKey)
+    : undefined;
 
-  const Icon = baseConfig.icon;
+  const customSec = siteConfig?.sections?.[sectionKey as keyof typeof siteConfig.sections];
+  const sectionTitle = configuredCategory?.name || customSec?.title || baseConfig?.title || 'Chuyên mục';
+  const sectionSubtitle = configuredCategory?.description || customSec?.subTitle || customSec?.desc || baseConfig?.subTitle || '';
+
+  const Icon = baseConfig?.icon || Shield;
 
   const rawSectionArticles = useMemo(() => {
     return articles.filter((a) => {
@@ -131,7 +136,13 @@ export const SectionView: React.FC<SectionViewProps> = ({
   }, [articles, sectionKey]);
 
   const availableCategories = useMemo(() => {
-    const baseCats: string[] = (customSec && (customSec as any).categories?.length > 0)
+    const fromConfigCats = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
+      ? configuredCategory.subcategories
+      : undefined;
+
+    const baseCats: string[] = fromConfigCats
+      ? fromConfigCats
+      : (customSec && (customSec as any).categories?.length > 0)
       ? (customSec as any).categories
       : categoryOptions[sectionKey] || [];
 
@@ -140,7 +151,7 @@ export const SectionView: React.FC<SectionViewProps> = ({
       .filter((cat): cat is string => Boolean(cat && !baseCats.some((b) => b.toLowerCase() === cat.toLowerCase())));
 
     return Array.from(new Set([...baseCats, ...extraCats]));
-  }, [customSec, sectionKey, rawSectionArticles]);
+  }, [configuredCategory, customSec, sectionKey, rawSectionArticles]);
 
   const totalViews = useMemo(() => {
     return rawSectionArticles.reduce((sum, a) => sum + (a.views || 0), 0);

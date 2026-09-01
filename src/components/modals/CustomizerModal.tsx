@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import {
   Article,
+  CategoryConfig,
   CustomMenuItem,
   NavTabItem,
   PageView,
@@ -50,7 +51,7 @@ import {
   SectionType,
   SiteConfig,
 } from '../../types';
-import { defaultDailyWidgets, defaultNavTabs, defaultSiteConfig } from '../../data/initialData';
+import { defaultCategoriesConfig, defaultDailyWidgets, defaultNavTabs, defaultSiteConfig } from '../../data/initialData';
 import { UnitLogo } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
@@ -169,13 +170,26 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     ...(siteConfig?.sections || {}),
   });
   const [selectedSectionKey, setSelectedSectionKey] = useState<
-    'ctd' | 'hl' | 'bac' | 'doc' | 'lecture' | 'meeting'
+    'ctd' | 'hl' | 'bac' | 'doc' | 'lecture' | 'meeting' | string
   >('ctd');
+
+  // Dynamic Categories Config State (Synchronized across the entire system)
+  const [categoriesList, setCategoriesList] = useState<CategoryConfig[]>(() => {
+    const raw = siteConfig?.categories_config || siteConfig?.categoriesConfig || siteConfig?.categories;
+    if (raw && Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object') {
+      return raw as CategoryConfig[];
+    }
+    return defaultCategoriesConfig;
+  });
+  const [selectedCatId, setSelectedCatId] = useState<string>('ctd');
 
   // Sub-category management states
   const [editingCategoryIndex, setEditingCategoryIndex] = useState<number | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState<string>('');
   const [newCategoryInput, setNewCategoryInput] = useState<string>('');
+  const [newCategoryTitleInput, setNewCategoryTitleInput] = useState<string>('');
+  const [newCategoryNavInput, setNewCategoryNavInput] = useState<string>('');
+  const [isAddingNewMainCat, setIsAddingNewMainCat] = useState<boolean>(false);
   const [pendingRenames, setPendingRenames] = useState<
     { sectionKey: SectionType; oldName: string; newName: string }[]
   >([]);
@@ -256,6 +270,14 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         ...defaultSiteConfig.sections,
         ...(siteConfig?.sections || {}),
       });
+      const rawCats = siteConfig?.categories_config || siteConfig?.categoriesConfig || siteConfig?.categories;
+      if (rawCats && Array.isArray(rawCats) && rawCats.length > 0 && typeof rawCats[0] === 'object') {
+        setCategoriesList(rawCats as CategoryConfig[]);
+        if (rawCats[0]?.id) setSelectedCatId(rawCats[0].id);
+      } else {
+        setCategoriesList(defaultCategoriesConfig);
+        setSelectedCatId('ctd');
+      }
       setFooterUnitName(
         siteConfig?.site_info?.unit_name ||
         siteConfig?.footerUnitName ||
@@ -355,33 +377,41 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle section fields change
-  const handleSectionFieldChange = (field: string, val: string) => {
-    setSections((prev) => {
-      const current = prev[selectedSectionKey] || {};
-      const updatedSection: any = {
-        ...current,
-        [field]: val,
-      };
+  // Handle category / section field change with instant dynamic sync
+  const handleCategoryFieldChange = (field: 'name' | 'navName' | 'description', val: string) => {
+    setCategoriesList((prev) =>
+      prev.map((c) => {
+        if (c.id === selectedCatId) {
+          const updated = { ...c, [field]: val };
+          if (field === 'navName') {
+            updated.shortLabel = val;
+          }
+          return updated;
+        }
+        return c;
+      })
+    );
 
-      // If user edits shortLabel or title, keep short_name, nav_title, and shortLabel synchronized
-      if (field === 'shortLabel' || field === 'short_name' || field === 'nav_title') {
+    setSections((prev: any) => {
+      const current = prev[selectedCatId] || {};
+      const updatedSection: any = { ...current };
+      if (field === 'name') updatedSection.title = val;
+      if (field === 'navName') {
         updatedSection.shortLabel = val;
         updatedSection.short_name = val;
         updatedSection.nav_title = val;
       }
-
+      if (field === 'description') updatedSection.desc = val;
       return {
         ...prev,
-        [selectedSectionKey]: updatedSection,
+        [selectedCatId]: updatedSection,
       };
     });
 
-    // If changing shortLabel or title, immediately update the corresponding nav tab label if it exists
-    if (field === 'shortLabel' || field === 'short_name' || field === 'nav_title') {
+    if (field === 'navName' || field === 'name') {
       setNavTabs((prev) =>
         prev.map((t) => {
-          if (t.id === selectedSectionKey || t.targetPage === selectedSectionKey) {
+          if (t.id === selectedCatId || t.targetPage === selectedCatId) {
             return {
               ...t,
               label: val,
@@ -395,9 +425,26 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
   };
 
+  const handleSectionFieldChange = (field: string, val: string) => {
+    if (field === 'title') {
+      handleCategoryFieldChange('name', val);
+    } else if (field === 'shortLabel' || field === 'short_name' || field === 'nav_title') {
+      handleCategoryFieldChange('navName', val);
+    } else if (field === 'desc' || field === 'description') {
+      handleCategoryFieldChange('description', val);
+    }
+  };
+
   // Subcategories logic
-  const currentSectionData = sections[selectedSectionKey] as SectionConfigItem | undefined;
-  const currentCategories = currentSectionData?.categories || [];
+  const currentCategoryObj =
+    categoriesList.find((c) => c.id === selectedCatId) ||
+    categoriesList[0] || {
+      id: selectedCatId,
+      name: '',
+      navName: '',
+      subcategories: [],
+    };
+  const currentCategories = currentCategoryObj.subcategories || [];
 
   const handleStartEditCategory = (idx: number, currentVal: string) => {
     setEditingCategoryIndex(idx);
@@ -422,29 +469,37 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     const updatedCategories = [...currentCategories];
     updatedCategories[idx] = newName;
 
-    setSections((prev) => ({
+    setCategoriesList((prev) =>
+      prev.map((c) => (c.id === selectedCatId ? { ...c, subcategories: updatedCategories } : c))
+    );
+
+    setSections((prev: any) => ({
       ...prev,
-      [selectedSectionKey]: {
-        ...(prev[selectedSectionKey] as SectionConfigItem),
+      [selectedCatId]: {
+        ...(prev[selectedCatId] || {}),
         categories: updatedCategories,
       },
     }));
 
-    if (selectedSectionKey === 'ctd' || selectedSectionKey === 'hl' || selectedSectionKey === 'bac') {
+    if (selectedCatId === 'ctd' || selectedCatId === 'hl' || selectedCatId === 'bac') {
       setPendingRenames((prev) => [
         ...prev.filter(
-          (r) => !(r.sectionKey === selectedSectionKey && r.oldName === oldName)
+          (r) => !(r.sectionKey === selectedCatId && r.oldName === oldName)
         ),
-        { sectionKey: selectedSectionKey, oldName, newName },
+        { sectionKey: selectedCatId as SectionType, oldName, newName },
       ]);
     }
 
     setEditingCategoryIndex(null);
+    toast.success('Đã sửa tên tiểu mục', `Tiểu mục đã đổi tên thành "${newName}"`);
   };
 
   const handleAddCategory = () => {
     const val = newCategoryInput.trim();
-    if (!val) return;
+    if (!val) {
+      toast.warning('Thiếu tên tiểu mục', 'Vui lòng nhập tên tiểu mục cần thêm!');
+      return;
+    }
 
     if (currentCategories.some((c) => c.toLowerCase() === val.toLowerCase())) {
       toast.warning('Trùng tên tiểu mục', 'Tiểu mục này đã tồn tại!');
@@ -452,14 +507,19 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
 
     const updatedCategories = [...currentCategories, val];
-    setSections((prev) => ({
+    setCategoriesList((prev) =>
+      prev.map((c) => (c.id === selectedCatId ? { ...c, subcategories: updatedCategories } : c))
+    );
+
+    setSections((prev: any) => ({
       ...prev,
-      [selectedSectionKey]: {
-        ...(prev[selectedSectionKey] as SectionConfigItem),
+      [selectedCatId]: {
+        ...(prev[selectedCatId] || {}),
         categories: updatedCategories,
       },
     }));
     setNewCategoryInput('');
+    toast.success('Đã thêm tiểu mục', `Đã thêm tiểu mục "${val}" vào chuyên mục!`);
   };
 
   const handleDeleteCategory = (catName: string) => {
@@ -469,7 +529,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
 
     const affectedCount = articles.filter(
-      (a) => a.sectionKey === selectedSectionKey && a.category === catName
+      (a) => (a.sectionKey === selectedCatId || a.category === catName) && a.category === catName
     ).length;
 
     const confirmMsg = affectedCount > 0
@@ -479,22 +539,121 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     if (!confirm(confirmMsg)) return;
 
     const remainingCategories = currentCategories.filter((c) => c !== catName);
-    setSections((prev) => ({
+    setCategoriesList((prev) =>
+      prev.map((c) => (c.id === selectedCatId ? { ...c, subcategories: remainingCategories } : c))
+    );
+
+    setSections((prev: any) => ({
       ...prev,
-      [selectedSectionKey]: {
-        ...(prev[selectedSectionKey] as SectionConfigItem),
+      [selectedCatId]: {
+        ...(prev[selectedCatId] || {}),
         categories: remainingCategories,
       },
     }));
 
     if (affectedCount > 0 && remainingCategories.length > 0) {
-      if (selectedSectionKey === 'ctd' || selectedSectionKey === 'hl' || selectedSectionKey === 'bac') {
+      if (selectedCatId === 'ctd' || selectedCatId === 'hl' || selectedCatId === 'bac') {
         setPendingRenames((prev) => [
           ...prev,
-          { sectionKey: selectedSectionKey, oldName: catName, newName: remainingCategories[0] },
+          { sectionKey: selectedCatId as SectionType, oldName: catName, newName: remainingCategories[0] },
         ]);
       }
     }
+    toast.success('Đã xóa tiểu mục', `Đã xóa tiểu mục "${catName}".`);
+  };
+
+  const handleMoveSubcategory = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentCategories.length) return;
+    const updated = [...currentCategories];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+
+    setCategoriesList((prev) =>
+      prev.map((c) => (c.id === selectedCatId ? { ...c, subcategories: updated } : c))
+    );
+    setSections((prev: any) => ({
+      ...prev,
+      [selectedCatId]: {
+        ...(prev[selectedCatId] || {}),
+        categories: updated,
+      },
+    }));
+  };
+
+  const handleCreateNewMainCategory = () => {
+    const name = newCategoryTitleInput.trim();
+    const navName = newCategoryNavInput.trim() || name;
+    if (!name) {
+      toast.warning('Thiếu tên chuyên mục', 'Vui lòng nhập tên đầy đủ của chuyên mục mới!');
+      return;
+    }
+
+    const newId = `cat-${Date.now()}`;
+    const newCatItem: CategoryConfig = {
+      id: newId,
+      name,
+      navName,
+      shortLabel: navName,
+      description: 'Chuyên mục tuyên truyền, thông tin và hoạt động của đơn vị',
+      subcategories: ['Tin tức chung', 'Hoạt động nổi bật'],
+      order: categoriesList.length + 1,
+      enabled: true,
+    };
+
+    setCategoriesList((prev) => [...prev, newCatItem]);
+    setSections((prev: any) => ({
+      ...prev,
+      [newId]: {
+        title: name,
+        shortLabel: navName,
+        short_name: navName,
+        nav_title: navName,
+        desc: newCatItem.description,
+        categories: newCatItem.subcategories,
+      },
+    }));
+
+    // Add to navTabs
+    setNavTabs((prev) => [
+      ...prev,
+      {
+        id: newId,
+        label: navName,
+        short_name: navName,
+        nav_title: navName,
+        type: 'internal',
+        targetPage: newId as any,
+        enabled: true,
+        order: prev.length + 1,
+      },
+    ]);
+
+    setSelectedCatId(newId);
+    setSelectedSectionKey(newId);
+    setNewCategoryTitleInput('');
+    setNewCategoryNavInput('');
+    setIsAddingNewMainCat(false);
+    toast.success('Đã thêm chuyên mục', `Đã tạo chuyên mục mới "${name}"!`);
+  };
+
+  const handleDeleteMainCategory = (catId: string) => {
+    if (categoriesList.length <= 1) {
+      toast.warning('Không thể xóa', 'Hệ thống cần duy trì ít nhất 1 chuyên mục!');
+      return;
+    }
+    const target = categoriesList.find((c) => c.id === catId);
+    if (!confirm(`Đồng chí có chắc chắn muốn xóa toàn bộ chuyên mục "${target?.name || catId}"?`)) return;
+
+    const remaining = categoriesList.filter((c) => c.id !== catId);
+    setCategoriesList(remaining);
+    setNavTabs((prev) => prev.filter((t) => t.id !== catId && t.targetPage !== (catId as any)));
+    if (selectedCatId === catId) {
+      setSelectedCatId(remaining[0].id);
+      setSelectedSectionKey(remaining[0].id);
+    }
+    toast.success('Đã xóa chuyên mục', `Đã xóa chuyên mục khỏi danh mục.`);
   };
 
   // Custom Menu Management Logic
@@ -626,6 +785,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       footerLogoSizePx,
       establishedDate: establishedDate.trim(),
       sections,
+      categories_config: categoriesList,
+      categoriesConfig: categoriesList,
+      categories: categoriesList,
       navTabs,
       customMenuItems,
       // Marquee & Ticker settings (Synchronized)
@@ -1402,38 +1564,119 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: SECTIONS & SUBCATEGORIES */}
+          {/* TAB 3: SECTIONS & SUBCATEGORIES */}
           {activeTab === 'sections' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs font-bold">
-                {[
-                  { key: 'ctd', label: '1. CTĐ - CTCT', color: '#b91c1c' },
-                  { key: 'hl', label: '2. Huấn luyện - SSCĐ', color: '#065f46' },
-                  { key: 'bac', label: '3. Học tập theo Bác', color: '#b45309' },
-                  { key: 'doc', label: '4. Kho Văn bản', color: '#2563eb' },
-                  { key: 'lecture', label: '5. Bài giảng điện tử', color: '#0891b2' },
-                  { key: 'meeting', label: '6. Họp Đảng ủy', color: '#831843' },
-                ].map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSectionKey(s.key as any);
-                      setEditingCategoryIndex(null);
-                      setNewCategoryInput('');
-                    }}
-                    className={`px-3 py-2 rounded-lg transition-all cursor-pointer shrink-0 ${
-                      selectedSectionKey === s.key
-                        ? 'bg-gray-900 text-white font-black shadow-xs'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <span>{s.label}</span>
-                  </button>
-                ))}
+              {/* Category sub-tab buttons bar */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 text-xs font-bold">
+                {categoriesList.map((cat, idx) => {
+                  const isSelected = selectedCatId === cat.id;
+                  const displayTitle =
+                    cat.navName ||
+                    cat.shortLabel ||
+                    cat.name ||
+                    sections[cat.id]?.shortLabel ||
+                    sections[cat.id]?.title ||
+                    `Chuyên mục ${idx + 1}`;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCatId(cat.id);
+                        setSelectedSectionKey(cat.id as any);
+                        setEditingCategoryIndex(null);
+                        setNewCategoryInput('');
+                        setIsAddingNewMainCat(false);
+                      }}
+                      className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-red-800 text-white font-black shadow-md border-b-2 border-amber-400'
+                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300 font-bold'
+                      }`}
+                    >
+                      <span className={isSelected ? 'text-amber-300 font-black' : 'text-gray-500 font-bold'}>
+                        {idx + 1}.
+                      </span>
+                      <span>{displayTitle}</span>
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNewMainCat(true)}
+                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-dashed border-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Thêm chuyên mục</span>
+                </button>
               </div>
 
-              {/* Selected Section Details */}
+              {/* Add New Main Category Popup / Form */}
+              {isAddingNewMainCat && (
+                <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-300 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-amber-950 text-xs uppercase flex items-center gap-1.5">
+                      <Plus className="w-4 h-4 text-amber-700" />
+                      <span>TẠO CHUYÊN MỤC MỚI CHO TOÀN HỆ THỐNG</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingNewMainCat(false)}
+                      className="text-gray-500 hover:text-gray-700 p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Tên đầy đủ của Chuyên mục:
+                      </label>
+                      <input
+                        type="text"
+                        value={newCategoryTitleInput}
+                        onChange={(e) => setNewCategoryTitleInput(e.target.value)}
+                        placeholder="Ví dụ: TUYÊN TRUYỀN GIÁO DỤC, HẬU CẦN - KỸ THUẬT..."
+                        className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                        Tên viết tắt trên Menu Navbar:
+                      </label>
+                      <input
+                        type="text"
+                        value={newCategoryNavInput}
+                        onChange={(e) => setNewCategoryNavInput(e.target.value)}
+                        placeholder="Ví dụ: TUYÊN TRUYỀN GIÁO DỤC"
+                        className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingNewMainCat(false)}
+                      className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateNewMainCategory}
+                      className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Xác nhận thêm</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Category Details */}
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1442,9 +1685,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      value={sections[selectedSectionKey]?.title || ''}
-                      onChange={(e) => handleSectionFieldChange('title', e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700 font-bold"
+                      value={currentCategoryObj?.name || sections[selectedCatId]?.title || ''}
+                      onChange={(e) => handleCategoryFieldChange('name', e.target.value)}
+                      placeholder="Nhập tên đầy đủ chuyên mục..."
+                      className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700 font-bold text-xs"
                     />
                   </div>
 
@@ -1454,10 +1698,14 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      value={sections[selectedSectionKey]?.shortLabel || ''}
-                      onChange={(e) => handleSectionFieldChange('shortLabel', e.target.value)}
-                      className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700 font-bold"
+                      value={currentCategoryObj?.navName || sections[selectedCatId]?.shortLabel || ''}
+                      onChange={(e) => handleCategoryFieldChange('navName', e.target.value)}
+                      placeholder="Nhập tên hiển thị trên thanh Menu..."
+                      className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700 font-bold text-xs text-red-900"
                     />
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Tên này sẽ hiển thị trực tiếp trên thanh điều hướng Menu Navbar và nhãn tab ở trên.
+                    </p>
                   </div>
                 </div>
 
@@ -1467,102 +1715,162 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    value={sections[selectedSectionKey]?.desc || ''}
-                    onChange={(e) => handleSectionFieldChange('desc', e.target.value)}
-                    className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700"
+                    value={currentCategoryObj?.description || sections[selectedCatId]?.desc || ''}
+                    onChange={(e) => handleCategoryFieldChange('description', e.target.value)}
+                    placeholder="Mô tả tóm tắt định hướng và nội dung chính của chuyên mục..."
+                    className="w-full p-2 bg-white border border-gray-300 rounded-lg focus:border-red-700 text-xs"
                   />
                 </div>
 
                 {/* Subcategories Editor */}
-                {currentCategories && currentCategories.length > 0 && (
-                  <div className="pt-2 border-t border-gray-200 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-black text-gray-900 uppercase text-xs flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-red-700" />
-                        <span>Danh sách các Tiểu mục ({currentCategories.length}):</span>
-                      </h5>
-                    </div>
+                <div className="pt-2 border-t border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-black text-gray-900 uppercase text-xs flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-red-700" />
+                      <span>Danh sách các Tiểu mục ({currentCategories.length}):</span>
+                    </h5>
+                    <span className="text-[11px] text-gray-500 italic">
+                      Hiển thị trong menu thả xuống và bộ lọc bài viết
+                    </span>
+                  </div>
 
-                    <div className="space-y-2">
-                      {currentCategories.map((cat, idx) => {
-                        const isEditing = editingCategoryIndex === idx;
-                        return (
-                          <div
-                            key={idx}
-                            className="bg-white p-2.5 rounded-lg border border-gray-200 flex items-center justify-between gap-2"
-                          >
-                            {isEditing ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <input
-                                  type="text"
-                                  value={editingCategoryValue}
-                                  onChange={(e) => setEditingCategoryValue(e.target.value)}
-                                  className="p-1.5 bg-amber-50 border border-amber-400 rounded text-xs flex-1 font-bold"
-                                  autoFocus
-                                />
+                  <div className="space-y-2">
+                    {currentCategories.map((cat, idx) => {
+                      const isEditing = editingCategoryIndex === idx;
+                      return (
+                        <div
+                          key={idx}
+                          className="bg-white p-2.5 rounded-lg border border-gray-200 flex items-center justify-between gap-2 hover:border-gray-300 transition-colors"
+                        >
+                          {isEditing ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <input
+                                type="text"
+                                value={editingCategoryValue}
+                                onChange={(e) => setEditingCategoryValue(e.target.value)}
+                                className="p-1.5 bg-amber-50 border border-amber-400 rounded text-xs flex-1 font-bold"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveEditCategory(idx);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditCategory(idx)}
+                                className="px-2.5 py-1 bg-emerald-700 text-white rounded font-bold text-xs cursor-pointer flex items-center gap-1"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Lưu</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingCategoryIndex(null)}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-red-100 text-red-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-gray-900 text-xs">
+                                  {cat}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleSaveEditCategory(idx)}
-                                  className="px-2.5 py-1 bg-emerald-700 text-white rounded font-bold text-xs cursor-pointer"
+                                  onClick={() => handleMoveSubcategory(idx, 'up')}
+                                  disabled={idx === 0}
+                                  className={`p-1 rounded ${
+                                    idx === 0
+                                      ? 'text-gray-300 cursor-not-allowed'
+                                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 cursor-pointer'
+                                  }`}
+                                  title="Di chuyển lên"
                                 >
-                                  Lưu
+                                  <MoveUp className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setEditingCategoryIndex(null)}
-                                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs cursor-pointer"
+                                  onClick={() => handleMoveSubcategory(idx, 'down')}
+                                  disabled={idx === currentCategories.length - 1}
+                                  className={`p-1 rounded ${
+                                    idx === currentCategories.length - 1
+                                      ? 'text-gray-300 cursor-not-allowed'
+                                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100 cursor-pointer'
+                                  }`}
+                                  title="Di chuyển xuống"
                                 >
-                                  Hủy
+                                  <MoveDown className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditCategory(idx, cat)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 cursor-pointer"
+                                  title="Sửa tên tiểu mục"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCategory(cat)}
+                                  className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
+                                  title="Xóa tiểu mục"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                            ) : (
-                              <>
-                                <span className="font-bold text-gray-900 text-xs">
-                                  {idx + 1}. {cat}
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEditCategory(idx, cat)}
-                                    className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 cursor-pointer"
-                                    title="Sửa tên tiểu mục"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteCategory(cat)}
-                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
-                                    title="Xóa tiểu mục"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                    {/* Add new subcategory */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="text"
-                        value={newCategoryInput}
-                        onChange={(e) => setNewCategoryInput(e.target.value)}
-                        placeholder="Nhập tên tiểu mục mới cần thêm..."
-                        className="flex-1 p-2 bg-white border border-gray-300 rounded-lg text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddCategory}
-                        className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Thêm tiểu mục</span>
-                      </button>
-                    </div>
+                  {/* Add new subcategory */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCategory();
+                        }
+                      }}
+                      placeholder="Nhập tên tiểu mục mới cần thêm (Ví dụ: 500 ngày đêm, Công tác Hậu cần - Kỹ thuật)..."
+                      className="flex-1 p-2 bg-white border border-gray-300 rounded-lg text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCategory}
+                      className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Thêm tiểu mục</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete Entire Category Button (if not only 1 category) */}
+                {categoriesList.length > 1 && (
+                  <div className="pt-3 border-t border-gray-200 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMainCategory(selectedCatId)}
+                      className="px-3 py-1.5 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Xóa chuyên mục này</span>
+                    </button>
                   </div>
                 )}
               </div>

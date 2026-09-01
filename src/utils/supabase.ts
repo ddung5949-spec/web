@@ -1022,6 +1022,29 @@ export const supabaseDb = {
             result.uncle_ho_images = rawUncleHoImgs;
           }
 
+          // Check categories_config column or inside json
+          const rawCategoriesConfig =
+            row.categories_config ||
+            row.categoriesConfig ||
+            row.categories ||
+            result.categories_config ||
+            result.categoriesConfig ||
+            result.categories;
+
+          if (rawCategoriesConfig) {
+            let parsedCats = rawCategoriesConfig;
+            if (typeof parsedCats === 'string') {
+              try {
+                parsedCats = JSON.parse(parsedCats);
+              } catch {}
+            }
+            if (Array.isArray(parsedCats)) {
+              result.categories_config = parsedCats;
+              result.categoriesConfig = parsedCats;
+              result.categories = parsedCats;
+            }
+          }
+
           // Check direct column daily_widgets or daily_posters on row if not inside json
           const rowDaily = row.daily_widgets || row.daily_posters || row.dailyWidgets;
           if (rowDaily) {
@@ -1216,6 +1239,8 @@ export const supabaseDb = {
         theme_color: configData.colorRed || '#b91c1c',
         daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
         daily_posters: dailyWidgetsDict,
+        categories_config: configData.categories_config || configData.categoriesConfig || [],
+        categories: configData.categories_config || configData.categoriesConfig || [],
         config_json: configData,
         config: configData,
         data: configData,
@@ -1236,6 +1261,7 @@ export const supabaseDb = {
           unit_name: configData.footerUnitName || configData.title || '',
           marquee_text: configData.ticker || '',
           theme_color: configData.colorRed || '#b91c1c',
+          categories_config: configData.categories_config || configData.categoriesConfig || [],
           config_json: configData,
           config: configData,
           data: configData,

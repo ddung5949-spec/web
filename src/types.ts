@@ -274,6 +274,22 @@ export interface MeetingRoomItem {
   votes: Record<string, MeetingVote>; // key: `${docId}_${userId}`
 }
 
+export interface CategoryConfig {
+  id: string; // e.g. 'ctd', 'hl', 'bac', 'doc', 'lecture', 'meeting', 'cat-1'
+  name: string; // Tên đầy đủ của chuyên mục (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'Công tác Đảng - CTCT')
+  navName: string; // Tên hiển thị viết tắt trên Menu Navbar (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'CTĐ - CTCT')
+  shortLabel?: string;
+  description?: string; // Mô tả định hướng nội dung
+  subcategories: string[]; // Danh sách các tiểu mục con (vd: ['CTĐ - CTCT', 'Công tác Quân sự', 'Công tác Hậu cần - Kỹ thuật', '500 ngày đêm'])
+  sectionKey?: SectionType | string;
+  targetPage?: PageView;
+  type?: 'internal' | 'external';
+  externalUrl?: string;
+  openNewTab?: boolean;
+  enabled?: boolean;
+  order?: number;
+}
+
 export interface SectionConfigItem {
   id: SectionType | string;
   title: string;
@@ -498,6 +514,9 @@ export interface SiteConfig {
   footerLogoSizePx?: number;
   establishedDate?: string;
   sections: SiteSectionsConfig;
+  categories_config?: CategoryConfig[];
+  categoriesConfig?: CategoryConfig[];
+  categories?: CategoryConfig[] | string[];
   customMenuItems?: CustomMenuItem[];
   navTabs?: NavTabItem[];
   dailyWidgets?: DailyWidgetItem[];

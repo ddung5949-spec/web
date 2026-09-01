@@ -87,9 +87,16 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
 
   const isEditing = Boolean(articleToEdit);
 
+  const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
+  const configuredCategory = Array.isArray(categoriesList)
+    ? categoriesList.find((c: any) => c.id === selectedSection)
+    : undefined;
+
   const currentSectionConfig =
     siteConfig?.sections?.[selectedSection] || defaultSiteConfig.sections[selectedSection];
-  const categories = currentSectionConfig?.categories || [];
+  const categories = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
+    ? configuredCategory.subcategories
+    : currentSectionConfig?.categories || [];
 
   // Initialize form state ONLY when modal transitions from closed to open or a different article is selected
   useEffect(() => {

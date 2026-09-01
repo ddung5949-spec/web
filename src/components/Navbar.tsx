@@ -57,18 +57,28 @@ export const Navbar: React.FC<NavbarProps> = ({
     return tabs
       .filter((t) => t.enabled !== false)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [siteConfig?.navTabs, siteConfig?.sections]);
+  }, [siteConfig?.navTabs, siteConfig?.sections, siteConfig?.categories_config]);
 
   // Helper to resolve display tab title according to priorities:
-  // tab.short_name || tab.nav_title || tab.name || tab.title || section.shortLabel || section.title || tab.label
+  // category_config.navName -> section.shortLabel -> tab.short_name -> tab.nav_title -> tab.label
   const getTabLabel = (tab: NavTabItem): string => {
+    const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
+    const catItem = Array.isArray(categoriesList)
+      ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage)
+      : undefined;
+
+    if (catItem) {
+      const catLabel = catItem.navName || catItem.shortLabel || catItem.name;
+      if (catLabel) return catLabel;
+    }
+
     const sectionConfig = (siteConfig?.sections as any)?.[tab.id] || (siteConfig?.sections as any)?.[tab.targetPage as string];
     const resolved =
+      (sectionConfig && ((sectionConfig as any).short_name || (sectionConfig as any).nav_title || sectionConfig.shortLabel || sectionConfig.title || (sectionConfig as any).name)) ||
       tab.short_name ||
       tab.nav_title ||
       tab.name ||
       tab.title ||
-      (sectionConfig && ((sectionConfig as any).short_name || (sectionConfig as any).nav_title || sectionConfig.shortLabel || sectionConfig.title || (sectionConfig as any).name)) ||
       tab.label ||
       tab.id;
     return resolved;
