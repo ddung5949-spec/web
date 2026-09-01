@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { LectureItem, User } from '../../types';
+import { toast } from '../Toast';
 
 interface AddLectureModalProps {
   isOpen: boolean;
@@ -132,7 +133,7 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !desc.trim() || !author.trim()) {
-      alert('Vui lòng điền đầy đủ các thông tin bài giảng (*)!');
+      toast.warning('Thiếu thông tin bắt buộc', 'Vui lòng điền đầy đủ các thông tin bài giảng (*)!');
       return;
     }
 
@@ -158,7 +159,7 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         fileSize: finalFileSize,
         fileUrl: fileUrl || lectureToEdit.fileUrl || '',
       });
-      alert('Đã cập nhật thông tin và tệp bài giảng thành công!');
+      toast.success('Cập nhật thành công', 'Đã cập nhật thông tin và tệp bài giảng thành công!');
     } else {
       const today = new Date();
       const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(
@@ -179,7 +180,7 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         fileUrl,
         downloads: 0,
       });
-      alert('Đã thêm và tải lên bài giảng điện tử mới thành công!');
+      toast.success('Tải lên thành công', 'Đã thêm và tải lên bài giảng điện tử mới thành công!');
     }
 
     onClose();

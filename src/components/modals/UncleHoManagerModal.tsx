@@ -23,6 +23,7 @@ import {
 import { UncleHoQuote, UncleHoSettings } from '../../types';
 import { compressImageFile, validateImageFile } from '../../utils/imageUtils';
 import { getSupabase } from '../../utils/supabase';
+import { toast } from '../Toast';
 
 interface UncleHoManagerModalProps {
   isOpen: boolean;
@@ -98,7 +99,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       for (const file of fileList) {
         const validation = validateImageFile(file);
         if (!validation.valid) {
-          alert(validation.error || `Tệp ${file.name} không hợp lệ.`);
+          toast.warning('Tệp không hợp lệ', validation.error || `Tệp ${file.name} không hợp lệ.`);
           continue;
         }
         // Nén ảnh nhẹ qua Canvas (chiều rộng tối đa 800px, chất lượng 0.65)
@@ -108,9 +109,10 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
 
       if (newUrls.length > 0) {
         setSlideshowImages((prev) => [...prev, ...newUrls]);
+        toast.success('Đã thêm ảnh', `Đã thêm ${newUrls.length} ảnh vào album.`);
       }
     } catch (err: any) {
-      alert(`Lỗi khi tải ảnh: ${err.message || 'Không xác định'}`);
+      toast.error('Lỗi tải ảnh', `Lỗi khi tải ảnh: ${err.message || 'Không xác định'}`);
     } finally {
       setIsProcessingImages(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -164,7 +166,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       // ignore
     }
 
-    // Direct Supabase upsert to daily_posters
+    // Direct Supabase upsert to daily_posters and site_config
     const supabase = getSupabase();
     if (supabase) {
       try {
@@ -177,12 +179,18 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
           extra_data: { images: slideshowImages, bannerTitle: settings.bannerTitle },
           updated_at: nowIso,
         }, { onConflict: 'id' });
+
+        await supabase.from('site_config').upsert({
+          id: 'default',
+          uncle_ho_images: slideshowImages,
+          updated_at: nowIso,
+        }, { onConflict: 'id' });
       } catch (dbErr) {
-        console.warn('[UncleHoManagerModal] Supabase upsert daily_posters error:', dbErr);
+        console.warn('[UncleHoManagerModal] Supabase upsert error:', dbErr);
       }
     }
 
-    alert('✅ Đã lưu thành công lên máy chủ! Album ảnh Bác Hồ đã được đồng bộ cho tất cả người dùng.');
+    toast.success('Đã lưu thành công', 'Album ảnh Bác Hồ đã được đồng bộ cho tất cả người dùng.');
   };
 
   // Bắt đầu chỉnh sửa hoặc tạo mới lời Bác dạy theo ngày
@@ -208,11 +216,11 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   const handleSaveQuoteItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formQuote.trim()) {
-      alert('Vui lòng nhập Lời Bác dạy cốt lõi!');
+      toast.warning('Thiếu nội dung', 'Vui lòng nhập Lời Bác dạy cốt lõi!');
       return;
     }
     if (!selectedDayMonth.trim() || !selectedDayMonth.includes('/')) {
-      alert('Vui lòng nhập ngày/tháng theo định dạng DD/MM (ví dụ: 19/05, 02/09)!');
+      toast.warning('Sai định dạng ngày', 'Vui lòng nhập ngày/tháng theo định dạng DD/MM (ví dụ: 19/05, 02/09)!');
       return;
     }
 
@@ -267,7 +275,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       })();
     }
 
-    alert(`Đã lưu Lời Bác dạy ngày ${newItem.dayMonth} thành công!`);
+    toast.success('Đã lưu Lời Bác dạy', `Đã lưu Lời Bác dạy ngày ${newItem.dayMonth} thành công!`);
     handleCreateNewQuote();
   };
 

@@ -17,6 +17,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { DocumentItem } from '../../types';
+import { toast } from '../Toast';
 
 interface AddDocModalProps {
   isOpen: boolean;
@@ -163,7 +164,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !title.trim() || !issuer.trim()) {
-      alert('Vui lòng điền đầy đủ các trường thông tin bắt buộc (*)!');
+      toast.warning('Thiếu thông tin bắt buộc', 'Vui lòng điền đầy đủ các trường thông tin bắt buộc (*)!');
       return;
     }
 
@@ -185,7 +186,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         fileUrl: fileUrl.trim() || editingDoc.fileUrl || undefined,
         secretLevel,
       });
-      alert('Đã cập nhật thông tin văn bản thành công!');
+      toast.success('Cập nhật thành công', 'Đã cập nhật thông tin văn bản thành công!');
     } else {
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
@@ -206,7 +207,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         downloads: 0,
         secretLevel,
       });
-      alert('Đã lưu văn bản vào Kho lưu trữ điện tử thành công!');
+      toast.success('Lưu văn bản thành công', 'Đã lưu văn bản vào Kho lưu trữ điện tử thành công!');
     }
 
     onClose();

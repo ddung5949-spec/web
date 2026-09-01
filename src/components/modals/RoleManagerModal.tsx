@@ -16,6 +16,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import { RoleDefinition } from '../../types';
+import { toast } from '../Toast';
 
 interface RoleManagerModalProps {
   isOpen: boolean;
@@ -144,7 +145,7 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
 
   const handleDelete = (role: RoleDefinition) => {
     if (role.isSystem) {
-      alert('Không thể xóa vai trò mặc định của hệ thống!');
+      toast.warning('Không thể xóa', 'Không thể xóa vai trò mặc định của hệ thống!');
       return;
     }
     if (window.confirm(`Đồng chí có chắc chắn muốn xóa vai trò "${role.name}" không?`)) {

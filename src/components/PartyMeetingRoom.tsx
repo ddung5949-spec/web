@@ -58,6 +58,7 @@ import {
   VoteChoice,
 } from '../types';
 import { getSupabase } from '../utils/supabase';
+import { toast } from './Toast';
 
 interface OnlineParticipant {
   userId: number;
@@ -191,7 +192,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
 
   const handleOpenCreateRoomModal = () => {
     if (meetingRooms.length >= MAX_ROOMS) {
-      alert(`Hệ thống đã đạt giới hạn tối đa ${MAX_ROOMS} phòng họp Đảng ủy đồng thời. Vui lòng kết thúc hoặc xóa bớt phòng họp cũ trước khi tạo mới!`);
+      toast.warning('Đã đạt giới hạn', `Hệ thống đã đạt giới hạn tối đa ${MAX_ROOMS} phòng họp Đảng ủy đồng thời. Vui lòng kết thúc hoặc xóa bớt phòng họp cũ trước khi tạo mới!`);
       return;
     }
     const nextIndex = meetingRooms.length + 1;
@@ -238,7 +239,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const handleSaveRoomForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!roomFormTitle.trim() || !roomFormCode.trim()) {
-      alert('Vui lòng nhập đầy đủ mã phòng và tên phiên họp!');
+      toast.warning('Thiếu thông tin', 'Vui lòng nhập đầy đủ mã phòng và tên phiên họp!');
       return;
     }
 
@@ -267,10 +268,11 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
         onSaveMeetingRoom(updatedRoom);
       }
       setIsRoomModalOpen(false);
+      toast.success('Cập nhật thành công', `Đã cập nhật phòng họp "${updatedRoom.title}"!`);
     } else {
       // Create new room
       if (meetingRooms.length >= MAX_ROOMS) {
-        alert(`Đã đạt giới hạn tối đa ${MAX_ROOMS} phòng họp!`);
+        toast.warning('Đã đạt giới hạn', `Đã đạt giới hạn tối đa ${MAX_ROOMS} phòng họp!`);
         return;
       }
 
@@ -608,11 +610,11 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   // Handle voting choice
   const handleVoteChoice = (choice: VoteChoice) => {
     if (!currentUser) {
-      alert('Đồng chí vui lòng đăng nhập tài khoản Đảng ủy viên để thực hiện quyền biểu quyết!');
+      toast.warning('Yêu cầu đăng nhập', 'Đồng chí vui lòng đăng nhập tài khoản Đảng ủy viên để thực hiện quyền biểu quyết!');
       return;
     }
     if (!currentUser.canJoinPartyMeeting && currentUser.role !== 'admin') {
-      alert('Tài khoản của đồng chí chưa được cấp quyền biểu quyết trong Hội nghị Đảng ủy!');
+      toast.warning('Không có quyền biểu quyết', 'Tài khoản của đồng chí chưa được cấp quyền biểu quyết trong Hội nghị Đảng ủy!');
       return;
     }
     if (!activeDocument) return;
@@ -634,6 +636,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
     };
 
     onCastVote(newVote);
+    toast.success('Đã biểu quyết', `Đồng chí đã biểu quyết "${choice}" thành công!`);
 
     // Also persist inside the current room's votes
     if (currentRoom && onSaveMeetingRoom) {
@@ -657,7 +660,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const handleHighlight = () => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      alert('Đồng chí vui lòng bôi đen đoạn văn bản cần đánh dấu ý kiến đóng góp!');
+      toast.info('Hướng dẫn đánh dấu', 'Đồng chí vui lòng bôi đen đoạn văn bản cần đánh dấu ý kiến đóng góp!');
       return;
     }
 
@@ -676,19 +679,21 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
     const range = selection.getRangeAt(0);
     range.deleteContents();
     range.insertNode(span);
+    toast.success('Đã đánh dấu ý kiến', 'Đã gắn thẻ góp ý vào đoạn văn bản được chọn.');
   };
 
   // Start editing active document (Broadcast lock)
   const handleStartEditDoc = () => {
     if (!activeDocument || !currentUser) {
-      alert('Đồng chí vui lòng đăng nhập để thực hiện chỉnh sửa văn bản!');
+      toast.warning('Yêu cầu đăng nhập', 'Đồng chí vui lòng đăng nhập để thực hiện chỉnh sửa văn bản!');
       return;
     }
 
     const currentLock = docLocks[activeDocument.id];
     if (currentLock && currentLock.userId !== currentUser.id) {
-      alert(
-        `⚠️ Đồng chí ${currentLock.userName} (${currentLock.userRankUnit || 'Đảng ủy viên'}) đang chỉnh sửa văn bản này! Vui lòng chờ đồng chí ấy lưu xong.`
+      toast.warning(
+        'Văn bản đang bị khóa',
+        `Đồng chí ${currentLock.userName} (${currentLock.userRankUnit || 'Đảng ủy viên'}) đang chỉnh sửa văn bản này! Vui lòng chờ đồng chí ấy lưu xong.`
       );
       return;
     }
@@ -790,11 +795,11 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
       if (editorRef.current) {
         editorRef.current.innerHTML = result.value;
         handleSaveActiveDoc();
-        alert('Đã nhập thành công nội dung từ tệp Word (.docx) vào văn bản!');
+        toast.success('Nhập văn bản Word thành công', 'Đã nhập nội dung từ tệp Word (.docx) vào văn bản hội nghị!');
       }
     } catch (err) {
       console.error('Error parsing docx:', err);
-      alert('Không thể đọc tệp Word. Vui lòng kiểm tra định dạng .docx!');
+      toast.error('Lỗi đọc tệp', 'Không thể đọc tệp Word. Vui lòng kiểm tra định dạng .docx!');
     }
   };
 
@@ -811,9 +816,10 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
         setNewDocTitle(cleanName);
       }
+      toast.success('Đã đọc tệp Word', `Đã nạp nội dung từ tệp "${file.name}"!`);
     } catch (err) {
       console.error('Error parsing docx:', err);
-      alert('Không thể đọc tệp Word. Vui lòng kiểm tra định dạng .docx!');
+      toast.error('Lỗi đọc tệp', 'Không thể đọc tệp Word. Vui lòng kiểm tra định dạng .docx!');
     }
   };
 
@@ -821,7 +827,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const handleCreateDocument = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDocTitle.trim()) {
-      alert('Vui lòng nhập tên trích yếu văn bản!');
+      toast.warning('Thiếu thông tin', 'Vui lòng nhập tên trích yếu văn bản!');
       return;
     }
 
@@ -905,7 +911,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
   const handlePrintMeetingMinutes = (room: MeetingRoomItem) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Vui lòng cho phép mở cửa sổ popup để in biên bản hội nghị!');
+      toast.warning('Trình duyệt chặn Popup', 'Vui lòng cho phép mở cửa sổ popup để in biên bản hội nghị!');
       return;
     }
 

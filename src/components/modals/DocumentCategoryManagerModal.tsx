@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { DocumentItem } from '../../types';
+import { toast } from '../Toast';
 
 interface DocumentCategoryManagerModalProps {
   isOpen: boolean;
@@ -74,13 +75,14 @@ export const DocumentCategoryManagerModal: React.FC<DocumentCategoryManagerModal
     const trimmed = newCatName.trim();
     if (!trimmed) return;
     if (catList.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-      alert('Tên danh mục này đã tồn tại!');
+      toast.warning('Trùng tên danh mục', 'Tên danh mục này đã tồn tại!');
       return;
     }
     const updated = [...catList, trimmed];
     setCatList(updated);
     handleManualSave(updated);
     setNewCatName('');
+    toast.success('Đã thêm danh mục', `Đã thêm danh mục "${trimmed}" thành công!`);
   };
 
   const handleStartEdit = (index: number) => {
@@ -91,7 +93,7 @@ export const DocumentCategoryManagerModal: React.FC<DocumentCategoryManagerModal
   const handleSaveEdit = (index: number) => {
     const trimmed = editingValue.trim();
     if (!trimmed) {
-      alert('Tên danh mục không được để trống!');
+      toast.warning('Thiếu thông tin', 'Tên danh mục không được để trống!');
       return;
     }
     const oldName = catList[index];
@@ -101,7 +103,7 @@ export const DocumentCategoryManagerModal: React.FC<DocumentCategoryManagerModal
           (c, idx) => idx !== index && c.toLowerCase() === trimmed.toLowerCase()
         )
       ) {
-        alert('Tên danh mục này đã trùng với một danh mục khác!');
+        toast.warning('Trùng tên danh mục', 'Tên danh mục này đã trùng với một danh mục khác!');
         return;
       }
       const updated = [...catList];
@@ -111,6 +113,7 @@ export const DocumentCategoryManagerModal: React.FC<DocumentCategoryManagerModal
       if (onRenameCategory) {
         onRenameCategory(oldName, trimmed);
       }
+      toast.success('Đã cập nhật danh mục', `Đã đổi tên danh mục thành "${trimmed}".`);
     }
     setEditingIndex(null);
     setEditingValue('');

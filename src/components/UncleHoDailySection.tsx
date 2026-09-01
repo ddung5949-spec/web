@@ -254,6 +254,13 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
             src={albumImages[currentSlideIndex % albumImages.length]}
             alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
             className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (target.src !== DEFAULT_UNCLE_HO_IMAGES[0]) {
+                target.src = DEFAULT_UNCLE_HO_IMAGES[0];
+              }
+            }}
             onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
           />
 

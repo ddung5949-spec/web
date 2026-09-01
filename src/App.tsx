@@ -161,11 +161,31 @@ export function App() {
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [articles, setArticles] = useState<Article[]>(() =>
-    safeStore.get('mangyang_articles', [])
-  );
+  const [articles, setArticles] = useState<Article[]>(() => {
+    try {
+      const cached = localStorage.getItem('articles_cache') || localStorage.getItem('mangyang_articles');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return safeStore.get('mangyang_articles', []);
+  });
 
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('documents_cache') || localStorage.getItem('mangyang_documents');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return safeStore.get('mangyang_documents', []);
+  });
 
   const [lectures, setLectures] = useState<LectureItem[]>([]);
 
@@ -291,24 +311,43 @@ export function App() {
     let isMounted = true;
     setIsLoadingData(true);
 
-    // 1. Unified fetchGlobalData running for 100% of users (authenticated and anonymous)
+    // 1. Parallel Database-First fetch for 100% of users (authenticated and anonymous)
     const fetchGlobalData = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
 
-        // 1.1 Tải cấu hình Site Config (Thông báo chữ chạy, Tiện ích quân nhân, Album ảnh Bác)
-        const { data: config, error: cfgErr } = await supabase
-          .from('site_config')
-          .select('*')
-          .eq('id', 'default')
-          .maybeSingle();
+        const [
+          configRes,
+          postersRes,
+          articlesRes,
+          docsRes,
+          lecturesRes,
+          quotesRes,
+          roomsRes,
+          meetDocsRes,
+          meetSettingsRes,
+          meetVotesRes,
+          usersRes,
+        ] = await Promise.all([
+          supabase.from('site_config').select('*').eq('id', 'default').maybeSingle(),
+          supabase.from('daily_posters').select('*'),
+          supabase.from('articles').select('*').order('published_at', { ascending: false }).limit(60),
+          supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(60),
+          supabase.from('lectures').select('*').order('created_at', { ascending: false }).limit(60),
+          supabase.from('uncle_ho_quotes').select('*').limit(366),
+          supabase.from('meeting_rooms').select('*').order('created_at', { ascending: false }).limit(30),
+          supabase.from('meeting_documents').select('*').limit(50),
+          supabase.from('meeting_settings').select('*').maybeSingle(),
+          supabase.from('meeting_votes').select('*'),
+          supabase.from('users').select('*').limit(100),
+        ]);
 
-        if (cfgErr) {
-          console.warn('[App] Error fetching site_config from Supabase:', cfgErr.message);
-        }
+        if (!isMounted) return;
 
-        if (config && isMounted) {
+        // 1.1 Process site_config
+        if (configRes.data) {
+          const config = configRes.data;
           let parsed = config.config_json || config.config || config.data || config;
           if (typeof parsed === 'string') {
             try {
@@ -385,16 +424,9 @@ export function App() {
           }
         }
 
-        // 1.2 Tải 4 chuyên mục Poster hàng ngày (bảng daily_posters)
-        const { data: posters, error: postErr } = await supabase
-          .from('daily_posters')
-          .select('*');
-
-        if (postErr) {
-          console.warn('[App] Error fetching daily_posters from Supabase:', postErr.message);
-        }
-
-        if (posters && posters.length > 0 && isMounted) {
+        // 1.2 Process daily_posters
+        if (postersRes.data && postersRes.data.length > 0) {
+          const posters = postersRes.data;
           const posterMap: Record<string, any> = {};
           posters.forEach((p: any) => {
             const id = (p.id || p.key || p.widget_id || '').replace(/^widget_/, '');
@@ -495,62 +527,84 @@ export function App() {
             };
           });
         }
+
+        // 1.3 Process articles
+        if (articlesRes.data && Array.isArray(articlesRes.data) && articlesRes.data.length > 0) {
+          const mappedArticles: Article[] = articlesRes.data.map((row: any) => supabaseDb.mapRowToArticle(row));
+          setArticles(mappedArticles);
+          try {
+            localStorage.setItem('articles_cache', JSON.stringify(mappedArticles));
+          } catch {
+            // ignore
+          }
+        }
+
+        // 1.4 Process documents
+        if (docsRes.data && Array.isArray(docsRes.data) && docsRes.data.length > 0) {
+          const mappedDocs: DocumentItem[] = docsRes.data.map((item: any) => ({
+            id: Number(item.id),
+            code: item.code || '',
+            title: item.title || '',
+            category: item.category || 'Văn bản chỉ đạo',
+            issuer: item.issuer || 'Trung đoàn 95',
+            date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '28/08/2026'),
+            type: item.type || 'pdf',
+            description: item.description || undefined,
+            fileName: item.file_name || item.fileName || undefined,
+            fileSize: item.file_size || item.fileSize || undefined,
+            fileUrl: item.file_url || item.fileUrl || undefined,
+            downloads: Number(item.downloads || 0),
+            secretLevel: item.secret_level || item.secretLevel || 'normal',
+          }));
+          setDocuments(mappedDocs);
+          safeStore.set('mangyang_documents', mappedDocs);
+          try {
+            localStorage.setItem('documents_cache', JSON.stringify(mappedDocs));
+          } catch {
+            // ignore
+          }
+        }
+
+        // 1.5 Process lectures
+        if (lecturesRes.data && Array.isArray(lecturesRes.data) && lecturesRes.data.length > 0) {
+          setLectures(lecturesRes.data as any);
+        }
+
+        // 1.6 Process uncle_ho_quotes
+        if (quotesRes.data && Array.isArray(quotesRes.data) && quotesRes.data.length > 0) {
+          setUncleHoQuotes(quotesRes.data as any);
+        }
+
+        // 1.7 Process meeting data
+        if (roomsRes.data && Array.isArray(roomsRes.data) && roomsRes.data.length > 0) {
+          setMeetingRooms(roomsRes.data as any);
+        }
+        if (meetDocsRes.data && Array.isArray(meetDocsRes.data) && meetDocsRes.data.length > 0) {
+          setMeetingDocuments(meetDocsRes.data as any);
+        }
+        if (meetSettingsRes.data) {
+          setMeetingSettings((prev) => ({ ...prev, ...(meetSettingsRes.data as any) }));
+        }
+        if (meetVotesRes.data && Array.isArray(meetVotesRes.data) && meetVotesRes.data.length > 0) {
+          const voteMap: Record<number, any> = {};
+          meetVotesRes.data.forEach((v: any) => {
+            if (v.id) voteMap[v.id] = v;
+          });
+          setMeetingVotes(voteMap);
+        }
+
+        // 1.8 Process users
+        if (usersRes.data && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
+          setUsers(usersRes.data as any);
+        }
       } catch (err) {
         console.warn('[App] fetchGlobalData error:', err);
+      } finally {
+        if (isMounted) setIsLoadingData(false);
       }
     };
 
     fetchGlobalData();
-
-    // 2. Tải dữ liệu bài viết trực tiếp từ Supabase (bảng articles)
-    cloudStorage
-      .loadArticles([])
-      .then((data) => {
-        if (isMounted && data) {
-          setArticles(data);
-          if (data.length > 0) {
-            safeStore.set('mangyang_articles', data);
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('[App] Error loading articles:', err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingData(false);
-      });
-
-    cloudStorage.loadUsers(defaultUsers).then((data) => {
-      if (isMounted && data && data.length > 0) setUsers(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadDocuments([]).then((data) => {
-      if (isMounted && data) setDocuments(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadLectures([]).then((data) => {
-      if (isMounted && data) setLectures(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadUncleHoQuotes([]).then((data) => {
-      if (isMounted && data) setUncleHoQuotes(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadMeetingRooms([]).then((data) => {
-      if (isMounted && data) setMeetingRooms(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadMeetingDocuments([]).then((data) => {
-      if (isMounted && data) setMeetingDocuments(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadMeetingSettings(defaultMeetingSettings).then((data) => {
-      if (isMounted && data) setMeetingSettings(data);
-    }).catch(console.warn);
-
-    cloudStorage.loadMeetingVotes({}).then((data) => {
-      if (isMounted && data) setMeetingVotes(data);
-    }).catch(console.warn);
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
     const unsub = cloudStorage.subscribeAll({
@@ -1770,7 +1824,7 @@ export function App() {
         updated[idx] = room;
       } else {
         if (prev.length >= 30) {
-          alert('Đã đạt giới hạn tối đa 30 phòng họp đồng thời! Vui lòng kết thúc hoặc xóa bớt phòng họp cũ.');
+          showToast('warning', 'Đạt giới hạn phòng họp', 'Đã đạt giới hạn tối đa 30 phòng họp đồng thời! Vui lòng kết thúc hoặc xóa bớt phòng họp cũ.');
           return prev;
         }
         updated = [room, ...prev];

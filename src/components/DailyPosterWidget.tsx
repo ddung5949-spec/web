@@ -18,6 +18,7 @@ import {
 import { DailyWidgetItem, User } from '../types';
 import { defaultDailyWidgets } from '../data/initialData';
 import { supabaseDb, getSupabase } from '../utils/supabase';
+import { toast } from './Toast';
 
 interface DailyPosterWidgetProps {
   widgetId: string; // 'safety_message' | 'traffic_situation' | 'good_deed' | 'widget_safety_message' ...
@@ -240,7 +241,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       setFormImage(compressedBase64);
     } catch (err) {
       console.error('Error compressing poster image:', err);
-      alert('Không thể xử lý ảnh tải lên. Vui lòng thử lại với ảnh khác.');
+      toast.error('Lỗi xử lý ảnh', 'Không thể xử lý ảnh tải lên. Vui lòng thử lại với ảnh khác.');
     } finally {
       setIsCompressing(false);
     }
@@ -342,11 +343,13 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       }
 
       await onSaveDailyWidgets(finalList);
-      setIsEditModalOpen(false);
-      alert('✅ Đã lưu thành công lên máy chủ hệ thống!');
+      toast.success('Cập nhật Poster thành công!', 'Dữ liệu poster đã được lưu và đồng bộ lên hệ thống.');
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+      }, 500);
     } catch (err) {
       console.error('Save daily poster widget error:', err);
-      alert('Lỗi khi lưu poster. Vui lòng thử lại!');
+      toast.error('Lỗi lưu Poster', 'Không thể lưu poster lên máy chủ. Vui lòng thử lại!');
     } finally {
       setIsSaving(false);
     }

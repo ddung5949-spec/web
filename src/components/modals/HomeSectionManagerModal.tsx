@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { defaultHomeCategoryColumns } from '../../data/initialData';
 import { HomeCategoryColumn, SectionType, SiteConfig } from '../../types';
+import { toast } from '../Toast';
 
 interface HomeSectionManagerModalProps {
   isOpen: boolean;
@@ -138,7 +139,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim()) {
-      alert('Vui lòng nhập tiêu đề chuyên mục!');
+      toast.warning('Thiếu thông tin', 'Vui lòng nhập tiêu đề chuyên mục!');
       return;
     }
 

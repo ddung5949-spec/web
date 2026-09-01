@@ -53,6 +53,7 @@ import {
 import { defaultDailyWidgets, defaultNavTabs, defaultSiteConfig } from '../../data/initialData';
 import { UnitLogo } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
+import { toast } from '../Toast';
 
 interface CustomizerModalProps {
   isOpen: boolean;
@@ -338,7 +339,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP, SVG)!');
+      toast.warning('Định dạng không hợp lệ', 'Vui lòng chọn tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP, SVG)!');
       return;
     }
     const reader = new FileReader();
@@ -414,7 +415,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
 
     if (currentCategories.some((c, i) => i !== idx && c.toLowerCase() === newName.toLowerCase())) {
-      alert('Tiểu mục này đã tồn tại trong chuyên mục!');
+      toast.warning('Trùng tên tiểu mục', 'Tiểu mục này đã tồn tại trong chuyên mục!');
       return;
     }
 
@@ -446,7 +447,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     if (!val) return;
 
     if (currentCategories.some((c) => c.toLowerCase() === val.toLowerCase())) {
-      alert('Tiểu mục này đã tồn tại!');
+      toast.warning('Trùng tên tiểu mục', 'Tiểu mục này đã tồn tại!');
       return;
     }
 
@@ -463,7 +464,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   const handleDeleteCategory = (catName: string) => {
     if (currentCategories.length <= 1) {
-      alert('Mỗi chuyên mục cần giữ lại ít nhất một tiểu mục!');
+      toast.warning('Không thể xóa', 'Mỗi chuyên mục cần giữ lại ít nhất một tiểu mục!');
       return;
     }
 
@@ -499,12 +500,12 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   // Custom Menu Management Logic
   const handleAddMenuItem = () => {
     if (!newMenuTitle.trim()) {
-      alert('Vui lòng nhập tên mục điều hướng!');
+      toast.warning('Thiếu thông tin', 'Vui lòng nhập tên mục điều hướng!');
       return;
     }
 
     if (newMenuType === 'external' && !newMenuExternalUrl.trim()) {
-      alert('Vui lòng nhập đường dẫn liên kết URL ngoài!');
+      toast.warning('Thiếu đường dẫn', 'Vui lòng nhập đường dẫn liên kết URL ngoài!');
       return;
     }
 
@@ -520,7 +521,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setCustomMenuItems((prev) => [...prev, newItem]);
     setNewMenuTitle('');
     setNewMenuExternalUrl('');
-    alert(`Đã thêm mục "${newItem.title}" vào thanh điều hướng menu!`);
+    toast.success('Đã thêm mục điều hướng', `Đã thêm mục "${newItem.title}" vào thanh menu!`);
   };
 
   const handleDeleteMenuItem = (id: string) => {
@@ -1256,11 +1257,12 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                     type="button"
                     onClick={() => {
                       if (!newTickerInput.trim()) {
-                        alert('Vui lòng nhập nội dung thông báo trước khi thêm!');
+                        toast.warning('Thiếu nội dung', 'Vui lòng nhập nội dung thông báo trước khi thêm!');
                         return;
                       }
                       setTickerCustomList((prev) => [...prev, newTickerInput.trim()]);
                       setNewTickerInput('');
+                      toast.success('Đã thêm thông báo', 'Thông báo mới đã được thêm vào danh sách chạy chữ.');
                     }}
                     className="px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md font-bold text-xs flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
                   >
@@ -1335,7 +1337,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                               type="button"
                               onClick={() => {
                                 if (tickerCustomList.length <= 1) {
-                                  alert('Cần giữ lại ít nhất 1 thông báo!');
+                                  toast.warning('Không thể xóa', 'Cần giữ lại ít nhất 1 thông báo!');
                                   return;
                                 }
                                 setTickerCustomList((prev) => prev.filter((_, i) => i !== idx));
@@ -2634,8 +2636,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
                         setBackupStatusMsg('✅ Đã xuất và tải về file sao lưu hệ thống thành công!');
+                        toast.success('Xuất sao lưu thành công', 'Tệp sao lưu .JSON đã được tải về máy tính.');
                       } catch (err: any) {
-                        alert('Lỗi khi xuất bản sao lưu: ' + (err?.message || 'Không xác định'));
+                        toast.error('Lỗi sao lưu', 'Lỗi khi xuất bản sao lưu: ' + (err?.message || 'Không xác định'));
                       }
                     }}
                     className="w-full py-2.5 px-4 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
@@ -2704,11 +2707,12 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                           }
 
                           setBackupStatusMsg(`✅ Khôi phục thành công! Đã nạp lại ${restoredCount} mục dữ liệu.`);
+                          toast.success('Khôi phục dữ liệu thành công', `Đã nạp lại ${restoredCount} mục dữ liệu. Hệ thống sẽ làm mới sau giây lát...`);
                           setTimeout(() => {
                             window.location.reload();
                           }, 1200);
                         } catch (err: any) {
-                          alert('Lỗi khi khôi phục dữ liệu: ' + (err?.message || 'Tệp sao lưu không đúng định dạng'));
+                          toast.error('Lỗi khôi phục', 'Lỗi khi khôi phục dữ liệu: ' + (err?.message || 'Tệp sao lưu không đúng định dạng'));
                         } finally {
                           setIsRestoring(false);
                           if (restoreFileInputRef.current) {

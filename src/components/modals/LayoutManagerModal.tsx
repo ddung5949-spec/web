@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { HomeLayoutSettings, SidebarWidgetId, SidebarWidgetSetting, SiteConfig } from '../../types';
 import { defaultSidebarWidgets } from '../../data/initialData';
+import { toast } from '../Toast';
 
 interface LayoutManagerModalProps {
   isOpen: boolean;
@@ -187,7 +188,7 @@ export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
 
   const handleSave = () => {
     onSaveLayout(layout);
-    alert('Đã cập nhật và lưu cấu hình bố cục Trang chủ vào Cơ sở dữ liệu thành công!');
+    toast.success('Đã lưu bố cục', 'Đã cập nhật và lưu cấu hình bố cục Trang chủ thành công!');
     onClose();
   };
 

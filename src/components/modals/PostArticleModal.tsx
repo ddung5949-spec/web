@@ -27,6 +27,7 @@ import {
 } from '../../types';
 import { defaultSiteConfig } from '../../data/initialData';
 import { compressImageFile, optimizeArticleImagesPayload, validateImageFile } from '../../utils/imageUtils';
+import { toast } from '../Toast';
 
 interface PostArticleModalProps {
   isOpen: boolean;
@@ -263,7 +264,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   const handleMainImageFileUpload = async (file: File) => {
     const val = validateImageFile(file);
     if (!val.valid) {
-      alert(val.error || 'Vui lòng chọn tệp hình ảnh hợp lệ (JPG, PNG, WEBP, GIF)!');
+      toast.warning('Tệp không hợp lệ', val.error || 'Vui lòng chọn tệp hình ảnh hợp lệ (JPG, PNG, WEBP, GIF)!');
       return;
     }
 
@@ -365,7 +366,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   // Set as representative thumbnail
   const handleSetMainThumbnail = (url: string) => {
     setImageUrl(url);
-    alert('Đã đặt làm ảnh đại diện bài viết!');
+    toast.success('Đã chọn ảnh đại diện', 'Đã đặt ảnh được chọn làm ảnh đại diện bài viết!');
   };
 
   const handleDrop = (e: React.DragEvent) => {

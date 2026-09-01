@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { supabase } from '../../utils/supabase';
+import { toast } from '../Toast';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -372,11 +373,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       }
 
       // 6. Hiển thị thông báo Toast xanh
+      toast.success('Đã cập nhật hồ sơ quân nhân!', 'Thông tin cá nhân và ảnh đại diện đã được lưu thành công.');
       if (showToast) {
-        showToast('success', 'Thành công', '✅ Đã cập nhật hồ sơ quân nhân thành công!');
+        showToast('success', 'Đã cập nhật hồ sơ quân nhân!', 'Thông tin cá nhân và ảnh đại diện đã được lưu thành công.');
       }
 
-      setSuccessMsg('✅ Đã cập nhật hồ sơ quân nhân thành công!');
+      setSuccessMsg('✅ Đã cập nhật hồ sơ quân nhân!');
 
       // 7. Tự động đóng modal sau chốc lát
       setTimeout(() => {

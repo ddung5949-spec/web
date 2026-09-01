@@ -72,6 +72,7 @@ import {
   User,
 } from '../types';
 import { cloudStorage } from '../utils/storage';
+import { toast } from './Toast';
 
 interface RealtimeCollabDocumentWorkspaceProps {
   currentRoom: MeetingRoomItem;
@@ -480,7 +481,7 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
   // 7. SECTION EDITING IN STRUCTURED MODE
   const handleLockAndEditSection = (sectionId: string) => {
     if (!currentUser) {
-      alert('Vui lòng đăng nhập để tham gia chỉnh sửa văn kiện!');
+      toast.warning('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để tham gia chỉnh sửa văn kiện!');
       return;
     }
 
@@ -493,7 +494,8 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
       sec.lockedBy.userId !== currentUser.id &&
       Date.now() - (sec.lockedBy.timestamp || 0) < 60000
     ) {
-      alert(
+      toast.warning(
+        'Mục đang được sửa',
         `Mục này đang được đồng chí ${sec.lockedBy.userName} chỉnh sửa trực tiếp. Để tránh xung đột dữ liệu, vui lòng chọn mục khác hoặc đợi đồng chí ấy hoàn tất!`
       );
       return;
@@ -595,7 +597,7 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
   const handleInsertCommentTag = () => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      alert('Đồng chí vui lòng bôi đen đoạn văn bản cần đính kèm ý kiến đóng góp!');
+      toast.info('Hướng dẫn gắn góp ý', 'Đồng chí vui lòng bôi đen đoạn văn bản cần đính kèm ý kiến đóng góp!');
       return;
     }
 
@@ -617,6 +619,7 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
     if (fullEditorRef.current) {
       triggerAutoSave({ contentHtml: fullEditorRef.current.innerHTML }, true);
     }
+    toast.success('Đã gắn ý kiến đóng góp', 'Đoạn văn bản đã được đánh dấu góp ý thành công.');
   };
 
   const handleRequestSpeech = () => {
@@ -651,10 +654,10 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
       if (fullEditorRef.current) {
         fullEditorRef.current.innerHTML = importedHtml;
       }
-      addToast('Đã nhập và đồng bộ thành công văn bản Word (.docx)!', 'success');
+      toast.success('Đã nhập tệp Word', 'Đã nhập và đồng bộ thành công văn bản Word (.docx)!');
     } catch (err) {
       console.error('Word import error:', err);
-      alert('Không thể đọc tệp Word. Vui lòng kiểm tra lại tệp .docx!');
+      toast.error('Lỗi đọc tệp', 'Không thể đọc tệp Word. Vui lòng kiểm tra lại tệp .docx!');
     }
   };
 
@@ -662,7 +665,7 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
   const handlePrintDocument = () => {
     const printWin = window.open('', '_blank');
     if (!printWin) {
-      alert('Vui lòng cho phép popup để in văn bản!');
+      toast.warning('Trình duyệt chặn Popup', 'Vui lòng cho phép popup để in văn bản!');
       return;
     }
     const html = `
