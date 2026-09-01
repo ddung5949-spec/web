@@ -23,23 +23,71 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   const isAdmin = currentUser?.role === 'admin';
-  const showBackToTop = siteConfig.footerShowBackToTop !== false;
-  const showLogo = siteConfig.footerShowLogo !== false;
-  const showAddress = siteConfig.footerShowAddress !== false;
-  const showContact = siteConfig.footerShowContact !== false;
-  const showSlogan = siteConfig.footerShowSlogan !== false;
-  const showCustomLinks = siteConfig.footerShowCustomLinks !== false && (siteConfig.footerCustomLinks || []).length > 0;
 
-  const mainBg = siteConfig.footerBgColor || siteConfig.colorGreen || '#143d2b';
-  const sloganBg = siteConfig.footerSloganBgColor || '#0a2318';
-  const accentColor = siteConfig.footerAccentColor || '#fbbf24';
-  const layout = siteConfig.footerLayout || 'split';
+  // Extract footer toggles with nested & flat fallbacks
+  const showBackToTop =
+    siteConfig.footer_config?.toggles?.show_back_to_top ??
+    (siteConfig.footerShowBackToTop !== false);
+  const showLogo =
+    siteConfig.footer_config?.toggles?.show_logo ??
+    (siteConfig.footerShowLogo !== false);
+  const showAddress =
+    siteConfig.footer_config?.toggles?.show_address ??
+    (siteConfig.footerShowAddress !== false);
+  const showContact =
+    siteConfig.footer_config?.toggles?.show_contact ??
+    (siteConfig.footerShowContact !== false);
+  const showSlogan =
+    siteConfig.footer_config?.toggles?.show_slogan ??
+    (siteConfig.footerShowSlogan !== false);
+  const showCustomLinks =
+    siteConfig.footerShowCustomLinks !== false &&
+    (siteConfig.footer_config?.custom_links?.length || (siteConfig.footerCustomLinks || []).length) > 0;
 
-  const customLinks = siteConfig.footerCustomLinks || [
-    { id: 'link-1', label: 'Cổng TTĐT Bộ Quốc phòng', url: 'http://mod.gov.vn', openNewTab: true },
-    { id: 'link-2', label: 'Báo Quân đội nhân dân', url: 'https://www.qdnd.vn', openNewTab: true },
-    { id: 'link-3', label: 'Báo Quân khu 5', url: 'https://baoquankhu5.vn', openNewTab: true },
-  ];
+  // Extract colors with nested & flat fallbacks
+  const mainBg =
+    siteConfig.footer_config?.colors?.bg ||
+    siteConfig.footerBgColor ||
+    siteConfig.colorGreen ||
+    '#143d2b';
+  const sloganBg =
+    siteConfig.footer_config?.colors?.slogan_bg ||
+    siteConfig.footerSloganBgColor ||
+    '#0a2318';
+  const accentColor =
+    siteConfig.footer_config?.colors?.accent ||
+    siteConfig.footerAccentColor ||
+    '#fbbf24';
+  const layout =
+    siteConfig.footer_config?.layout ||
+    siteConfig.footerLayout ||
+    'split';
+
+  // Extract unit and contact information
+  const unitName =
+    siteConfig.site_info?.unit_name ||
+    siteConfig.footerUnitName ||
+    'Trung đoàn 95, Sư đoàn 2';
+  const address =
+    siteConfig.site_info?.stationed_area ||
+    siteConfig.footerAddress ||
+    '';
+  const hotline =
+    siteConfig.site_info?.hotline ||
+    siteConfig.footerHotline ||
+    '';
+  const email =
+    siteConfig.site_info?.internal_email ||
+    siteConfig.footerEmail ||
+    '';
+
+  const customLinks =
+    siteConfig.footer_config?.custom_links ||
+    siteConfig.footerCustomLinks || [
+      { id: 'link-1', label: 'Cổng TTĐT Bộ Quốc phòng', url: 'http://mod.gov.vn', openNewTab: true },
+      { id: 'link-2', label: 'Báo Quân đội nhân dân', url: 'https://www.qdnd.vn', openNewTab: true },
+      { id: 'link-3', label: 'Báo Quân khu 5', url: 'https://baoquankhu5.vn', openNewTab: true },
+    ];
 
   return (
     <div className="w-full select-none relative">
@@ -134,24 +182,24 @@ export const Footer: React.FC<FooterProps> = ({
                 <p className="text-white/75 text-[10px] sm:text-[11px] leading-tight truncate max-w-2xl flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-amber-300/80 shrink-0" />
                   <span>
-                    {siteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2'}
-                    {siteConfig.footerAddress ? ` • ${siteConfig.footerAddress}` : ''}
+                    {unitName}
+                    {address ? ` • ${address}` : ''}
                   </span>
                 </p>
               )}
 
-              {showContact && (siteConfig.footerHotline || siteConfig.footerEmail) && (
+              {showContact && (hotline || email) && (
                 <div className="flex flex-wrap items-center gap-x-4 text-[10px] text-white/70 pt-0.5">
-                  {siteConfig.footerHotline && (
+                  {hotline && (
                     <span className="flex items-center gap-1">
                       <Phone className="w-2.5 h-2.5 text-amber-300/80 shrink-0" />
-                      <span>Trực ban: <strong className="font-mono text-white/90 font-bold">{siteConfig.footerHotline}</strong></span>
+                      <span>Trực ban: <strong className="font-mono text-white/90 font-bold">{hotline}</strong></span>
                     </span>
                   )}
-                  {siteConfig.footerEmail && (
+                  {email && (
                     <span className="flex items-center gap-1">
                       <Mail className="w-2.5 h-2.5 text-amber-300/80 shrink-0" />
-                      <span>Email: <strong className="font-mono text-white/90 font-bold">{siteConfig.footerEmail}</strong></span>
+                      <span>Email: <strong className="font-mono text-white/90 font-bold">{email}</strong></span>
                     </span>
                   )}
                 </div>

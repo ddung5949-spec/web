@@ -72,10 +72,10 @@ body {
 
 @keyframes marquee {
   0% {
-    transform: translateX(100%);
+    transform: translateX(0%);
   }
   100% {
-    transform: translateX(-100%);
+    transform: translateX(-50%);
   }
 }
 
@@ -83,13 +83,14 @@ body {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
-  animation: marquee 32s linear infinite;
+  animation: marquee 35s linear infinite;
   will-change: transform;
 }
 
 .animate-marquee:hover,
 .animate-marquee:active,
-.animate-marquee:focus {
+.animate-marquee:focus,
+.marquee-paused {
   animation-play-state: paused !important;
 }
 

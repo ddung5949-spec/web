@@ -117,12 +117,21 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   );
 
   // Ticker states
+  const initialMode =
+    (siteConfig?.marquee_mode === 'today' || siteConfig?.tickerMode === 'auto_today')
+      ? 'auto_today'
+      : (siteConfig?.marquee_mode === 'recent_days' || siteConfig?.tickerMode === 'auto_days')
+      ? 'auto_days'
+      : (siteConfig?.marquee_mode === 'manual' || siteConfig?.tickerMode === 'manual')
+      ? 'manual'
+      : 'combined';
+
   const [tickerMode, setTickerMode] = useState<'manual' | 'auto_today' | 'auto_days' | 'combined'>(
-    siteConfig?.tickerMode || 'combined'
+    initialMode
   );
-  const [tickerDays, setTickerDays] = useState<number>(siteConfig?.tickerDays ?? 3);
+  const [tickerDays, setTickerDays] = useState<number>(siteConfig?.marquee_days ?? siteConfig?.tickerDays ?? 3);
   const [tickerCustomList, setTickerCustomList] = useState<string[]>(
-    siteConfig?.tickerCustomList || [
+    siteConfig?.announcements || siteConfig?.tickerCustomList || [
       'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
       'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
       'Các chi bộ, đảng bộ trực thuộc hoàn thành việc học tập, quán triệt các Nghị quyết mới.',
@@ -216,16 +225,21 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setEnableLogoGlow(siteConfig?.enableLogoGlow !== false);
       setLogoSizePx(siteConfig?.logoSizePx || 48);
       setFooterLogoSizePx(siteConfig?.footerLogoSizePx || 38);
-      setTickerMode(siteConfig?.tickerMode || 'combined');
-      setTickerDays(siteConfig?.tickerDays ?? 3);
+      const tMode = siteConfig?.marquee_mode || siteConfig?.tickerMode || 'combined';
+      setTickerMode((tMode === 'today' ? 'auto_today' : tMode === 'recent_days' ? 'auto_days' : tMode) as any);
+      setTickerDays(Number(siteConfig?.marquee_days ?? siteConfig?.tickerDays ?? 3));
       setTickerCustomList(
-        siteConfig?.tickerCustomList || [
-          'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
-          'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
-          'Các chi bộ, đảng bộ trực thuộc hoàn thành việc học tập, quán triệt các Nghị quyết mới.',
-        ]
+        siteConfig?.announcements && siteConfig.announcements.length > 0
+          ? siteConfig.announcements
+          : siteConfig?.tickerCustomList && siteConfig.tickerCustomList.length > 0
+          ? siteConfig.tickerCustomList
+          : [
+              'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
+              'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
+              'Các chi bộ, đảng bộ trực thuộc hoàn thành việc học tập, quán triệt các Nghị quyết mới.',
+            ]
       );
-      setTickerSpeed(siteConfig?.tickerSpeed || 'normal');
+      setTickerSpeed(siteConfig?.marquee_speed || siteConfig?.tickerSpeed || 'normal');
       setTickerPrefix(siteConfig?.tickerPrefix || 'Bản tin nội bộ');
       setNewTickerInput('');
       setEditingTickerIdx(null);
@@ -241,23 +255,73 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         ...defaultSiteConfig.sections,
         ...(siteConfig?.sections || {}),
       });
-      setFooterUnitName(siteConfig?.footerUnitName || defaultSiteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2');
+      setFooterUnitName(
+        siteConfig?.site_info?.unit_name ||
+        siteConfig?.footerUnitName ||
+        defaultSiteConfig.footerUnitName ||
+        'Trung đoàn 95, Sư đoàn 2'
+      );
       setFooterAddress(
-        siteConfig?.footerAddress || defaultSiteConfig.footerAddress || 'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)'
+        siteConfig?.site_info?.stationed_area ||
+        siteConfig?.footerAddress ||
+        defaultSiteConfig.footerAddress ||
+        'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)'
       );
       setFooterHotline(
-        siteConfig?.footerHotline || defaultSiteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)'
+        siteConfig?.site_info?.hotline ||
+        siteConfig?.footerHotline ||
+        defaultSiteConfig.footerHotline ||
+        '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)'
       );
-      setFooterEmail(siteConfig?.footerEmail || defaultSiteConfig.footerEmail || 'chinhtri.trungdoan95@bqp.vn');
-      setFooterBgColor(siteConfig?.footerBgColor || defaultSiteConfig.footerBgColor || '#143d2b');
-      setFooterSloganBgColor(siteConfig?.footerSloganBgColor || defaultSiteConfig.footerSloganBgColor || '#0a2318');
-      setFooterAccentColor(siteConfig?.footerAccentColor || defaultSiteConfig.footerAccentColor || '#fbbf24');
-      setFooterLayout(siteConfig?.footerLayout || 'split');
-      setFooterShowLogo(siteConfig?.footerShowLogo !== false);
-      setFooterShowAddress(siteConfig?.footerShowAddress !== false);
-      setFooterShowContact(siteConfig?.footerShowContact !== false);
-      setFooterShowSlogan(siteConfig?.footerShowSlogan !== false);
-      setFooterShowBackToTop(siteConfig?.footerShowBackToTop !== false);
+      setFooterEmail(
+        siteConfig?.site_info?.internal_email ||
+        siteConfig?.footerEmail ||
+        defaultSiteConfig.footerEmail ||
+        'chinhtri.trungdoan95@bqp.vn'
+      );
+      setFooterBgColor(
+        siteConfig?.footer_config?.colors?.bg ||
+        siteConfig?.footerBgColor ||
+        defaultSiteConfig.footerBgColor ||
+        '#143d2b'
+      );
+      setFooterSloganBgColor(
+        siteConfig?.footer_config?.colors?.slogan_bg ||
+        siteConfig?.footerSloganBgColor ||
+        defaultSiteConfig.footerSloganBgColor ||
+        '#0a2318'
+      );
+      setFooterAccentColor(
+        siteConfig?.footer_config?.colors?.accent ||
+        siteConfig?.footerAccentColor ||
+        defaultSiteConfig.footerAccentColor ||
+        '#fbbf24'
+      );
+      setFooterLayout(
+        siteConfig?.footer_config?.layout ||
+        siteConfig?.footerLayout ||
+        'split'
+      );
+      setFooterShowLogo(
+        siteConfig?.footer_config?.toggles?.show_logo ??
+        (siteConfig?.footerShowLogo !== false)
+      );
+      setFooterShowAddress(
+        siteConfig?.footer_config?.toggles?.show_address ??
+        (siteConfig?.footerShowAddress !== false)
+      );
+      setFooterShowContact(
+        siteConfig?.footer_config?.toggles?.show_contact ??
+        (siteConfig?.footerShowContact !== false)
+      );
+      setFooterShowSlogan(
+        siteConfig?.footer_config?.toggles?.show_slogan ??
+        (siteConfig?.footerShowSlogan !== false)
+      );
+      setFooterShowBackToTop(
+        siteConfig?.footer_config?.toggles?.show_back_to_top ??
+        (siteConfig?.footerShowBackToTop !== false)
+      );
       const fSettings = siteConfig?.fontSettings || siteConfig?.font_settings;
       setScalePreset(fSettings?.scalePreset || 'standard');
       setGlobalScale(fSettings?.globalScale ?? 100);
@@ -538,6 +602,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const normalizedMarqueeMode =
+      tickerMode === 'auto_today'
+        ? 'today'
+        : tickerMode === 'auto_days'
+        ? 'recent_days'
+        : tickerMode;
+
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       title: title.trim(),
@@ -556,15 +627,28 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       sections,
       navTabs,
       customMenuItems,
+      // Marquee & Ticker settings (Synchronized)
       tickerMode,
       tickerDays,
       tickerCustomList,
       tickerSpeed,
       tickerPrefix: tickerPrefix.trim(),
+      marquee_mode: normalizedMarqueeMode as any,
+      marquee_days: tickerDays,
+      marquee_speed: tickerSpeed,
+      announcements: tickerCustomList,
+      // Unit & Station Info (Synchronized)
       footerUnitName: footerUnitName.trim(),
       footerAddress: footerAddress.trim(),
       footerHotline: footerHotline.trim(),
       footerEmail: footerEmail.trim(),
+      site_info: {
+        unit_name: footerUnitName.trim(),
+        stationed_area: footerAddress.trim(),
+        hotline: footerHotline.trim(),
+        internal_email: footerEmail.trim(),
+      },
+      // Footer Config (Synchronized)
       footerBgColor,
       footerSloganBgColor,
       footerAccentColor,
@@ -574,6 +658,22 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       footerShowContact,
       footerShowSlogan,
       footerShowBackToTop,
+      footer_config: {
+        colors: {
+          bg: footerBgColor,
+          slogan_bg: footerSloganBgColor,
+          accent: footerAccentColor,
+        },
+        toggles: {
+          show_logo: footerShowLogo,
+          show_address: footerShowAddress,
+          show_contact: footerShowContact,
+          show_slogan: footerShowSlogan,
+          show_back_to_top: footerShowBackToTop,
+        },
+        layout: footerLayout,
+        custom_links: siteConfig?.footer_config?.custom_links || siteConfig?.footerCustomLinks,
+      },
       fontSettings: {
         scalePreset,
         globalScale,

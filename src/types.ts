@@ -509,10 +509,14 @@ export interface SiteConfig {
   uncleHoImages?: string[];
   uncle_ho_images?: string[];
   sidebarWidgets?: SidebarWidgetSetting[];
-  tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined';
+  tickerMode?: 'manual' | 'auto_today' | 'auto_days' | 'combined' | 'today' | 'recent_days';
+  marquee_mode?: 'manual' | 'auto_today' | 'auto_days' | 'combined' | 'today' | 'recent_days';
   tickerDays?: number;
+  marquee_days?: number;
   tickerCustomList?: string[];
+  announcements?: string[];
   tickerSpeed?: 'slow' | 'normal' | 'fast';
+  marquee_speed?: 'slow' | 'normal' | 'fast';
   tickerPrefix?: string;
   homeAnnouncements?: HomeAnnouncement[];
   quickActionCards?: QuickActionCard[];
@@ -524,6 +528,28 @@ export interface SiteConfig {
   spotlightArticleIds?: number[];
   homeRightSidebarWidgets?: RightSidebarWidgetType[];
   userRoles?: RoleDefinition[];
+  site_info?: {
+    unit_name?: string;
+    stationed_area?: string;
+    hotline?: string;
+    internal_email?: string;
+  };
+  footer_config?: {
+    colors?: {
+      bg?: string;
+      slogan_bg?: string;
+      accent?: string;
+    };
+    toggles?: {
+      show_logo?: boolean;
+      show_address?: boolean;
+      show_contact?: boolean;
+      show_slogan?: boolean;
+      show_back_to_top?: boolean;
+    };
+    layout?: 'split' | 'centered' | 'compact' | 'columns';
+    custom_links?: FooterCustomLink[];
+  };
   footerAddress?: string;
   footerHotline?: string;
   footerEmail?: string;

@@ -70,29 +70,54 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
   onOpenArticle,
   onTickerClick,
 }) => {
-  const mode = siteConfig?.tickerMode || 'combined';
-  const customDays = siteConfig?.tickerDays ?? 3;
-  const customList = siteConfig?.tickerCustomList || [];
-  const speed = siteConfig?.tickerSpeed || 'normal';
+  const rawMode = siteConfig?.marquee_mode || siteConfig?.tickerMode || 'combined';
+  const mode =
+    rawMode === 'today' || rawMode === 'auto_today'
+      ? 'today'
+      : rawMode === 'recent_days' || rawMode === 'auto_days'
+      ? 'recent_days'
+      : rawMode === 'manual'
+      ? 'manual'
+      : 'combined';
+
+  const customDays = Number(siteConfig?.marquee_days ?? siteConfig?.tickerDays ?? 3);
+  const announcementsList =
+    siteConfig?.announcements && siteConfig.announcements.length > 0
+      ? siteConfig.announcements
+      : siteConfig?.tickerCustomList && siteConfig.tickerCustomList.length > 0
+      ? siteConfig.tickerCustomList
+      : tickerText
+      ? [tickerText]
+      : [
+          'Chào mừng kỷ niệm ngày truyền thống Trung đoàn 95, Sư đoàn 2 anh hùng!',
+          'Toàn đơn vị duy trì nghiêm chế độ trực ban, trực chỉ huy, sẵn sàng chiến đấu cao.',
+          'Đẩy mạnh phong trào thi đua Quyết thắng và học tập làm theo tư tưởng, đạo đức Hồ Chí Minh.',
+        ];
+
+  const speed = siteConfig?.marquee_speed || siteConfig?.tickerSpeed || 'normal';
   const prefix = siteConfig?.tickerPrefix || 'Bản tin nội bộ';
 
   // Compute ticker items based on configured mode
   const tickerItems = useMemo<TickerItem[]>(() => {
-    const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
+    const approvedArticles = articles.filter(
+      (a) => !a.status || a.status === 'approved' || a.status !== 'pending'
+    );
     const items: TickerItem[] = [];
 
-    // 1. Manual announcements from custom list or legacy tickerText
-    const manualAnnouncements: string[] =
-      customList.length > 0
-        ? customList.filter((s) => s.trim().length > 0)
-        : tickerText
-        ? [tickerText]
+    const cleanAnnouncements = announcementsList
+      .map((s) => (typeof s === 'string' ? s.trim() : ''))
+      .filter((s) => s.length > 0);
+
+    const fallbackAnnouncements =
+      cleanAnnouncements.length > 0
+        ? cleanAnnouncements
         : ['Chào mừng các đồng chí đến với Cổng Thông tin Điện tử Trung đoàn 95, Sư đoàn 2 anh hùng!'];
 
+    // 1. Chế độ THỦ CÔNG ("manual"): Chỉ chạy danh sách thông báo thủ công
     if (mode === 'manual') {
-      manualAnnouncements.forEach((ann, idx) => {
+      fallbackAnnouncements.forEach((ann, idx) => {
         items.push({
-          id: `ann-${idx}`,
+          id: `manual-ann-${idx}`,
           type: 'announcement',
           text: ann,
           tag: 'THÔNG BÁO',
@@ -101,14 +126,15 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
       return items;
     }
 
-    if (mode === 'auto_today') {
-      const todayArticles = approvedArticles.filter((art) => {
-        const d = parseArticleDate(art.date);
-        return d ? isToday(d) : false;
+    // 2. Chế độ HÔM NAY ("today" / "auto_today"): Lấy bài viết hôm nay; nếu không có bài, TỰ ĐỘNG chuyển sang thông báo nội bộ
+    if (mode === 'today') {
+      const todayArticles最佳 = approvedArticles.filter((art) => {
+        const d最佳 = parseArticleDate(art.date);
+        return d最佳 ? isToday(d最佳) : false;
       });
 
-      if (todayArticles.length > 0) {
-        todayArticles.forEach((art) => {
+      if (todayArticles最佳.length > 0) {
+        todayArticles最佳.forEach((art) => {
           items.push({
             id: `today-${art.id}`,
             type: 'article',
@@ -118,17 +144,10 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
           });
         });
       } else {
-        // Fallback if no new articles today
-        items.push({
-          id: 'today-none',
-          type: 'announcement',
-          text: 'Hôm nay chưa có bài đăng mới. Toàn đơn vị duy trì nghiêm các chế độ học tập, rèn luyện và SSCĐ.',
-          tag: 'HÔM NAY',
-        });
-        // Include default announcements
-        manualAnnouncements.slice(0, 2).forEach((ann, idx) => {
+        // Fallback tự động sang danh sách thông báo nội bộ (TUYỆT ĐỐI KHÔNG để trống)
+        fallbackAnnouncements.forEach((ann, idx) => {
           items.push({
-            id: `ann-fallback-${idx}`,
+            id: `today-fallback-ann-${idx}`,
             type: 'announcement',
             text: ann,
             tag: 'THÔNG BÁO',
@@ -138,7 +157,8 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
       return items;
     }
 
-    if (mode === 'auto_days') {
+    // 3. Chế độ BÀI ĐĂNG TRONG X NGÀY ("recent_days" / "auto_days"): Lọc bài viết trong X ngày qua; nếu không có bài, tự động fallback
+    if (mode === 'recent_days') {
       const recentArticles = approvedArticles.filter((art) => {
         const d = parseArticleDate(art.date);
         return d ? isWithinDays(d, customDays) : false;
@@ -155,15 +175,10 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
           });
         });
       } else {
-        items.push({
-          id: 'recent-none',
-          type: 'announcement',
-          text: `Chưa có bài viết mới trong ${customDays} ngày qua. Đang hiển thị bản tin tuyên huấn Sư đoàn.`,
-          tag: 'TIN MỚI',
-        });
-        manualAnnouncements.forEach((ann, idx) => {
+        // Fallback tự động sang thông báo nội bộ
+        fallbackAnnouncements.forEach((ann, idx) => {
           items.push({
-            id: `ann-recent-fallback-${idx}`,
+            id: `recent-fallback-ann-${idx}`,
             type: 'announcement',
             text: ann,
             tag: 'THÔNG BÁO',
@@ -173,8 +188,8 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
       return items;
     }
 
-    // Default: 'combined' mode (Manual Announcements + Recent Articles)
-    manualAnnouncements.forEach((ann, idx) => {
+    // 4. Chế độ KẾT HỢP ("combined"): Gộp danh sách thông báo thủ công + Tiêu đề bài viết mới xuất bản
+    fallbackAnnouncements.forEach((ann, idx) => {
       items.push({
         id: `comb-ann-${idx}`,
         type: 'announcement',
@@ -183,7 +198,7 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
       });
     });
 
-    const recentForCombined = approvedArticles.slice(0, 5);
+    const recentForCombined = approvedArticles.slice(0, 6);
     recentForCombined.forEach((art) => {
       items.push({
         id: `comb-art-${art.id}`,
@@ -195,11 +210,65 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
     });
 
     return items;
-  }, [articles, mode, customDays, customList, tickerText]);
+  }, [articles, mode, customDays, announcementsList]);
 
-  // Speed duration mapping (increased to smooth 32s - 35s as requested)
-  const animationDuration = speed === 'slow' ? '48s' : speed === 'fast' ? '22s' : '34s';
+  // Dynamic animationDuration calculation according to exact formula:
+  // animationDuration = Math.max(20, Math.floor(textLength * 0.25) * speedFactor)
+  const textLength = useMemo(() => {
+    return tickerItems.reduce((acc, it) => acc + (it.text?.length || 0), 0);
+  }, [tickerItems]);
+
+  const speedFactor = speed === 'slow' ? 1.4 : speed === 'fast' ? 0.7 : 1.0;
+  const calculatedSeconds = Math.max(20, Math.floor(textLength * 0.25) * speedFactor);
+  const animationDuration = `${calculatedSeconds}s`;
+
   const [isTouchPaused, setIsTouchPaused] = React.useState(false);
+
+  // Render a single sequence of items
+  const renderTickerList = (keyPrefix: string) => (
+    <div className="inline-flex items-center gap-6 pr-8">
+      {tickerItems.map((item, index) => (
+        <React.Fragment key={`${keyPrefix}-${item.id}`}>
+          <div
+            onClick={() => {
+              if (item.article && onOpenArticle) {
+                onOpenArticle(item.article);
+              } else if (onTickerClick) {
+                onTickerClick();
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 cursor-pointer transition-all ${
+              item.type === 'article'
+                ? 'hover:text-red-700 hover:underline'
+                : 'hover:text-emerald-800'
+            }`}
+          >
+            {item.tag && (
+              <span
+                className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-2xs ${
+                  item.type === 'article'
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}
+              >
+                {item.tag}
+              </span>
+            )}
+
+            <span className="font-semibold text-gray-800 hover:text-red-700">
+              {item.text}
+            </span>
+
+            {item.type === 'article' && (
+              <ArrowRight className="w-3 h-3 text-red-600 opacity-75 inline shrink-0" />
+            )}
+          </div>
+
+          <span className="text-amber-500 font-black text-xs select-none">★</span>
+        </React.Fragment>
+      ))}
+    </div>
+  );
 
   return (
     <div className="bg-white border-b border-gray-200 py-1.5 shadow-xs select-none relative z-30">
@@ -232,53 +301,10 @@ export const NewsTicker: React.FC<NewsTickerProps> = ({
               paddingRight: '3rem',
             }}
           >
-            <div className="inline-flex items-center gap-6 pr-8">
-              {tickerItems.map((item, index) => (
-                <React.Fragment key={item.id}>
-                  <div
-                    onClick={() => {
-                      if (item.article && onOpenArticle) {
-                        onOpenArticle(item.article);
-                      } else if (onTickerClick) {
-                        onTickerClick();
-                      }
-                    }}
-                    className={`inline-flex items-center gap-1.5 cursor-pointer transition-all ${
-                      item.type === 'article'
-                        ? 'hover:text-red-700 hover:underline'
-                        : 'hover:text-emerald-800'
-                    }`}
-                  >
-                    {item.tag && (
-                      <span
-                        className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                          item.type === 'article'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : 'bg-red-100 text-red-800 border border-red-200'
-                        }`}
-                      >
-                        {item.tag}
-                      </span>
-                    )}
-
-                    <span className="font-semibold text-gray-800 hover:text-red-700">
-                      {item.text}
-                    </span>
-
-                    {item.type === 'article' && (
-                      <ArrowRight className="w-3 h-3 text-red-600 opacity-75 inline shrink-0" />
-                    )}
-                  </div>
-
-                  {index < tickerItems.length - 1 && (
-                    <span className="text-amber-500 font-black text-xs select-none">★</span>
-                  )}
-                </React.Fragment>
-              ))}
-
-              {/* Repeat separator at end */}
-              <span className="text-amber-500 font-black text-xs select-none">★</span>
-            </div>
+            {/* Primary Track */}
+            {renderTickerList('track-1')}
+            {/* Duplicated Track for 100% Seamless Looping */}
+            {renderTickerList('track-2')}
           </div>
         </div>
       </div>

@@ -326,6 +326,28 @@ export function App() {
             mergedConfig.ticker = config.marquee_text;
             mergedConfig.marquee_text = config.marquee_text;
           }
+          if (config.marquee_mode) {
+            mergedConfig.marquee_mode = config.marquee_mode;
+            mergedConfig.tickerMode = config.marquee_mode === 'today' ? 'auto_today' : config.marquee_mode === 'recent_days' ? 'auto_days' : config.marquee_mode;
+          }
+          if (config.marquee_days !== undefined) {
+            mergedConfig.marquee_days = config.marquee_days;
+            mergedConfig.tickerDays = config.marquee_days;
+          }
+          if (config.marquee_speed) {
+            mergedConfig.marquee_speed = config.marquee_speed;
+            mergedConfig.tickerSpeed = config.marquee_speed;
+          }
+          if (config.announcements && Array.isArray(config.announcements)) {
+            mergedConfig.announcements = config.announcements;
+            mergedConfig.tickerCustomList = config.announcements;
+          }
+          if (config.site_info) {
+            mergedConfig.site_info = config.site_info;
+          }
+          if (config.footer_config) {
+            mergedConfig.footer_config = config.footer_config;
+          }
 
           const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
           if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
@@ -1837,6 +1859,12 @@ export function App() {
     // 1. Cập nhật tức thì lên State và LocalStorage (Optimistic UI)
     setSiteConfig(newConfig);
     safeStore.set('mangyang_site_config', newConfig);
+    try {
+      localStorage.setItem('site_config_cache', JSON.stringify(newConfig));
+      localStorage.setItem('mangyang_site_config', JSON.stringify(newConfig));
+    } catch {
+      // ignore
+    }
 
     // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm Supabase
     const nowIso = new Date().toISOString();
@@ -1851,9 +1879,15 @@ export function App() {
             title: newConfig.title,
             subtitle: newConfig.subtitle,
             marquee_text: newConfig.ticker || newConfig.marquee_text,
+            marquee_mode: newConfig.marquee_mode || newConfig.tickerMode,
+            marquee_days: newConfig.marquee_days ?? newConfig.tickerDays,
+            marquee_speed: newConfig.marquee_speed || newConfig.tickerSpeed,
+            announcements: newConfig.announcements || newConfig.tickerCustomList,
             theme_color: newConfig.colorRed,
-            unit_name: newConfig.footerUnitName,
+            unit_name: newConfig.footerUnitName || newConfig.site_info?.unit_name,
             military_utilities: newConfig.quickActionCards || newConfig.military_utilities,
+            site_info: newConfig.site_info,
+            footer_config: newConfig.footer_config,
             config_json: newConfig,
             config: newConfig,
             data: newConfig,
