@@ -887,14 +887,30 @@ export function App() {
   };
 
   const handleOpenArticle = (article: Article) => {
-    // Increment view count
-    const updatedViews = (article.views || 0) + 1;
+    const sessionKey = `viewed_article_${article.id}`;
+    let isNewView = false;
+    try {
+      if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, '1');
+        isNewView = true;
+      }
+    } catch {
+      isNewView = true;
+    }
+
+    const currentCount = Number(article.views) || 0;
+    const updatedViews = isNewView ? currentCount + 1 : currentCount;
     const updatedArticle = { ...article, views: updatedViews };
 
+    // Instant UI update
     setArticles((prev) =>
       prev.map((a) => (String(a.id) === String(article.id) ? updatedArticle : a))
     );
-    cloudStorage.saveArticle(updatedArticle);
+
+    // Call Supabase increment in background
+    if (isNewView) {
+      cloudStorage.incrementViews(article.id, currentCount);
+    }
 
     if (currentPage !== 'article_detail' && currentPage !== 'article-detail') {
       setPreviousPage(currentPage);
@@ -2175,18 +2191,61 @@ export function App() {
     showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
   };
 
-  // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ)
+  // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ & Chuyên mục mở rộng)
   const handleSaveSectionCategories = async (sectionKey: SectionType, newCats: string[]) => {
+    const currentCategoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories || [];
+
+    const updatedCategoriesConfig = Array.isArray(currentCategoriesList)
+      ? currentCategoriesList.map((cat: any) => {
+          if (
+            cat.id === sectionKey ||
+            cat.targetPage === sectionKey ||
+            cat.name === sectionKey ||
+            cat.navName === sectionKey ||
+            cat.shortLabel === sectionKey
+          ) {
+            return {
+              ...cat,
+              subcategories: newCats,
+              categories: newCats,
+            };
+          }
+          return cat;
+        })
+      : [];
+
     const updatedConfig: SiteConfig = {
       ...siteConfig,
+      categories_config: updatedCategoriesConfig,
+      categoriesConfig: updatedCategoriesConfig,
+      categories: updatedCategoriesConfig,
       sections: {
         ...siteConfig.sections,
         [sectionKey]: {
-          ...siteConfig.sections[sectionKey],
+          ...siteConfig.sections?.[sectionKey],
           categories: newCats,
         },
       },
     };
+
+    // Direct Supabase upsert for instant persistence across devices
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            categories_config: updatedCategoriesConfig,
+            categories: updatedCategoriesConfig,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      } catch (err) {
+        console.warn('[App] Direct site_config categories_config upsert notice:', err);
+      }
+    }
+
     await handleSaveCustomizer(updatedConfig);
     showToast('success', 'Đã lưu danh mục chuyên mục', 'Cấu trúc danh mục mới đã được đồng bộ trực tiếp lên Cơ sở dữ liệu.');
   };
@@ -2480,9 +2539,16 @@ export function App() {
               />
             )}
 
-            {(currentPage === 'ctd' || currentPage === 'hl' || currentPage === 'bac') && (
+            {(currentPage === 'ctd' ||
+              currentPage === 'hl' ||
+              currentPage === 'bac' ||
+              currentPage.startsWith('cat-') ||
+              (Array.isArray(siteConfig.categories_config) &&
+                siteConfig.categories_config.some(
+                  (c: any) => c.id === currentPage || c.targetPage === currentPage
+                ))) && (
               <SectionView
-                sectionKey={currentPage}
+                sectionKey={currentPage as any}
                 articles={articles}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
@@ -2494,12 +2560,12 @@ export function App() {
                 onSelectSection={handleSelectPage}
                 onGoHome={() => handleSelectPage('home')}
                 onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
-                onSaveCategories={(newCats) => handleSaveSectionCategories(currentPage, newCats)}
+                onSaveCategories={(newCats) => handleSaveSectionCategories(currentPage as any, newCats)}
                 onRenameCategory={(oldCat, newCat) =>
-                  handleRenameSectionCategory(currentPage, oldCat, newCat)
+                  handleRenameSectionCategory(currentPage as any, oldCat, newCat)
                 }
                 onDeleteCategory={(catToDelete, fallbackCat) =>
-                  handleDeleteSectionCategory(currentPage, catToDelete, fallbackCat)
+                  handleDeleteSectionCategory(currentPage as any, catToDelete, fallbackCat)
                 }
               />
             )}

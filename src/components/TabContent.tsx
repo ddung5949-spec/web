@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { Article, SectionType, SiteConfig, User } from '../types';
 import { ArticleList } from './ArticleList';
-import { categoryOptions } from '../data/initialData';
 
 // Helper function to resolve which Tab an article belongs to
 export const resolveArticleSection = (
@@ -121,9 +120,20 @@ export const TabContent: React.FC<TabContentProps> = ({
     },
   }[sectionKey];
 
+  const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
+  const configuredCategory = Array.isArray(categoriesList)
+    ? categoriesList.find((c: any) =>
+        c.id === sectionKey ||
+        c.targetPage === sectionKey ||
+        c.name === sectionKey ||
+        c.navName === sectionKey ||
+        c.shortLabel === sectionKey
+      )
+    : undefined;
+
   const customSec = siteConfig?.sections?.[sectionKey as keyof typeof siteConfig.sections];
-  const sectionTitle = customSec?.title || tabConfig.title;
-  const sectionSubtitle = customSec?.subTitle || customSec?.desc || tabConfig.subTitle;
+  const sectionTitle = configuredCategory?.name || customSec?.title || tabConfig.title;
+  const sectionSubtitle = configuredCategory?.description || customSec?.subTitle || customSec?.desc || tabConfig.subTitle;
   const Icon = tabConfig.icon;
 
   // Lọc tất cả các bài thuộc tab hiện tại (dùng resolveArticleSection)
@@ -134,19 +144,19 @@ export const TabContent: React.FC<TabContentProps> = ({
     });
   }, [articles, sectionKey]);
 
-  // Lấy danh sách chuyên mục con cho tab
+  // Lấy danh sách chuyên mục con cho tab động 100%
   const availableCategories = useMemo(() => {
-    const baseCats: string[] =
-      (customSec && (customSec as any).categories?.length > 0)
-        ? (customSec as any).categories
-        : categoryOptions[sectionKey] || [];
-
-    const extraCats = tabArticles
-      .map((a) => a.category?.trim())
-      .filter((cat): cat is string => Boolean(cat && !baseCats.some((b) => b.toLowerCase() === cat.toLowerCase())));
-
-    return Array.from(new Set([...baseCats, ...extraCats]));
-  }, [customSec, sectionKey, tabArticles]);
+    if (configuredCategory && Array.isArray(configuredCategory.subcategories) && configuredCategory.subcategories.length > 0) {
+      return configuredCategory.subcategories;
+    }
+    if (configuredCategory && Array.isArray((configuredCategory as any).categories) && (configuredCategory as any).categories.length > 0) {
+      return (configuredCategory as any).categories;
+    }
+    if (customSec && Array.isArray((customSec as any).categories) && (customSec as any).categories.length > 0) {
+      return (customSec as any).categories as string[];
+    }
+    return [];
+  }, [configuredCategory, customSec]);
 
   // Lọc theo Category và Từ khóa tìm kiếm
   const filteredArticles = useMemo(() => {

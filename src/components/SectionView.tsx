@@ -30,7 +30,6 @@ import { Article, PageView, SectionType, SiteConfig, User } from '../types';
 import { ArticleCard } from './ArticleCard';
 import { ArticleList } from './ArticleList';
 import { resolveArticleSection } from './TabContent';
-import { categoryOptions } from '../data/initialData';
 import { CategoryManagerModal } from './modals/CategoryManagerModal';
 
 interface SectionViewProps {
@@ -119,7 +118,13 @@ export const SectionView: React.FC<SectionViewProps> = ({
 
   const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
   const configuredCategory = Array.isArray(categoriesList)
-    ? categoriesList.find((c: any) => c.id === sectionKey)
+    ? categoriesList.find((c: any) =>
+        c.id === sectionKey ||
+        c.targetPage === sectionKey ||
+        c.name === sectionKey ||
+        c.navName === sectionKey ||
+        c.shortLabel === sectionKey
+      )
     : undefined;
 
   const customSec = siteConfig?.sections?.[sectionKey as keyof typeof siteConfig.sections];
@@ -135,26 +140,23 @@ export const SectionView: React.FC<SectionViewProps> = ({
     });
   }, [articles, sectionKey]);
 
+  // 100% Dynamic Subcategories strictly derived from siteConfig.categories_config / sections
   const availableCategories = useMemo(() => {
-    const fromConfigCats = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
-      ? configuredCategory.subcategories
-      : undefined;
+    if (configuredCategory && Array.isArray(configuredCategory.subcategories) && configuredCategory.subcategories.length > 0) {
+      return configuredCategory.subcategories;
+    }
+    if (configuredCategory && Array.isArray((configuredCategory as any).categories) && (configuredCategory as any).categories.length > 0) {
+      return (configuredCategory as any).categories;
+    }
+    if (customSec && Array.isArray((customSec as any).categories) && (customSec as any).categories.length > 0) {
+      return (customSec as any).categories as string[];
+    }
+    return [];
+  }, [configuredCategory, customSec]);
 
-    const baseCats: string[] = fromConfigCats
-      ? fromConfigCats
-      : (customSec && (customSec as any).categories?.length > 0)
-      ? (customSec as any).categories
-      : categoryOptions[sectionKey] || [];
-
-    const extraCats = rawSectionArticles
-      .map((a) => a.category?.trim())
-      .filter((cat): cat is string => Boolean(cat && !baseCats.some((b) => b.toLowerCase() === cat.toLowerCase())));
-
-    return Array.from(new Set([...baseCats, ...extraCats]));
-  }, [configuredCategory, customSec, sectionKey, rawSectionArticles]);
-
+  // Dynamic real-time total views calculation based on actual articles
   const totalViews = useMemo(() => {
-    return rawSectionArticles.reduce((sum, a) => sum + (a.views || 0), 0);
+    return rawSectionArticles.reduce((sum, a) => sum + (Number(a.views) || 0), 0);
   }, [rawSectionArticles]);
 
   const filteredArticles = useMemo(() => {
@@ -524,5 +526,8 @@ export const SectionView: React.FC<SectionViewProps> = ({
     </div>
   );
 };
+
+export const CategoryView = SectionView;
+export const CategoryPage = SectionView;
 
 

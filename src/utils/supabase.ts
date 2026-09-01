@@ -467,10 +467,49 @@ export const supabaseDb = {
     const supabase = getSupabase();
     if (!supabase) return;
 
+    const numId = Number(articleId);
+    const newViews = (Number(currentViews) || 0) + 1;
+
     try {
-      await supabase.from('articles').update({ views: currentViews + 1 }).eq('id', articleId);
+      // 1. Try calling the PostgreSQL RPC function first
+      const { error: rpcError } = await supabase.rpc('increment_article_views', {
+        article_id: numId,
+      });
+
+      if (!rpcError) {
+        return;
+      }
+    } catch (rpcErr) {
+      // ignore and proceed to direct update fallback
+    }
+
+    try {
+      // 2. Fallback to direct row update
+      await supabase.from('articles').update({ views: newViews }).eq('id', numId);
     } catch (err) {
-      console.warn('Supabase incrementArticleViews failed:', err);
+      console.warn('Supabase incrementArticleViews fallback failed:', err);
+    }
+  },
+
+  async upsertCategoriesConfig(categoriesConfig: any[]): Promise<{ success: boolean; error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
+
+    try {
+      const { error } = await supabase.from('site_config').upsert(
+        {
+          id: 'default',
+          categories_config: categoriesConfig,
+          categories: categoriesConfig,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Supabase upsertCategoriesConfig failed:', err);
+      return { success: false, error: err?.message || 'Lỗi lưu cấu hình danh mục' };
     }
   },
 
