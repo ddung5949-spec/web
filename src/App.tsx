@@ -2739,6 +2739,7 @@ export function App() {
         siteConfig={siteConfig}
         currentUser={currentUser}
         onSelectPage={handleSelectPage}
+        onUpdateSiteConfig={handleSaveCustomizer}
       />
 
       {/* 6. Modals (Suspense Code-Splitting) */}
