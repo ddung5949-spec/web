@@ -132,21 +132,21 @@ export const Header: React.FC<HeaderProps> = ({
               establishedDate={siteConfig.establishedDate}
             />
             <div>
-              <h1 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-wide text-white leading-tight drop-shadow-xs group-hover:text-amber-200 transition-colors">
+              <h1 className="text-sm md:text-base lg:text-xl font-black uppercase tracking-wide text-white leading-tight drop-shadow-xs group-hover:text-amber-200 transition-colors">
                 {siteConfig.title}
               </h1>
-              <h2 className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-white/90 mt-0.5">
+              <h2 className="text-[10px] md:text-xs lg:text-sm font-semibold uppercase tracking-wider text-white/90 mt-0.5">
                 {siteConfig.subtitle}
               </h2>
             </div>
           </div>
 
           {/* Top Right Controls: Oval Time Box + Auth / User Dropdown (Close to bottom border & tabs) */}
-          <div className="flex items-center flex-wrap justify-center md:justify-end gap-2 sm:gap-2.5 pb-0.5">
+          <div className="flex items-center flex-wrap sm:flex-nowrap justify-center md:justify-end gap-2 sm:gap-2.5 pb-0.5">
             {/* 1. Khung thời gian nằm trong khung oval nền vàng */}
             <div
               id="header-time-oval"
-              className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-red-950 px-2.5 sm:px-3 py-1 rounded-full shadow-xs border border-amber-200 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold tracking-tight"
+              className="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-red-950 px-2 sm:px-3 py-1 rounded-full shadow-xs border border-amber-200 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold tracking-tight shrink-0"
             >
               <div className="flex items-center gap-1 text-red-900 font-extrabold">
                 <Clock className="w-3.5 h-3.5 text-red-800 animate-pulse" />

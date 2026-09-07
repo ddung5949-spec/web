@@ -197,7 +197,7 @@ export function App() {
     } catch {
       // ignore
     }
-    return safeStore.get('mangyang_articles', []);
+    return defaultArticles;
   });
 
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
@@ -210,18 +210,51 @@ export function App() {
     } catch {
       // ignore
     }
-    return safeStore.get('mangyang_documents', []);
+    return defaultDocuments;
   });
 
-  const [lectures, setLectures] = useState<LectureItem[]>([]);
+  const [lectures, setLectures] = useState<LectureItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('lectures_cache') || localStorage.getItem('mangyang_lectures');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultLectures;
+  });
 
-  const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>([]);
+  const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>(() => {
+    try {
+      const cached = localStorage.getItem('uncle_ho_quotes_cache') || localStorage.getItem('mangyang_uncle_ho_quotes');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultUncleHoQuotes;
+  });
 
   const [uncleHoSettings, setUncleHoSettings] = useState<UncleHoSettings>(() =>
     safeStore.get('mangyang_uncle_ho_settings', defaultUncleHoSettings)
   );
 
-  const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>([]);
+  const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('meeting_documents_cache') || localStorage.getItem('mangyang_meeting_documents');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultMeetingDocuments;
+  });
 
   const [meetingSettings, setMeetingSettings] = useState<MeetingRoomSettings>(() =>
     safeStore.get('mangyang_meeting_settings', defaultMeetingSettings)
@@ -231,7 +264,18 @@ export function App() {
     safeStore.get('mangyang_meeting_votes', {})
   );
 
-  const [meetingRooms, setMeetingRooms] = useState<MeetingRoomItem[]>([]);
+  const [meetingRooms, setMeetingRooms] = useState<MeetingRoomItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('meeting_rooms_cache') || localStorage.getItem('mangyang_meeting_rooms');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultMeetingRooms;
+  });
 
   const [roles, setRoles] = useState<RoleDefinition[]>(() =>
     safeStore.get('mangyang_custom_roles', defaultRoles)
@@ -335,30 +379,24 @@ export function App() {
   // Initial Database-First fetch & Realtime subscription
   useEffect(() => {
     let isMounted = true;
-    setIsLoadingData(true);
+    // Do not block initial render since instant cache hydration is in place
+    setIsLoadingData(false);
 
-    // 1. Parallel Database-First fetch for 100% of users (authenticated and anonymous)
+    // 1. Parallel Database-First fetch with Promise.allSettled and query payload trimming
     const fetchGlobalData = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
 
-        const [
-          configRes,
-          postersRes,
-          articlesRes,
-          docsRes,
-          lecturesRes,
-          quotesRes,
-          roomsRes,
-          meetDocsRes,
-          meetSettingsRes,
-          meetVotesRes,
-          usersRes,
-        ] = await Promise.all([
+        // QUERY PAYLOAD TRIMMING: Tuyệt đối không tải cột nội dung dài `content` ra trang chủ!
+        const results = await Promise.allSettled([
           supabase.from('site_config').select('*').eq('id', 'default').maybeSingle(),
           supabase.from('daily_posters').select('*'),
-          supabase.from('articles').select('*').order('published_at', { ascending: false }).limit(60),
+          supabase
+            .from('articles')
+            .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, created_at, published_at')
+            .order('created_at', { ascending: false })
+            .limit(60),
           supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(60),
           supabase.from('lectures').select('*').order('created_at', { ascending: false }).limit(60),
           supabase.from('uncle_ho_quotes').select('*').limit(366),
@@ -370,6 +408,21 @@ export function App() {
         ]);
 
         if (!isMounted) return;
+
+        const getResult = (settled: PromiseSettledResult<any>) =>
+          settled.status === 'fulfilled' ? settled.value : { data: null, error: (settled as any).reason };
+
+        const configRes = getResult(results[0]);
+        const postersRes = getResult(results[1]);
+        const articlesRes = getResult(results[2]);
+        const docsRes = getResult(results[3]);
+        const lecturesRes = getResult(results[4]);
+        const quotesRes = getResult(results[5]);
+        const roomsRes = getResult(results[6]);
+        const meetDocsRes = getResult(results[7]);
+        const meetSettingsRes = getResult(results[8]);
+        const meetVotesRes = getResult(results[9]);
+        const usersRes = getResult(results[10]);
 
         // 1.1 Process site_config
         if (configRes.data) {
@@ -554,19 +607,40 @@ export function App() {
           });
         }
 
-        // 1.3 Process articles
-        if (articlesRes.data && Array.isArray(articlesRes.data) && articlesRes.data.length > 0) {
-          const mappedArticles: Article[] = articlesRes.data.map((row: any) => supabaseDb.mapRowToArticle(row));
+        // 1.3 Process articles (Query Payload Trimming + Safe Fallback)
+        let articlesData: any[] | null = null;
+        if (articlesRes && articlesRes.data && Array.isArray(articlesRes.data) && articlesRes.data.length > 0) {
+          articlesData = articlesRes.data;
+        } else if (articlesRes && articlesRes.error) {
+          // Fallback an toàn với các cột cơ bản nếu bảng articles chưa có cột mở rộng
+          try {
+            const fallbackRes = await supabase
+              .from('articles')
+              .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, created_at')
+              .order('created_at', { ascending: false })
+              .limit(60);
+            if (fallbackRes.data && Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0) {
+              articlesData = fallbackRes.data;
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        if (articlesData && Array.isArray(articlesData) && articlesData.length > 0) {
+          const mappedArticles: Article[] = articlesData.map((row: any) => supabaseDb.mapRowToArticle(row));
           setArticles(mappedArticles);
+          safeStore.set('mangyang_articles', mappedArticles);
           try {
             localStorage.setItem('articles_cache', JSON.stringify(mappedArticles));
+            localStorage.setItem('mangyang_articles', JSON.stringify(mappedArticles));
           } catch {
             // ignore
           }
         }
 
         // 1.4 Process documents
-        if (docsRes.data && Array.isArray(docsRes.data) && docsRes.data.length > 0) {
+        if (docsRes && docsRes.data && Array.isArray(docsRes.data) && docsRes.data.length > 0) {
           const mappedDocs: DocumentItem[] = docsRes.data.map((item: any) => ({
             id: Number(item.id),
             code: item.code || '',
@@ -586,32 +660,53 @@ export function App() {
           safeStore.set('mangyang_documents', mappedDocs);
           try {
             localStorage.setItem('documents_cache', JSON.stringify(mappedDocs));
+            localStorage.setItem('mangyang_documents', JSON.stringify(mappedDocs));
           } catch {
             // ignore
           }
         }
 
         // 1.5 Process lectures
-        if (lecturesRes.data && Array.isArray(lecturesRes.data) && lecturesRes.data.length > 0) {
+        if (lecturesRes && lecturesRes.data && Array.isArray(lecturesRes.data) && lecturesRes.data.length > 0) {
           setLectures(lecturesRes.data as any);
+          try {
+            localStorage.setItem('lectures_cache', JSON.stringify(lecturesRes.data));
+          } catch {
+            // ignore
+          }
         }
 
         // 1.6 Process uncle_ho_quotes
-        if (quotesRes.data && Array.isArray(quotesRes.data) && quotesRes.data.length > 0) {
+        if (quotesRes && quotesRes.data && Array.isArray(quotesRes.data) && quotesRes.data.length > 0) {
           setUncleHoQuotes(quotesRes.data as any);
+          try {
+            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(quotesRes.data));
+          } catch {
+            // ignore
+          }
         }
 
         // 1.7 Process meeting data
-        if (roomsRes.data && Array.isArray(roomsRes.data) && roomsRes.data.length > 0) {
+        if (roomsRes && roomsRes.data && Array.isArray(roomsRes.data) && roomsRes.data.length > 0) {
           setMeetingRooms(roomsRes.data as any);
+          try {
+            localStorage.setItem('meeting_rooms_cache', JSON.stringify(roomsRes.data));
+          } catch {
+            // ignore
+          }
         }
-        if (meetDocsRes.data && Array.isArray(meetDocsRes.data) && meetDocsRes.data.length > 0) {
+        if (meetDocsRes && meetDocsRes.data && Array.isArray(meetDocsRes.data) && meetDocsRes.data.length > 0) {
           setMeetingDocuments(meetDocsRes.data as any);
+          try {
+            localStorage.setItem('meeting_documents_cache', JSON.stringify(meetDocsRes.data));
+          } catch {
+            // ignore
+          }
         }
-        if (meetSettingsRes.data) {
+        if (meetSettingsRes && meetSettingsRes.data) {
           setMeetingSettings((prev) => ({ ...prev, ...(meetSettingsRes.data as any) }));
         }
-        if (meetVotesRes.data && Array.isArray(meetVotesRes.data) && meetVotesRes.data.length > 0) {
+        if (meetVotesRes && meetVotesRes.data && Array.isArray(meetVotesRes.data) && meetVotesRes.data.length > 0) {
           const voteMap: Record<number, any> = {};
           meetVotesRes.data.forEach((v: any) => {
             if (v.id) voteMap[v.id] = v;
@@ -620,7 +715,7 @@ export function App() {
         }
 
         // 1.8 Process users
-        if (usersRes.data && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
+        if (usersRes && usersRes.data && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
           setUsers(usersRes.data as any);
         }
       } catch (err) {
@@ -918,6 +1013,49 @@ export function App() {
     setSelectedArticle(updatedArticle);
     setCurrentPage('article_detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // TỐI ƯU ZERO DELAY: Nếu bài viết danh sách trang chủ chưa có content đầy đủ, nạp ngầm nhanh từ Supabase
+    if (!article.content || article.content === article.summary || article.content === article.excerpt || article.content.length < 60) {
+      const sb = getSupabase();
+      if (sb) {
+        (async () => {
+          try {
+            const { data } = await sb
+              .from('articles')
+              .select('id, content, images, embed_code')
+              .eq('id', article.id)
+              .maybeSingle();
+
+            if (data && data.content) {
+              setSelectedArticle((prev) =>
+                prev && String(prev.id) === String(article.id)
+                  ? {
+                      ...prev,
+                      content: data.content,
+                      images: data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : prev.images,
+                      embedCode: data.embed_code || prev.embedCode,
+                    }
+                  : prev
+              );
+              setArticles((prev) =>
+                prev.map((a) =>
+                  String(a.id) === String(article.id)
+                    ? {
+                        ...a,
+                        content: data.content,
+                        images: data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : a.images,
+                        embedCode: data.embed_code || a.embedCode,
+                      }
+                    : a
+                )
+              );
+            }
+          } catch {
+            // ignore
+          }
+        })();
+      }
+    }
   };
 
   // Auth Handlers

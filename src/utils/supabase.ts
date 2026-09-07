@@ -361,27 +361,29 @@ export const supabaseDb = {
     };
   },
 
-  async fetchArticles(): Promise<Article[] | null> {
+  async fetchArticles(fullContent = false): Promise<Article[] | null> {
     const supabase = getSupabase();
     if (!supabase) return null;
 
     try {
-      let { data, error } = await supabase
-        .from('articles')
-        .select('*')
+      const selectCols = fullContent
+        ? '*'
+        : 'id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, created_at, published_at';
+
+      let { data, error } = await (supabase.from('articles') as any)
+        .select(selectCols)
         .order('created_at', { ascending: false });
 
       if (error) {
-        const resId = await supabase
-          .from('articles')
-          .select('*')
+        const resId = await (supabase.from('articles') as any)
+          .select('id, title, category, author, date, image, excerpt, summary, views, status, section_key')
           .order('id', { ascending: false });
 
         if (!resId.error && resId.data) {
           data = resId.data;
           error = null;
         } else {
-          const resAll = await supabase.from('articles').select('*');
+          const resAll = await (supabase.from('articles') as any).select('*');
           data = resAll.data;
           error = resAll.error;
         }
@@ -396,6 +398,26 @@ export const supabaseDb = {
       }
 
       return data.map((item: any): Article => supabaseDb.mapRowToArticle(item));
+    } catch {
+      return null;
+    }
+  },
+
+  async fetchArticleById(id: number | string): Promise<{ content?: string; images?: any[]; embedCode?: string } | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('id, content, images, embed_code')
+        .eq('id', id)
+        .maybeSingle();
+      if (error || !data) return null;
+      return {
+        content: data.content,
+        images: data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : undefined,
+        embedCode: data.embed_code || undefined,
+      };
     } catch {
       return null;
     }
