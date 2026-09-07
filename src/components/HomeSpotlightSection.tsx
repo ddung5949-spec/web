@@ -115,6 +115,8 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
               alt={primaryArticle.title}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
             />
             <div className="absolute top-2.5 left-2.5">
               <span className="bg-red-700 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-sm">
@@ -175,6 +177,8 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
                     alt={art.title}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">

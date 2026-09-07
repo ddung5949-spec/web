@@ -254,6 +254,8 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
             src={albumImages[currentSlideIndex % albumImages.length]}
             alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
             className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
+            loading="lazy"
+            decoding="async"
             referrerPolicy="no-referrer"
             onError={(e) => {
               const target = e.currentTarget;
@@ -529,6 +531,8 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
               src={lightboxImage}
               alt="Chân dung Bác Hồ phóng to"
               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border-2 border-amber-400"
+              loading="lazy"
+              decoding="async"
               onClick={(e) => e.stopPropagation()}
             />
             <p className="text-amber-200 text-xs font-bold mt-2 text-center">

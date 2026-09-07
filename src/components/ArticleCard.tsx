@@ -33,6 +33,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
           alt={article.title}
           className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
           loading="lazy"
+          decoding="async"
         />
         <div className="absolute top-2 left-2">
           <span className="bg-white/95 text-[#b91c1c] text-[10px] font-bold px-2 py-0.5 rounded border border-[#e2e8f0] uppercase tracking-wider shadow-xs">

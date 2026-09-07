@@ -382,350 +382,442 @@ export function App() {
     // Do not block initial render since instant cache hydration is in place
     setIsLoadingData(false);
 
-    // 1. Parallel Database-First fetch with Promise.allSettled and query payload trimming
-    const fetchGlobalData = async () => {
+    // Safe cache helpers to avoid storing heavy Base64 strings or full article content
+    const safeCacheArticles = (list: Article[]) => {
       try {
-        const supabase = getSupabase();
-        if (!supabase) return;
-
-        // QUERY PAYLOAD TRIMMING: Tuyệt đối không tải cột nội dung dài `content` ra trang chủ!
-        const results = await Promise.allSettled([
-          supabase.from('site_config').select('*').eq('id', 'default').maybeSingle(),
-          supabase.from('daily_posters').select('*'),
-          supabase
-            .from('articles')
-            .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, created_at, published_at')
-            .order('created_at', { ascending: false })
-            .limit(60),
-          supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(60),
-          supabase.from('lectures').select('*').order('created_at', { ascending: false }).limit(60),
-          supabase.from('uncle_ho_quotes').select('*').limit(366),
-          supabase.from('meeting_rooms').select('*').order('created_at', { ascending: false }).limit(30),
-          supabase.from('meeting_documents').select('*').limit(50),
-          supabase.from('meeting_settings').select('*').maybeSingle(),
-          supabase.from('meeting_votes').select('*'),
-          supabase.from('users').select('*').limit(100),
-        ]);
-
-        if (!isMounted) return;
-
-        const getResult = (settled: PromiseSettledResult<any>) =>
-          settled.status === 'fulfilled' ? settled.value : { data: null, error: (settled as any).reason };
-
-        const configRes = getResult(results[0]);
-        const postersRes = getResult(results[1]);
-        const articlesRes = getResult(results[2]);
-        const docsRes = getResult(results[3]);
-        const lecturesRes = getResult(results[4]);
-        const quotesRes = getResult(results[5]);
-        const roomsRes = getResult(results[6]);
-        const meetDocsRes = getResult(results[7]);
-        const meetSettingsRes = getResult(results[8]);
-        const meetVotesRes = getResult(results[9]);
-        const usersRes = getResult(results[10]);
-
-        // 1.1 Process site_config
-        if (configRes.data) {
-          const config = configRes.data;
-          let parsed = config.config_json || config.config || config.data || config;
-          if (typeof parsed === 'string') {
-            try {
-              parsed = JSON.parse(parsed);
-            } catch {
-              // ignore
-            }
+        const lightweight = list.slice(0, 20).map((art) => {
+          const copy: any = { ...art };
+          delete copy.content; // Tuyệt đối không lưu content chi tiết vào localStorage danh sách
+          if (typeof copy.image === 'string' && copy.image.startsWith('data:image') && copy.image.length > 2000) {
+            copy.image = '';
           }
-          const mergedConfig: any = typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
-          if (config.title) mergedConfig.title = config.title;
-          if (config.subtitle) mergedConfig.subtitle = config.subtitle;
-          if (config.unit_name) mergedConfig.footerUnitName = config.unit_name;
-          if (config.theme_color) mergedConfig.colorRed = config.theme_color;
-          if (config.marquee_text) {
-            mergedConfig.ticker = config.marquee_text;
-            mergedConfig.marquee_text = config.marquee_text;
-          }
-          if (config.marquee_mode) {
-            mergedConfig.marquee_mode = config.marquee_mode;
-            mergedConfig.tickerMode = config.marquee_mode === 'today' ? 'auto_today' : config.marquee_mode === 'recent_days' ? 'auto_days' : config.marquee_mode;
-          }
-          if (config.marquee_days !== undefined) {
-            mergedConfig.marquee_days = config.marquee_days;
-            mergedConfig.tickerDays = config.marquee_days;
-          }
-          if (config.marquee_speed) {
-            mergedConfig.marquee_speed = config.marquee_speed;
-            mergedConfig.tickerSpeed = config.marquee_speed;
-          }
-          if (config.announcements && Array.isArray(config.announcements)) {
-            mergedConfig.announcements = config.announcements;
-            mergedConfig.tickerCustomList = config.announcements;
-          }
-          if (config.site_info) {
-            mergedConfig.site_info = config.site_info;
-          }
-          if (config.footer_config) {
-            mergedConfig.footer_config = config.footer_config;
-          }
-
-          const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
-          if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
-            mergedConfig.quickActionCards = rawUtils;
-            mergedConfig.homeQuickActions = rawUtils;
-            mergedConfig.military_utilities = rawUtils;
-          }
-
-          const hoImgs = config.uncle_ho_images || mergedConfig.uncle_ho_images || mergedConfig.uncleHoSettings?.images;
-          if (Array.isArray(hoImgs) && hoImgs.length > 0) {
-            const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
-            setUncleHoSettings((prev) => ({
-              ...prev,
-              ...(mergedConfig.uncleHoSettings || mergedConfig.uncle_ho_settings || {}),
-              images: cleanImgs,
-              bannerTitle: mergedConfig.uncleHoSettings?.bannerTitle || prev.bannerTitle,
-            }));
-            try {
-              localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
-              localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
-            } catch {
-              // ignore
-            }
-          }
-
-          setSiteConfig((prev) => ({
-            ...prev,
-            ...mergedConfig,
-          }));
-          safeStore.set('mangyang_site_config', { ...mergedConfig });
-          try {
-            localStorage.setItem('site_config_cache', JSON.stringify(mergedConfig));
-          } catch {
-            // ignore
-          }
-        }
-
-        // 1.2 Process daily_posters
-        if (postersRes.data && postersRes.data.length > 0) {
-          const posters = postersRes.data;
-          const posterMap: Record<string, any> = {};
-          posters.forEach((p: any) => {
-            const id = (p.id || p.key || p.widget_id || '').replace(/^widget_/, '');
-            const normKey =
-              id === 'uncle_ho' || id === 'uncleHo' || id === 'bac_ho'
-                ? 'uncle_ho'
-                : id === 'safety_message' || id === 'safety'
-                ? 'safety'
-                : id === 'traffic_situation' || id === 'traffic'
-                ? 'traffic'
-                : id === 'good_deed'
-                ? 'good_deed'
-                : id;
-
-            const entry = {
-              id: normKey,
-              image_data: p.image_data || p.imageUrl || p.image || '',
-              aspect_ratio: p.aspect_ratio || p.aspectRatio || p.aspectRatioMode || 'auto',
-              title: p.title || '',
-              category_name: p.category_name || p.categoryName || '',
-              content: p.content || '',
-              extra_data: p.extra_data || {},
-              updated_at: p.updated_at || p.updatedAt || '',
-            };
-            posterMap[normKey] = entry;
-            posterMap[id] = entry;
-            if (normKey === 'safety') posterMap['safety_message'] = entry;
-            if (normKey === 'traffic') posterMap['traffic_situation'] = entry;
-          });
-
-          try {
-            localStorage.setItem('daily_posters', JSON.stringify(posterMap));
-            localStorage.setItem('daily_posters_cache', JSON.stringify(posterMap));
-          } catch {
-            // ignore
-          }
-
-          if (posterMap['uncle_ho']) {
-            const hoData = posterMap['uncle_ho'];
-            const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
-            if (Array.isArray(hoImages) && hoImages.length > 0) {
-              const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));
-              setUncleHoSettings((prev) => ({
-                ...prev,
-                images: cleanImages,
-                bannerTitle: hoData.title || prev.bannerTitle,
-              }));
-              try {
-                localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImages));
-                localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImages));
-              } catch {
-                // ignore
-              }
-            }
-          }
-
-          setSiteConfig((prev) => {
-            const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
-              ? [...prev.dailyWidgets]
-              : [...defaultDailyWidgets];
-
-            ['safety', 'traffic', 'good_deed'].forEach((k) => {
-              const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
-              const val = posterMap[k] || posterMap[cleanKey];
-              if (val && val.image_data) {
-                const idx = existingWidgets.findIndex(
-                  (w) =>
-                    w.id === cleanKey ||
-                    (k === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
-                    (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation'))
-                );
-                const item: DailyWidgetItem = {
-                  id: cleanKey,
-                  categoryName:
-                    val.category_name ||
-                    (k === 'safety'
-                      ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-                      : k === 'traffic'
-                      ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
-                      : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
-                  title: val.title || '',
-                  imageUrl: val.image_data,
-                  aspectRatioMode: (val.aspect_ratio as any) || 'auto',
-                  updatedAt: val.updated_at,
-                };
-                if (idx >= 0) {
-                  existingWidgets[idx] = { ...existingWidgets[idx], ...item };
-                } else {
-                  existingWidgets.push(item);
-                }
-              }
+          if (Array.isArray(copy.images)) {
+            copy.images = copy.images.filter((img: any) => {
+              const u = typeof img === 'string' ? img : img?.url || '';
+              return !u.startsWith('data:image') || u.length <= 2000;
             });
-
-            return {
-              ...prev,
-              dailyWidgets: existingWidgets,
-              dailyPosters: existingWidgets,
-            };
-          });
-        }
-
-        // 1.3 Process articles (Query Payload Trimming + Safe Fallback)
-        let articlesData: any[] | null = null;
-        if (articlesRes && articlesRes.data && Array.isArray(articlesRes.data) && articlesRes.data.length > 0) {
-          articlesData = articlesRes.data;
-        } else if (articlesRes && articlesRes.error) {
-          // Fallback an toàn với các cột cơ bản nếu bảng articles chưa có cột mở rộng
-          try {
-            const fallbackRes = await supabase
-              .from('articles')
-              .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, created_at')
-              .order('created_at', { ascending: false })
-              .limit(60);
-            if (fallbackRes.data && Array.isArray(fallbackRes.data) && fallbackRes.data.length > 0) {
-              articlesData = fallbackRes.data;
-            }
-          } catch {
-            // ignore
           }
-        }
-
-        if (articlesData && Array.isArray(articlesData) && articlesData.length > 0) {
-          const mappedArticles: Article[] = articlesData.map((row: any) => supabaseDb.mapRowToArticle(row));
-          setArticles(mappedArticles);
-          safeStore.set('mangyang_articles', mappedArticles);
-          try {
-            localStorage.setItem('articles_cache', JSON.stringify(mappedArticles));
-            localStorage.setItem('mangyang_articles', JSON.stringify(mappedArticles));
-          } catch {
-            // ignore
-          }
-        }
-
-        // 1.4 Process documents
-        if (docsRes && docsRes.data && Array.isArray(docsRes.data) && docsRes.data.length > 0) {
-          const mappedDocs: DocumentItem[] = docsRes.data.map((item: any) => ({
-            id: Number(item.id),
-            code: item.code || '',
-            title: item.title || '',
-            category: item.category || 'Văn bản chỉ đạo',
-            issuer: item.issuer || 'Trung đoàn 95',
-            date: item.date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '28/08/2026'),
-            type: item.type || 'pdf',
-            description: item.description || undefined,
-            fileName: item.file_name || item.fileName || undefined,
-            fileSize: item.file_size || item.fileSize || undefined,
-            fileUrl: item.file_url || item.fileUrl || undefined,
-            downloads: Number(item.downloads || 0),
-            secretLevel: item.secret_level || item.secretLevel || 'normal',
-          }));
-          setDocuments(mappedDocs);
-          safeStore.set('mangyang_documents', mappedDocs);
-          try {
-            localStorage.setItem('documents_cache', JSON.stringify(mappedDocs));
-            localStorage.setItem('mangyang_documents', JSON.stringify(mappedDocs));
-          } catch {
-            // ignore
-          }
-        }
-
-        // 1.5 Process lectures
-        if (lecturesRes && lecturesRes.data && Array.isArray(lecturesRes.data) && lecturesRes.data.length > 0) {
-          setLectures(lecturesRes.data as any);
-          try {
-            localStorage.setItem('lectures_cache', JSON.stringify(lecturesRes.data));
-          } catch {
-            // ignore
-          }
-        }
-
-        // 1.6 Process uncle_ho_quotes
-        if (quotesRes && quotesRes.data && Array.isArray(quotesRes.data) && quotesRes.data.length > 0) {
-          setUncleHoQuotes(quotesRes.data as any);
-          try {
-            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(quotesRes.data));
-          } catch {
-            // ignore
-          }
-        }
-
-        // 1.7 Process meeting data
-        if (roomsRes && roomsRes.data && Array.isArray(roomsRes.data) && roomsRes.data.length > 0) {
-          setMeetingRooms(roomsRes.data as any);
-          try {
-            localStorage.setItem('meeting_rooms_cache', JSON.stringify(roomsRes.data));
-          } catch {
-            // ignore
-          }
-        }
-        if (meetDocsRes && meetDocsRes.data && Array.isArray(meetDocsRes.data) && meetDocsRes.data.length > 0) {
-          setMeetingDocuments(meetDocsRes.data as any);
-          try {
-            localStorage.setItem('meeting_documents_cache', JSON.stringify(meetDocsRes.data));
-          } catch {
-            // ignore
-          }
-        }
-        if (meetSettingsRes && meetSettingsRes.data) {
-          setMeetingSettings((prev) => ({ ...prev, ...(meetSettingsRes.data as any) }));
-        }
-        if (meetVotesRes && meetVotesRes.data && Array.isArray(meetVotesRes.data) && meetVotesRes.data.length > 0) {
-          const voteMap: Record<number, any> = {};
-          meetVotesRes.data.forEach((v: any) => {
-            if (v.id) voteMap[v.id] = v;
-          });
-          setMeetingVotes(voteMap);
-        }
-
-        // 1.8 Process users
-        if (usersRes && usersRes.data && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
-          setUsers(usersRes.data as any);
-        }
-      } catch (err) {
-        console.warn('[App] fetchGlobalData error:', err);
-      } finally {
-        if (isMounted) setIsLoadingData(false);
+          return copy;
+        });
+        localStorage.setItem('articles_cache', JSON.stringify(lightweight));
+        localStorage.setItem('mangyang_articles', JSON.stringify(lightweight));
+      } catch (e) {
+        console.warn('Error caching articles:', e);
       }
     };
 
-    fetchGlobalData();
+    const safeCacheDocuments = (list: DocumentItem[]) => {
+      try {
+        const lightweight = list.slice(0, 20);
+        localStorage.setItem('documents_cache', JSON.stringify(lightweight));
+        localStorage.setItem('mangyang_documents', JSON.stringify(lightweight));
+      } catch (e) {
+        console.warn('Error caching documents:', e);
+      }
+    };
+
+    const safeCacheDailyPosters = (map: Record<string, any>) => {
+      try {
+        const lightweight: Record<string, any> = {};
+        Object.entries(map).forEach(([k, v]) => {
+          if (v && typeof v.image_data === 'string' && v.image_data.startsWith('data:image') && v.image_data.length > 300000) {
+            lightweight[k] = { ...v, image_data: '' };
+          } else {
+            lightweight[k] = v;
+          }
+        });
+        localStorage.setItem('daily_posters', JSON.stringify(lightweight));
+        localStorage.setItem('daily_posters_cache', JSON.stringify(lightweight));
+      } catch (e) {
+        console.warn('Error caching daily_posters:', e);
+      }
+    };
+
+    // Helper: Process site_config
+    const processSiteConfigData = (config: any) => {
+      let parsed = config.config_json || config.config || config.data || config;
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // ignore
+        }
+      }
+      const mergedConfig: any = typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+      if (config.title) mergedConfig.title = config.title;
+      if (config.subtitle) mergedConfig.subtitle = config.subtitle;
+      if (config.unit_name) mergedConfig.footerUnitName = config.unit_name;
+      if (config.theme_color) mergedConfig.colorRed = config.theme_color;
+      if (config.marquee_text) {
+        mergedConfig.ticker = config.marquee_text;
+        mergedConfig.marquee_text = config.marquee_text;
+      }
+      if (config.marquee_mode) {
+        mergedConfig.marquee_mode = config.marquee_mode;
+        mergedConfig.tickerMode = config.marquee_mode === 'today' ? 'auto_today' : config.marquee_mode === 'recent_days' ? 'auto_days' : config.marquee_mode;
+      }
+      if (config.marquee_days !== undefined) {
+        mergedConfig.marquee_days = config.marquee_days;
+        mergedConfig.tickerDays = config.marquee_days;
+      }
+      if (config.marquee_speed) {
+        mergedConfig.marquee_speed = config.marquee_speed;
+        mergedConfig.tickerSpeed = config.marquee_speed;
+      }
+      if (config.announcements && Array.isArray(config.announcements)) {
+        mergedConfig.announcements = config.announcements;
+        mergedConfig.tickerCustomList = config.announcements;
+      }
+      if (config.site_info) {
+        mergedConfig.site_info = config.site_info;
+      }
+      if (config.footer_config) {
+        mergedConfig.footer_config = config.footer_config;
+      }
+
+      const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
+      if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
+        mergedConfig.quickActionCards = rawUtils;
+        mergedConfig.homeQuickActions = rawUtils;
+        mergedConfig.military_utilities = rawUtils;
+      }
+
+      const hoImgs = config.uncle_ho_images || mergedConfig.uncle_ho_images || mergedConfig.uncleHoSettings?.images;
+      if (Array.isArray(hoImgs) && hoImgs.length > 0) {
+        const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
+        setUncleHoSettings((prev) => ({
+          ...prev,
+          ...(mergedConfig.uncleHoSettings || mergedConfig.uncle_ho_settings || {}),
+          images: cleanImgs,
+          bannerTitle: mergedConfig.uncleHoSettings?.bannerTitle || prev.bannerTitle,
+        }));
+        try {
+          localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
+          localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
+        } catch {
+          // ignore
+        }
+      }
+
+      setSiteConfig((prev) => ({
+        ...prev,
+        ...mergedConfig,
+      }));
+      safeStore.set('mangyang_site_config', { ...mergedConfig });
+      try {
+        localStorage.setItem('site_config_cache', JSON.stringify(mergedConfig));
+      } catch {
+        // ignore
+      }
+    };
+
+    // Helper: Process daily_posters
+    const processDailyPostersData = (posters: any[]) => {
+      const posterMap: Record<string, any> = {};
+      posters.forEach((p: any) => {
+        const id = (p.id || p.key || p.widget_id || '').replace(/^widget_/, '');
+        const normKey =
+          id === 'uncle_ho' || id === 'uncleHo' || id === 'bac_ho'
+            ? 'uncle_ho'
+            : id === 'safety_message' || id === 'safety'
+            ? 'safety'
+            : id === 'traffic_situation' || id === 'traffic'
+            ? 'traffic'
+            : id === 'good_deed'
+            ? 'good_deed'
+            : id;
+
+        const entry = {
+          id: normKey,
+          image_data: p.image_data || p.imageUrl || p.image || '',
+          aspect_ratio: p.aspect_ratio || p.aspectRatio || p.aspectRatioMode || 'auto',
+          title: p.title || '',
+          category_name: p.category_name || p.categoryName || '',
+          content: p.content || '',
+          extra_data: p.extra_data || {},
+          updated_at: p.updated_at || p.updatedAt || '',
+        };
+        posterMap[normKey] = entry;
+        posterMap[id] = entry;
+        if (normKey === 'safety') posterMap['safety_message'] = entry;
+        if (normKey === 'traffic') posterMap['traffic_situation'] = entry;
+      });
+
+      safeCacheDailyPosters(posterMap);
+
+      if (posterMap['uncle_ho']) {
+        const hoData = posterMap['uncle_ho'];
+        const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
+        if (Array.isArray(hoImages) && hoImages.length > 0) {
+          const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));
+          setUncleHoSettings((prev) => ({
+            ...prev,
+            images: cleanImages,
+            bannerTitle: hoData.title || prev.bannerTitle,
+          }));
+          try {
+            localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImages));
+            localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImages));
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      setSiteConfig((prev) => {
+        const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
+          ? [...prev.dailyWidgets]
+          : [...defaultDailyWidgets];
+
+        ['safety', 'traffic', 'good_deed'].forEach((k) => {
+          const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
+          const val = posterMap[k] || posterMap[cleanKey];
+          if (val && val.image_data) {
+            const idx = existingWidgets.findIndex(
+              (w) =>
+                w.id === cleanKey ||
+                (k === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
+                (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation'))
+            );
+            const item: DailyWidgetItem = {
+              id: cleanKey,
+              categoryName:
+                val.category_name ||
+                (k === 'safety'
+                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
+                  : k === 'traffic'
+                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
+              title: val.title || '',
+              imageUrl: val.image_data,
+              aspectRatioMode: (val.aspect_ratio as any) || 'auto',
+              updatedAt: val.updated_at,
+            };
+            if (idx >= 0) {
+              existingWidgets[idx] = { ...existingWidgets[idx], ...item };
+            } else {
+              existingWidgets.push(item);
+            }
+          }
+        });
+
+        return {
+          ...prev,
+          dailyWidgets: existingWidgets,
+          dailyPosters: existingWidgets,
+        };
+      });
+    };
+
+    // Helper: Process articles
+    const processArticlesData = (articlesData: any[]) => {
+      const mappedArticles: Article[] = articlesData.map((row: any) => supabaseDb.mapRowToArticle(row));
+      setArticles(mappedArticles);
+      safeCacheArticles(mappedArticles);
+    };
+
+    // Helper: Process documents
+    const processDocumentsData = (docsData: any[]) => {
+      const mappedDocs: DocumentItem[] = docsData.map((item: any) => ({
+        id: Number(item.id),
+        code: item.code_number || item.code || '',
+        title: item.title || '',
+        category: item.category || 'Văn bản chỉ đạo',
+        issuer: item.issuer || 'Trung đoàn 95',
+        date: item.date || item.issue_date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '28/08/2026'),
+        type: item.type || item.file_type || 'pdf',
+        description: item.description || undefined,
+        fileName: item.file_name || item.fileName || undefined,
+        fileSize: item.file_size || item.fileSize || undefined,
+        fileUrl: item.file_url || item.fileUrl || undefined,
+        downloads: Number(item.downloads || 0),
+        secretLevel: item.secret_level || item.secretLevel || 'normal',
+      }));
+      setDocuments(mappedDocs);
+      safeCacheDocuments(mappedDocs);
+    };
+
+    // 1. TÁCH RỜI TRUY VẤN - NẠP ĐỘC LẬP TỪNG BẢNG (INDEPENDENT FETCHING)
+    // Bảng nào xong trước lập tức cập nhật giao diện trước, không đợi nhau!
+    const fetchGlobalDataIndependently = () => {
+      const supabase = getSupabase();
+      if (!supabase) return;
+
+      // 1.1 Cấu hình trang & Menu (Nạp trước)
+      supabase
+        .from('site_config')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle()
+        .then(
+          ({ data, error }) => {
+            if (isMounted && !error && data) {
+              processSiteConfigData(data);
+            }
+          },
+          () => {}
+        );
+
+      // 1.2 Bài viết trang chủ (Chỉ lấy bài mới nhất & các cột cần thiết, KHÔNG nạp content)
+      (supabase.from('articles') as any)
+        .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at')
+        .order('created_at', { ascending: false })
+        .limit(16)
+        .then(
+          ({ data, error }: any) => {
+            if (!isMounted) return;
+            if (!error && data && Array.isArray(data) && data.length > 0) {
+              processArticlesData(data);
+            } else {
+              // Fallback nếu cột mở rộng chưa có
+              (supabase.from('articles') as any)
+                .select('id, title, category, author, date, image, excerpt, summary, views, status, section_key, created_at')
+                .order('created_at', { ascending: false })
+                .limit(16)
+                .then(
+                  ({ data: fbData }: any) => {
+                    if (isMounted && fbData && Array.isArray(fbData) && fbData.length > 0) {
+                      processArticlesData(fbData);
+                    }
+                  },
+                  () => {}
+                );
+            }
+          },
+          () => {}
+        );
+
+      // 1.3 Poster 4 chuyên mục (Nạp độc lập)
+      supabase
+        .from('daily_posters')
+        .select('id, title, image_data, aspect_ratio, category_name, content, extra_data, updated_at')
+        .then(
+          ({ data, error }) => {
+            if (isMounted && !error && data && Array.isArray(data) && data.length > 0) {
+              processDailyPostersData(data);
+            }
+          },
+          () => {}
+        );
+
+      // 1.4 Tài liệu (Nạp độc lập - chỉ lấy mục trang chủ)
+      supabase
+        .from('documents')
+        .select('id, code, code_number, title, category, issuer, date, issue_date, type, file_type, file_url, downloads, created_at')
+        .order('created_at', { ascending: false })
+        .limit(8)
+        .then(
+          ({ data, error }) => {
+            if (isMounted && !error && data && Array.isArray(data) && data.length > 0) {
+              processDocumentsData(data);
+            }
+          },
+          () => {}
+        );
+
+      // 1.5 Các bảng dữ liệu phụ (Chạy nền song song, không làm chậm giao diện chính)
+      supabase
+        .from('lectures')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30)
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              setLectures(data as any);
+              try { localStorage.setItem('lectures_cache', JSON.stringify(data)); } catch {}
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('uncle_ho_quotes')
+        .select('*')
+        .limit(366)
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              setUncleHoQuotes(data as any);
+              try { localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(data)); } catch {}
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('meeting_rooms')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              setMeetingRooms(data as any);
+              try { localStorage.setItem('meeting_rooms_cache', JSON.stringify(data)); } catch {}
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('meeting_documents')
+        .select('*')
+        .limit(30)
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              setMeetingDocuments(data as any);
+              try { localStorage.setItem('meeting_documents_cache', JSON.stringify(data)); } catch {}
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('meeting_settings')
+        .select('*')
+        .maybeSingle()
+        .then(
+          ({ data }) => {
+            if (isMounted && data) {
+              setMeetingSettings((prev) => ({ ...prev, ...(data as any) }));
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('meeting_votes')
+        .select('*')
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              const voteMap: Record<number, any> = {};
+              data.forEach((v: any) => {
+                if (v.id) voteMap[v.id] = v;
+              });
+              setMeetingVotes(voteMap);
+            }
+          },
+          () => {}
+        );
+
+      supabase
+        .from('users')
+        .select('*')
+        .limit(50)
+        .then(
+          ({ data }) => {
+            if (isMounted && data && Array.isArray(data) && data.length > 0) {
+              setUsers(data as any);
+            }
+          },
+          () => {}
+        );
+    };
+
+    fetchGlobalDataIndependently();
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
     const unsub = cloudStorage.subscribeAll({

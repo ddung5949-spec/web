@@ -403,6 +403,91 @@ export const supabaseDb = {
     }
   },
 
+  /**
+   * TỐI ƯU TRANG CHỦ: Chỉ lấy 8-16 bài viết mới nhất với các cột cần thiết,
+   * TUYỆT ĐỐI không nạp trường content để tiết kiệm 90% dung lượng mạng.
+   */
+  async fetchHomeArticles(limit = 12): Promise<Article[] | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const selectCols = 'id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at';
+      let { data, error } = await (supabase.from('articles') as any)
+        .select(selectCols)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        const fb = await (supabase.from('articles') as any)
+          .select('id, title, category, author, date, image, excerpt, summary, views, status, section_key, created_at')
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        data = fb.data;
+        error = fb.error;
+      }
+
+      if (error || !data || !Array.isArray(data)) return null;
+      return data.map((item: any): Article => supabaseDb.mapRowToArticle(item));
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * TỐI ƯU TRANG CHỦ: Chỉ lấy tài liệu cho trang chủ với các cột cần thiết
+   */
+  async fetchHomeDocuments(limit = 6): Promise<any[] | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await (supabase.from('documents') as any)
+        .select('id, title, code, code_number, category, file_type, file_url, issue_date, signer, created_at')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error || !data || !Array.isArray(data)) return null;
+      return data.map((item: any) => ({
+        id: Number(item.id),
+        code: item.code_number || item.code || '',
+        title: item.title || '',
+        category: item.category || 'Văn bản',
+        fileType: (item.file_type || 'PDF').toUpperCase(),
+        fileUrl: item.file_url || '',
+        issueDate: item.issue_date || '',
+        signer: item.signer || '',
+      }));
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * TỐI ƯU TRANG CHỦ: Nạp độc lập danh sách 4 poster chuyên mục
+   */
+  async fetchDailyPostersMap(): Promise<Record<string, any> | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('daily_posters')
+        .select('id, title, image_data, aspect_ratio, category_name, content, extra_data, updated_at');
+
+      if (error || !data || !Array.isArray(data)) return null;
+      const pMap: Record<string, any> = {};
+      data.forEach((p: any) => {
+        const rawId = (p.id || p.key || '').replace(/^widget_/, '');
+        pMap[rawId] = p;
+        pMap[p.id] = p;
+      });
+      return pMap;
+    } catch {
+      return null;
+    }
+  },
+
   async fetchArticleById(id: number | string): Promise<{ content?: string; images?: any[]; embedCode?: string } | null> {
     const supabase = getSupabase();
     if (!supabase) return null;

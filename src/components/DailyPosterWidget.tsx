@@ -409,6 +409,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
                 alt={currentItem.categoryName}
                 className={`rounded-lg transition-transform duration-300 group-hover:scale-[1.02] ${getAspectRatioClasses()}`}
                 loading="lazy"
+                decoding="async"
               />
 
               {/* Hover overlay hint */}
@@ -470,6 +471,8 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
                 src={currentItem.imageUrl}
                 alt={currentItem.categoryName}
                 className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+                loading="lazy"
+                decoding="async"
               />
             </div>
           </div>

@@ -187,8 +187,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
           try {
             const currentCache = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
             const mergedCache = currentCache ? { ...JSON.parse(currentCache), ...map } : map;
-            localStorage.setItem('daily_posters', JSON.stringify(mergedCache));
-            localStorage.setItem('daily_posters_cache', JSON.stringify(mergedCache));
+            // Làm nhẹ localStorage: loại bớt ảnh Base64 quá lớn
+            const lightweightMap: Record<string, any> = {};
+            Object.entries(mergedCache).forEach(([k, v]: [string, any]) => {
+              if (v && typeof v.image_data === 'string' && v.image_data.startsWith('data:image') && v.image_data.length > 300000) {
+                lightweightMap[k] = { ...v, image_data: '' };
+              } else {
+                lightweightMap[k] = v;
+              }
+            });
+            localStorage.setItem('daily_posters', JSON.stringify(lightweightMap));
+            localStorage.setItem('daily_posters_cache', JSON.stringify(lightweightMap));
           } catch {
             // ignore
           }
@@ -936,39 +945,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           </div>
                         )}
                       </div>
-                    ) : isLoading ? (
-                      <div className="p-3 divide-y divide-gray-100 space-y-2.5 flex-1">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="pt-2 first:pt-0 space-y-1.5 animate-pulse">
-                            <div className="w-11/12 h-3.5 bg-gray-200 rounded" />
-                            <div className="w-1/2 h-2.5 bg-gray-200 rounded" />
+                    ) : colArticles.length > 0 ? (
+                      <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
+                        {colArticles.map((art) => (
+                          <div
+                            key={art.id}
+                            onClick={() => onOpenArticle(art)}
+                            className="pt-2 first:pt-0 group/item cursor-pointer"
+                          >
+                            <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-red-700 leading-snug line-clamp-2 transition-colors">
+                              {art.title}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
+                              <span className="truncate max-w-[120px]">{art.author}</span>
+                              <span>•</span>
+                              <span>{art.date}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
-                        {colArticles.length > 0 ? (
-                          colArticles.map((art) => (
-                            <div
-                              key={art.id}
-                              onClick={() => onOpenArticle(art)}
-                              className="pt-2 first:pt-0 group/item cursor-pointer"
-                            >
-                              <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-red-700 leading-snug line-clamp-2 transition-colors">
-                                {art.title}
-                              </h4>
-                              <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
-                                <span className="truncate max-w-[120px]">{art.author}</span>
-                                <span>•</span>
-                                <span>{art.date}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="flex flex-col items-center justify-center h-full text-center py-6 text-gray-400">
-                            <p className="text-xs italic">Đang cập nhật tin bài...</p>
-                          </div>
-                        )}
+                      <div className="flex flex-col items-center justify-center h-full text-center py-6 text-gray-400 flex-1">
+                        <p className="text-xs italic">Đang cập nhật tin bài...</p>
                       </div>
                     )}
                   </div>
