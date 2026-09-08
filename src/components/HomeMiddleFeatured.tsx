@@ -13,6 +13,7 @@ import {
   UserPen,
 } from 'lucide-react';
 import { Article, HomeAnnouncement, User } from '../types';
+import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
 
 interface HomeMiddleFeaturedProps {
   articles: Article[];
@@ -77,7 +78,7 @@ export const HomeMiddleFeatured: React.FC<HomeMiddleFeaturedProps> = ({
               <img
                 src={
                   currentArticle.image ||
-                  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
+                  MILITARY_FALLBACK_BANNER
                 }
                 alt={currentArticle.title}
                 referrerPolicy="no-referrer"

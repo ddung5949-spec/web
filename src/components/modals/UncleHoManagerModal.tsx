@@ -435,7 +435,7 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 mt-3.5">
-                    {slideshowImages.map((imgUrl, index) => (
+                    {slideshowImages.filter((url) => typeof url === 'string' && url.trim() !== '').map((imgUrl, index) => (
                       <div
                         key={`img-${index}`}
                         className="relative rounded-xl overflow-hidden border-2 border-amber-300/80 bg-gray-900 group shadow-xs flex flex-col justify-between"

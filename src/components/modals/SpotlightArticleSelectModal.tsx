@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { Article } from '../../types';
+import { MILITARY_FALLBACK_BANNER } from '../../data/initialData';
 
 interface SpotlightArticleSelectModalProps {
   articles: Article[];
@@ -131,7 +132,7 @@ export const SpotlightArticleSelectModal: React.FC<
                   {/* Thumbnail Image */}
                   <div className="w-20 h-16 rounded-lg overflow-hidden bg-slate-900 shrink-0 relative">
                     <img
-                      src={art.image}
+                      src={art.image || MILITARY_FALLBACK_BANNER}
                       alt={art.title}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"

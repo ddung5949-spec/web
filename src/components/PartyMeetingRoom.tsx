@@ -59,6 +59,7 @@ import {
 } from '../types';
 import { getSupabase } from '../utils/supabase';
 import { toast } from './Toast';
+import { MILITARY_FALLBACK_AVATAR } from '../data/initialData';
 
 interface OnlineParticipant {
   userId: number;
@@ -2122,7 +2123,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                     {eligibleVoters.slice(0, 4).map((voter) => (
                       <img
                         key={voter.id}
-                        src={voter.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                        src={voter.avatar || MILITARY_FALLBACK_AVATAR}
                         alt={voter.fullName}
                         title={`${voter.fullName} (${voter.rankUnit})`}
                         className="inline-block h-5 w-5 rounded-full ring-2 ring-white object-cover"
@@ -2247,7 +2248,7 @@ export const PartyMeetingRoom: React.FC<PartyMeetingRoomProps> = ({
                     <div className="flex items-center gap-2 truncate">
                       <div className="relative shrink-0">
                         <img
-                          src={member.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                          src={member.avatar || MILITARY_FALLBACK_AVATAR}
                           alt={member.userName}
                           className="w-5 h-5 rounded-full object-cover ring-1 ring-emerald-400"
                         />

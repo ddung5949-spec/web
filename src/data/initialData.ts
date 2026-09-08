@@ -680,3 +680,8 @@ export const defaultUncleHoSettings: UncleHoSettings = {
   bannerTitle: 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
   showQuoteOfTheDay: true,
 };
+
+export const MILITARY_FALLBACK_BANNER = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23851010"/><stop offset="50%" stop-color="%23991b1b"/><stop offset="100%" stop-color="%23450a0a"/></linearGradient></defs><rect width="800" height="450" fill="url(%23bg)"/><g transform="translate(400,195)"><polygon points="0,-75 22,-23 78,-23 33,10 50,65 0,31 -50,65 -33,10 -78,-23 -22,-23" fill="%23fbbf24" stroke="%23d97706" stroke-width="3"/></g><text x="400" y="325" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="%23fef08a" text-anchor="middle" letter-spacing="2">QUÂN ĐỘI NHÂN DÂN VIỆT NAM</text><text x="400" y="360" font-family="Arial,sans-serif" font-size="15" font-weight="600" fill="%23ffffff" fill-opacity="0.9" text-anchor="middle" letter-spacing="1">TRUNG ĐOÀN 95 - SƯ ĐOÀN 2</text></svg>`;
+
+export const MILITARY_FALLBACK_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150" width="150" height="150"><circle cx="75" cy="75" r="75" fill="%23991b1b"/><polygon points="75,28 85,55 114,55 91,72 99,99 75,82 51,99 59,72 36,55 65,55" fill="%23fbbf24"/></svg>`;
+

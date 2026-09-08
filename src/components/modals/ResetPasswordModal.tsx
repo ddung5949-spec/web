@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Copy, Eye, EyeOff, Key, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { User } from '../../types';
+import { MILITARY_FALLBACK_AVATAR } from '../../data/initialData';
 
 interface ResetPasswordModalProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           {/* User Info Card */}
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 flex items-center gap-3">
             <img
-              src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+              src={user.avatar || MILITARY_FALLBACK_AVATAR}
               alt={user.fullName}
               className="w-10 h-10 rounded-full object-cover border border-gray-300"
             />

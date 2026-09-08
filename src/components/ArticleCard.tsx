@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit3, Eye, Trash2, UserPen } from 'lucide-react';
 import { Article } from '../types';
+import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
 
 interface ArticleCardProps {
   article: Article;
@@ -28,7 +29,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         <img
           src={
             article.image ||
-            'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop'
+            MILITARY_FALLBACK_BANNER
           }
           alt={article.title}
           className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"

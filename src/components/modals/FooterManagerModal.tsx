@@ -35,13 +35,12 @@ export const FooterManagerModal: React.FC<FooterManagerModalProps> = ({
   onClose,
 }) => {
   // Form States
-  const [footerUnitName, setFooterUnitName] = useState(siteConfig.footerUnitName || 'Trung đoàn 95, Sư đoàn 2');
-  const [footerAddress, setFooterAddress] = useState(siteConfig.footerAddress || 'Đắk Đoa, Gia Lai (Địa bàn đóng quân Trung đoàn 95)');
-  const [footerHotline, setFooterHotline] = useState(siteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến / Ban Chính trị)');
-  const [footerEmail, setFooterEmail] = useState(siteConfig.footerEmail || 'chinhtri.trungdoan95@bqp.vn');
+  const [footerUnitName, setFooterUnitName] = useState(siteConfig.footerUnitName || 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5');
+  const [footerAddress, setFooterAddress] = useState(siteConfig.footerAddress || 'Thành phố Pleiku, Tỉnh Gia Lai');
+  const [footerHotline, setFooterHotline] = useState(siteConfig.footerHotline || '069.xxx.xxx (Trực ban Tác chiến)');
+  const [footerEmail, setFooterEmail] = useState(siteConfig.footerEmail || 'tuyenhuan.mangyang@bqp.vn');
   const [slogan, setSlogan] = useState(siteConfig.slogan || 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG');
-  const [footerCopyright, setFooterCopyright] = useState(siteConfig.footerCopyright || '© Bản quyền thuộc về Trung đoàn 95, Sư đoàn 2');
-
+  const [footerCopyright, setFooterCopyright] = useState(''); // Để trống để không hiển thị dòng bản quyền
   // Layout & Styling
   const [footerLayout, setFooterLayout] = useState<'split' | 'centered' | 'compact' | 'columns'>(
     siteConfig.footerLayout || 'split'

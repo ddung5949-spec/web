@@ -17,6 +17,7 @@ import {
 import { Article, User } from '../types';
 import { SpotlightArticleSelectModal } from './modals/SpotlightArticleSelectModal';
 import { SpotlightSkeleton } from './SkeletonLoader';
+import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
 
 interface HomeSpotlightSectionProps {
   articles: Article[];
@@ -111,7 +112,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
           {/* Featured Image with Ratio */}
           <div className="md:col-span-5 relative rounded-lg overflow-hidden bg-slate-900 aspect-16/10 sm:aspect-4/3 md:aspect-16/10 shadow-sm">
             <img
-              src={primaryArticle.image}
+              src={primaryArticle.image || MILITARY_FALLBACK_BANNER}
               alt={primaryArticle.title}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
@@ -173,7 +174,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
               >
                 <div className="w-20 h-16 rounded-lg overflow-hidden bg-slate-900 shrink-0">
                   <img
-                    src={art.image}
+                    src={art.image || MILITARY_FALLBACK_BANNER}
                     alt={art.title}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

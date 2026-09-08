@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { Article, ArticleImage, PageView, SectionType, User } from '../types';
+import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
 import { AIVoiceReader } from './AIVoiceReader';
 import { updatePageSEO } from '../utils/seo';
 import { sanitizeHtml } from '../utils/sanitizer';
@@ -120,20 +121,21 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
     onBack();
   };
 
-  // Group images by position
-  const imagesList: ArticleImage[] =
+  // Group images by position (filter out any empty URLs to avoid empty src error)
+  const imagesList: ArticleImage[] = (
     article.images && article.images.length > 0
       ? article.images
-      : article.image
+      : article.image && article.image.trim() !== ''
       ? [
           {
             id: 'default-img',
             url: article.image,
             caption: article.title,
-            position: 'top',
+            position: 'top' as const,
           },
         ]
-      : [];
+      : []
+  ).filter((img) => img && typeof img.url === 'string' && img.url.trim() !== '');
 
   const topImages = imagesList.filter((img) => img.position === 'top');
   const middle1Images = imagesList.filter((img) => img.position === 'middle_1');
@@ -690,7 +692,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
                 <div>
                   <div className="relative h-28 rounded overflow-hidden mb-2 bg-gray-200">
                     <img
-                      src={rel.image || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800'}
+                      src={rel.image || MILITARY_FALLBACK_BANNER}
                       alt={rel.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />

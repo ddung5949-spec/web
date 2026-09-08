@@ -38,6 +38,7 @@ import { MilitaryProfile, PageView, RoleDefinition, UserRole, User as UserType }
 import { ResetPasswordModal } from './modals/ResetPasswordModal';
 import { UserEditModal } from './modals/UserEditModal';
 import { RoleManagerModal } from './modals/RoleManagerModal';
+import { MILITARY_FALLBACK_AVATAR } from '../data/initialData';
 import { SoldierProfileModal } from './modals/SoldierProfileModal';
 import { ExcelSoldierImportModal } from './modals/ExcelSoldierImportModal';
 import { BatchAccountCreateModal } from './modals/BatchAccountCreateModal';
@@ -624,7 +625,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                                 src={
                                   p.avatar ||
                                   linkedUser?.avatar ||
-                                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
+                                  MILITARY_FALLBACK_AVATAR
                                 }
                                 alt={p.fullName}
                                 className="w-8 h-8 rounded-full object-cover border border-gray-300 shrink-0"
@@ -888,7 +889,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                           <td className="py-3 px-3.5 whitespace-nowrap">
                             <div className="flex items-center gap-2.5">
                               <img
-                                src={u.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                                src={u.avatar || MILITARY_FALLBACK_AVATAR}
                                 alt={u.fullName}
                                 className="w-8 h-8 rounded-full object-cover border border-gray-300"
                               />

@@ -1,10 +1,11 @@
 import { Article } from '../types';
+import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
 
 export function updatePageSEO(article?: Article | null, customTitle?: string) {
   try {
     const defaultSiteTitle = 'TRUYỀN THÔNG ĐOÀN MANG YANG - TRUNG ĐOÀN 95, SƯ ĐOÀN 2';
     const defaultDescription = 'Trang thông tin điện tử, truyền thông và giáo dục chính trị Trung đoàn 95 (Đoàn Mang Yang Anh hùng), Sư đoàn 2, Quân đoàn 3 - Quân đội nhân dân Việt Nam.';
-    const defaultImage = 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&auto=format&fit=crop&q=80';
+    const defaultImage = MILITARY_FALLBACK_BANNER;
     const siteUrl = window.location.origin;
 
     let pageTitle = defaultSiteTitle;

@@ -118,13 +118,14 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   const albumImages: string[] = useMemo(() => {
     // 1. Kiểm tra trong settings
     if (settings?.images && Array.isArray(settings.images) && settings.images.length > 0) {
-      const filtered = settings.images.filter((img) => img && !img.includes('unsplash.com'));
+      const filtered = settings.images.filter((img) => img && typeof img === 'string' && img.trim() !== '' && !img.includes('unsplash.com'));
       if (filtered.length > 0) return filtered;
     }
 
     // 2. Kiểm tra ảnh vừa nạp từ Supabase
     if (fetchedAlbumImages.length > 0) {
-      return fetchedAlbumImages;
+      const valid = fetchedAlbumImages.filter((img) => img && typeof img === 'string' && img.trim() !== '');
+      if (valid.length > 0) return valid;
     }
 
     // 3. Kiểm tra cache localStorage
@@ -133,7 +134,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const filtered = parsed.filter((img: string) => img && !img.includes('unsplash.com'));
+          const filtered = parsed.filter((img: string) => img && typeof img === 'string' && img.trim() !== '' && !img.includes('unsplash.com'));
           if (filtered.length > 0) return filtered;
         }
       }
@@ -142,10 +143,10 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       if (dailyCache) {
         const parsed = JSON.parse(dailyCache);
         if (parsed?.uncle_ho?.extra_data?.images && Array.isArray(parsed.uncle_ho.extra_data.images)) {
-          const imgs = parsed.uncle_ho.extra_data.images.filter((img: string) => img && !img.includes('unsplash.com'));
+          const imgs = parsed.uncle_ho.extra_data.images.filter((img: string) => img && typeof img === 'string' && img.trim() !== '' && !img.includes('unsplash.com'));
           if (imgs.length > 0) return imgs;
         }
-        if (parsed?.uncle_ho?.image_data && !parsed.uncle_ho.image_data.includes('unsplash.com')) {
+        if (parsed?.uncle_ho?.image_data && typeof parsed.uncle_ho.image_data === 'string' && parsed.uncle_ho.image_data.trim() !== '' && !parsed.uncle_ho.image_data.includes('unsplash.com')) {
           return [parsed.uncle_ho.image_data];
         }
       }
@@ -251,7 +252,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           onMouseLeave={() => setIsPlaying(true)}
         >
           <img
-            src={albumImages[currentSlideIndex % albumImages.length]}
+            src={albumImages[currentSlideIndex % (albumImages.length || 1)] || DEFAULT_UNCLE_HO_IMAGES[0]}
             alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
             className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
             loading="lazy"
@@ -263,7 +264,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                 target.src = DEFAULT_UNCLE_HO_IMAGES[0];
               }
             }}
-            onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
+            onClick={() => setLightboxImage(albumImages[currentSlideIndex % (albumImages.length || 1)] || DEFAULT_UNCLE_HO_IMAGES[0])}
           />
 
           {/* Lớp phủ gradient viền dưới nhẹ */}
@@ -514,7 +515,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       )}
 
       {/* LIGHTBOX PHÓNG TO ẢNH SLIDESHOW */}
-      {lightboxImage && (
+      {lightboxImage && lightboxImage.trim() !== '' && (
         <div
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
           onClick={() => setLightboxImage(null)}

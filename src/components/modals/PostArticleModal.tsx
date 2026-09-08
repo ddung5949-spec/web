@@ -25,7 +25,7 @@ import {
   SiteConfig,
   User,
 } from '../../types';
-import { defaultSiteConfig } from '../../data/initialData';
+import { defaultSiteConfig, MILITARY_FALLBACK_BANNER } from '../../data/initialData';
 import { compressImageFile, optimizeArticleImagesPayload, validateImageFile } from '../../utils/imageUtils';
 import { toast } from '../Toast';
 
@@ -747,7 +747,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
                         {/* Thumbnail */}
                         <div className="relative shrink-0 w-20 h-16 rounded-md overflow-hidden border border-gray-300 bg-gray-100">
                           <img
-                            src={img.url}
+                            src={img.url || MILITARY_FALLBACK_BANNER}
                             alt={img.caption || `Ảnh ${index + 1}`}
                             className="w-full h-full object-cover"
                           />

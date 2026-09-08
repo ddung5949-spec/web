@@ -12,6 +12,7 @@ import {
   SiteConfig,
   User,
 } from '../types';
+import { MILITARY_FALLBACK_AVATAR, MILITARY_FALLBACK_BANNER } from '../data/initialData';
 
 // Read Supabase credentials from client-side Vite environment variables with project defaults
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env || {};
@@ -115,7 +116,7 @@ export const supabaseAuth = {
       (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.avatar) ||
       meta.avatar_url ||
       meta.avatar ||
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+      MILITARY_FALLBACK_AVATAR;
 
     const rank =
       (cachedProfile && (cachedProfile.id === sbUser.id || cachedProfile.email === email) && cachedProfile.rank) ||
@@ -205,7 +206,7 @@ export const supabaseDb = {
         position: item.position || '',
         rankUnit: item.rank_unit || item.rankUnit || 'Trung đoàn 95',
         militaryCode: item.military_code || item.militaryCode,
-        avatar: item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        avatar: item.avatar || MILITARY_FALLBACK_AVATAR,
         role: item.role || 'user',
         canViewDoc: item.can_view_doc ?? item.canViewDoc ?? true,
         canUploadDoc: item.can_upload_doc ?? item.canUploadDoc ?? false,
@@ -349,7 +350,7 @@ export const supabaseDb = {
       category: (item.category || (secKey === 'bac' ? 'Lời Bác dạy' : secKey === 'hl' ? 'Huấn luyện - SSCĐ' : 'Tin tức hoạt động')).trim(),
       author: item.author || 'Cán bộ - Chiến sĩ',
       date: formattedDate,
-      image: item.image || item.thumbnail || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop',
+      image: item.image || item.thumbnail || MILITARY_FALLBACK_BANNER,
       images: item.images ? (typeof item.images === 'string' ? JSON.parse(item.images) : item.images) : undefined,
       excerpt: item.excerpt || item.summary || item.title || '',
       summary: item.summary || item.excerpt || '',

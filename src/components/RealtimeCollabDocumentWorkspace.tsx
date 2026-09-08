@@ -73,6 +73,7 @@ import {
 } from '../types';
 import { cloudStorage } from '../utils/storage';
 import { toast } from './Toast';
+import { MILITARY_FALLBACK_AVATAR } from '../data/initialData';
 
 interface RealtimeCollabDocumentWorkspaceProps {
   currentRoom: MeetingRoomItem;
@@ -789,10 +790,7 @@ export const RealtimeCollabDocumentWorkspace: React.FC<
                   }`}
                 >
                   <img
-                    src={
-                      user.userAvatar ||
-                      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
-                    }
+                    src={user.userAvatar || MILITARY_FALLBACK_AVATAR}
                     alt={user.userName}
                     style={{ borderColor: user.color || '#dc2626' }}
                     className="w-7 h-7 rounded-full border-2 object-cover shadow-xs transition-transform group-hover:scale-110"

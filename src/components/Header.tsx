@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { PageView, RoleDefinition, SiteConfig, User } from '../types';
 import { UnitLogo } from './UnitLogo';
+import { MILITARY_FALLBACK_AVATAR } from '../data/initialData';
 
 interface HeaderProps {
   siteConfig: SiteConfig;
@@ -175,15 +176,11 @@ export const Header: React.FC<HeaderProps> = ({
                   title="Nhấn để mở menu tài khoản & quản trị"
                 >
                   <img
-                    src={
-                      currentUser.avatar ||
-                      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
-                    }
+                    src={currentUser.avatar || MILITARY_FALLBACK_AVATAR}
                     alt="Avatar"
                     className="w-6 h-6 rounded-full object-cover border-2 border-amber-300 shadow-xs"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+                      (e.target as HTMLImageElement).src = MILITARY_FALLBACK_AVATAR;
                     }}
                   />
                   {/* Chỉ hiển thị tên người dùng khi đã đăng nhập */}
@@ -208,15 +205,11 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="bg-gradient-to-br from-[#143d2b] to-[#1e583e] text-white p-3.5 sm:p-4 border-b-2 border-amber-400">
                       <div className="flex items-center gap-3">
                         <img
-                          src={
-                            currentUser.avatar ||
-                            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
-                          }
+                          src={currentUser.avatar || MILITARY_FALLBACK_AVATAR}
                           alt="Avatar"
                           className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-md"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+                            (e.target as HTMLImageElement).src = MILITARY_FALLBACK_AVATAR;
                           }}
                         />
                         <div className="flex-1 min-w-0">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Shield, User, UserCheck, UserPlus, X } from 'lucide-react';
 import { RoleDefinition, UserRole, User as UserType } from '../../types';
+import { MILITARY_FALLBACK_AVATAR } from '../../data/initialData';
 
 interface UserEditModalProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       setRankUnit('');
       setBirthDate('');
       setRole('user');
-      setAvatar('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150');
+      setAvatar(MILITARY_FALLBACK_AVATAR);
       setCanViewDoc(true);
       setCanUploadDoc(false);
       setCanJoinPartyMeeting(false);

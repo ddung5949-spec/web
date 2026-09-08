@@ -36,7 +36,7 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
     hero: 'w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56',
   };
 
-  const isCustomImage = logoType === 'custom_image' && Boolean(customLogoUrl);
+  const isCustomImage = logoType === 'custom_image' && Boolean(customLogoUrl && customLogoUrl.trim() !== '');
 
   const customStyle: React.CSSProperties = {
     isolation: 'isolate',

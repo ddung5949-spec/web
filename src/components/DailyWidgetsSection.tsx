@@ -209,7 +209,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
             {/* Widget Content Body */}
             <div className="p-3 flex flex-col gap-2.5">
               {/* Image Frame (16:9 aspect ratio) */}
-              {widget.imageUrl && (
+              {widget.imageUrl && widget.imageUrl.trim() !== '' && (
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-100 border border-gray-200 group">
                   <img
                     src={widget.imageUrl}
@@ -350,7 +350,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
                   </div>
 
                   {/* Image Preview */}
-                  {formImage && (
+                  {formImage && formImage.trim() !== '' && (
                     <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50 mt-2">
                       <img
                         src={formImage}

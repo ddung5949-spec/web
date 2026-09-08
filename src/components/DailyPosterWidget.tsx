@@ -16,10 +16,12 @@ import { defaultDailyWidgets } from '../data/initialData';
 import { supabaseDb, getSupabase } from '../utils/supabase';
 import { toast } from './Toast';
 
-interface DailyPosterWidgetProps {
+export interface DailyPosterWidgetProps {
   widgetId: string; // 'safety_message' | 'traffic_situation' | 'good_deed' | 'widget_safety_message' ...
-  dailyWidgets?: DailyWidgetItem[];
-  currentUser: User | null;
+  dailyWidgets?: DailyWidgetItem[] | Record<string, any>;
+  initialItem?: DailyWidgetItem;
+  dailyPosters?: Record<string, any>;
+  currentUser?: User | null;
   onSaveDailyWidgets: (widgets: DailyWidgetItem[]) => Promise<void> | void;
 }
 
@@ -72,6 +74,8 @@ export function compressPosterImage(file: File, maxWidth = 800, quality = 0.65):
 export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   widgetId,
   dailyWidgets,
+  initialItem,
+  dailyPosters,
   currentUser,
   onSaveDailyWidgets,
 }) => {
@@ -126,32 +130,71 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
     // ignore
   }
 
-  // Find custom configured item from dailyWidgets prop (supports both array and object format)
+  // 2. Resolve custom configured item
   let customItem: DailyWidgetItem | undefined;
-  if (Array.isArray(dailyWidgets)) {
-    customItem = dailyWidgets.find(
-      (w) =>
-        w.id === cleanId ||
-        w.id === widgetId ||
-        (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'widget_safety_message' || w.id === 'safety')) ||
-        (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation' || w.id === 'traffic')) ||
-        (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
-    );
-  } else if (dailyWidgets && typeof dailyWidgets === 'object') {
-    const rawVal =
-      (dailyWidgets as any)[cleanId] ||
-      (dailyWidgets as any)[widgetId] ||
-      (dailyWidgets as any)[posterKey];
-    if (rawVal) {
+
+  // 2a. Priority: initialItem if supplied
+  if (initialItem && (initialItem.imageUrl || initialItem.title || initialItem.categoryName)) {
+    customItem = {
+      ...initialItem,
+      id: cleanId,
+      categoryName: initialItem.categoryName || defaultCategoryTitle,
+    };
+  }
+
+  // 2b. Priority: dailyPosters prop (direct real-time Supabase state)
+  if ((!customItem || !customItem.imageUrl) && dailyPosters && typeof dailyPosters === 'object') {
+    const fromMap =
+      dailyPosters[posterKey] ||
+      dailyPosters[cleanId] ||
+      dailyPosters[widgetId];
+    if (fromMap && (fromMap.image_data || fromMap.imageUrl || fromMap.image || fromMap.title)) {
       customItem = {
         id: cleanId,
-        categoryName: rawVal.categoryName || rawVal.category_name || defaultCategoryTitle,
-        title: rawVal.title || '',
-        content: rawVal.content || '',
-        imageUrl: rawVal.image || rawVal.imageUrl || rawVal.image_data || '',
-        aspectRatioMode: rawVal.aspectRatio || rawVal.aspectRatioMode || rawVal.aspect_ratio || 'auto',
-        updatedAt: rawVal.updatedAt || rawVal.updated_at || '',
+        categoryName: fromMap.category_name || fromMap.categoryName || customItem?.categoryName || defaultCategoryTitle,
+        title: fromMap.title || customItem?.title || '',
+        content: fromMap.content || customItem?.content || '',
+        imageUrl: fromMap.image_data || fromMap.imageUrl || fromMap.image || customItem?.imageUrl || '',
+        aspectRatioMode: fromMap.aspect_ratio || fromMap.aspectRatio || fromMap.aspectRatioMode || customItem?.aspectRatioMode || 'auto',
+        updatedAt: fromMap.updated_at || fromMap.updatedAt || customItem?.updatedAt || '',
       };
+    }
+  }
+
+  // 2c. Check dailyWidgets prop (supports both array and object format)
+  if (!customItem || !customItem.imageUrl) {
+    if (Array.isArray(dailyWidgets)) {
+      const matched = dailyWidgets.find(
+        (w) =>
+          w.id === cleanId ||
+          w.id === widgetId ||
+          (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'widget_safety_message' || w.id === 'safety')) ||
+          (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation' || w.id === 'traffic')) ||
+          (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
+      );
+      if (matched) {
+        customItem = {
+          ...(customItem || {}),
+          ...matched,
+          imageUrl: matched.imageUrl || customItem?.imageUrl || '',
+        };
+      }
+    } else if (dailyWidgets && typeof dailyWidgets === 'object') {
+      const rawVal =
+        (dailyWidgets as any)[cleanId] ||
+        (dailyWidgets as any)[widgetId] ||
+        (dailyWidgets as any)[posterKey];
+      if (rawVal) {
+        customItem = {
+          id: cleanId,
+          categoryName: rawVal.categoryName || rawVal.category_name || defaultCategoryTitle,
+          title: rawVal.title || '',
+          content: rawVal.content || '',
+          imageUrl: rawVal.image || rawVal.imageUrl || rawVal.image_data || '',
+          aspectRatioMode: rawVal.aspectRatio || rawVal.aspectRatioMode || rawVal.aspect_ratio || 'auto',
+          updatedAt: rawVal.updatedAt || rawVal.updated_at || '',
+        };
+      }
     }
   }
 
@@ -286,9 +329,13 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
           if (upsertErr) {
             console.error('[DailyPosterWidget] Supabase direct upsert error:', upsertErr);
+            toast.error('Lỗi lưu CSDL', upsertErr.message || 'Không thể lưu lên Supabase');
+            throw new Error(upsertErr.message);
           }
-        } catch (dbErr) {
+        } catch (dbErr: any) {
           console.error('[DailyPosterWidget] Supabase error:', dbErr);
+          toast.error('Lỗi lưu CSDL', dbErr?.message || 'Lỗi khi đồng bộ lên Supabase');
+          throw dbErr;
         }
       }
 
@@ -321,7 +368,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       // -------------------------------------------------------------
       // Cập nhật State chung & siteConfig toàn ứng dụng
       // -------------------------------------------------------------
-      const existingList = dailyWidgets && dailyWidgets.length > 0 ? [...dailyWidgets] : [...defaultDailyWidgets];
+      const existingList = Array.isArray(dailyWidgets) && dailyWidgets.length > 0 ? [...dailyWidgets] : [...defaultDailyWidgets];
       const index = existingList.findIndex(
         (w) =>
           w.id === cleanId ||
@@ -343,9 +390,9 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       setTimeout(() => {
         setIsEditModalOpen(false);
       }, 500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save daily poster widget error:', err);
-      toast.error('Lỗi lưu Poster', 'Không thể lưu poster lên máy chủ. Vui lòng thử lại!');
+      toast.error('Lỗi lưu CSDL', err?.message || 'Không thể lưu poster lên máy chủ. Vui lòng thử lại!');
     } finally {
       setIsSaving(false);
     }
@@ -398,7 +445,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
         {/* 2. Poster Image Body: Minimalist, clean, full display, clickable for zoom */}
         <div className="p-2 sm:p-2.5 bg-slate-50/50 flex flex-col items-center justify-center">
-          {currentItem.imageUrl ? (
+          {currentItem.imageUrl && currentItem.imageUrl.trim() !== '' ? (
             <div
               onClick={() => setIsLightboxOpen(true)}
               className="relative w-full rounded-lg overflow-hidden bg-slate-900/5 border border-gray-200/80 shadow-2xs group cursor-zoom-in transition-all flex items-center justify-center"
@@ -467,13 +514,15 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
             {/* Poster Image full resolution */}
             <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 shadow-2xl flex items-center justify-center max-h-[85vh]">
-              <img
-                src={currentItem.imageUrl}
-                alt={currentItem.categoryName}
-                className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
-                loading="lazy"
-                decoding="async"
-              />
+              {currentItem.imageUrl && currentItem.imageUrl.trim() !== '' && (
+                <img
+                  src={currentItem.imageUrl}
+                  alt={currentItem.categoryName}
+                  className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -609,7 +658,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
                   Xem trước ảnh Poster:
                 </label>
                 <div className="w-full max-h-60 rounded-xl border border-gray-200 bg-slate-100 p-2 overflow-hidden flex items-center justify-center">
-                  {formImage ? (
+                  {formImage && formImage.trim() !== '' ? (
                     <img
                       src={formImage}
                       alt="Preview"

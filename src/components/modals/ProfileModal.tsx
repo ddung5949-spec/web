@@ -18,6 +18,7 @@ import {
 import { User as UserType } from '../../types';
 import { supabase } from '../../utils/supabase';
 import { toast } from '../Toast';
+import { MILITARY_FALLBACK_AVATAR } from '../../data/initialData';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -199,7 +200,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const initialAvatar =
       (cached && (cached.id === currentUser.id || cached.email === currentUser.email) && cached.avatar) ||
       currentUser.avatar ||
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+      MILITARY_FALLBACK_AVATAR;
 
     setFullName(initialFullName);
     setBirthDate(initialBirthDate);
@@ -442,12 +443,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div className="text-center space-y-2 pb-1 bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
             <div className="relative inline-block group">
               <img
-                src={avatarPreview || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                src={avatarPreview || MILITARY_FALLBACK_AVATAR}
                 alt="Avatar quân nhân"
                 className="w-24 h-24 rounded-full object-cover border-3 border-amber-400 mx-auto shadow-md bg-stone-100"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+                  (e.target as HTMLImageElement).src = MILITARY_FALLBACK_AVATAR;
                 }}
               />
 

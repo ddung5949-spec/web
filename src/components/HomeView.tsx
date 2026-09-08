@@ -75,6 +75,7 @@ interface HomeViewProps {
   lectures?: LectureItem[];
   uncleHoQuotes?: UncleHoQuote[];
   uncleHoSettings?: UncleHoSettings;
+  dailyPosters?: Record<string, any>;
   currentUser?: User | null;
   siteConfig?: SiteConfig;
   isLoading?: boolean;
@@ -109,6 +110,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   },
   currentUser = null,
   siteConfig,
+  dailyPosters: propsDailyPosters,
   isLoading = false,
   onOpenArticle,
   onSelectSection,
@@ -144,6 +146,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
       return {};
     }
   });
+
+  const effectiveDailyPosters = React.useMemo(() => {
+    return {
+      ...dailyPosters,
+      ...(propsDailyPosters || {}),
+    };
+  }, [dailyPosters, propsDailyPosters]);
 
   // Tải dữ liệu từ Supabase bảng 'daily_posters' khi khởi tạo và gán vào State (Không phụ thuộc đăng nhập)
   React.useEffect(() => {
@@ -218,7 +227,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       ? [...siteConfig.dailyWidgets]
       : [];
 
-    Object.entries(dailyPosters).forEach(([id, poster]) => {
+    Object.entries(effectiveDailyPosters).forEach(([id, poster]) => {
       const cleanId = id.replace(/^widget_/, '');
       const posterKey = cleanId === 'safety_message' ? 'safety' : cleanId === 'traffic_situation' ? 'traffic' : cleanId;
       const targetId = posterKey === 'safety' ? 'safety_message' : posterKey === 'traffic' ? 'traffic_situation' : 'good_deed';
@@ -235,7 +244,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           w.id === id ||
           (posterKey === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
           (posterKey === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation')) ||
-          (posterKey === 'good_deed' && w.id === 'good_deed')
+          (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
       );
 
       const itemData: DailyWidgetItem = {
@@ -260,7 +269,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     });
 
     return list.length > 0 ? list : (siteConfig?.dailyWidgets as any) || [];
-  }, [siteConfig?.dailyWidgets, dailyPosters]);
+  }, [siteConfig?.dailyWidgets, effectiveDailyPosters]);
 
   // Layout Settings
   const layout = siteConfig?.layoutSettings || {};
@@ -593,6 +602,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-left-safety-${widget.id}`}
                         widgetId="safety_message"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -604,6 +614,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-left-traffic-${widget.id}`}
                         widgetId="traffic_situation"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -615,6 +626,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-left-deed-${widget.id}`}
                         widgetId="good_deed"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -625,18 +637,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         <DailyPosterWidget
                           widgetId="safety_message"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="traffic_situation"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="good_deed"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
@@ -734,6 +749,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-right-safety-${widget.id}`}
                         widgetId="safety_message"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -745,6 +761,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-right-traffic-${widget.id}`}
                         widgetId="traffic_situation"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -756,6 +773,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         key={`widget-right-deed-${widget.id}`}
                         widgetId="good_deed"
                         dailyWidgets={mergedDailyWidgets}
+                        dailyPosters={effectiveDailyPosters}
                         currentUser={currentUser}
                         onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                       />
@@ -766,18 +784,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         <DailyPosterWidget
                           widgetId="safety_message"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="traffic_situation"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
                         <DailyPosterWidget
                           widgetId="good_deed"
                           dailyWidgets={mergedDailyWidgets}
+                          dailyPosters={effectiveDailyPosters}
                           currentUser={currentUser}
                           onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
                         />
@@ -933,7 +954,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             className="w-full flex-1 min-h-[240px] rounded-lg overflow-hidden border border-gray-200 bg-black/5 flex items-center justify-center"
                             dangerouslySetInnerHTML={{ __html: col.embedCode || col.embedHtml || '' }}
                           />
-                        ) : col.embedUrl ? (
+                        ) : col.embedUrl && col.embedUrl.trim() !== '' ? (
                           <iframe
                             src={col.embedUrl}
                             title={col.title}

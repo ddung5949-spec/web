@@ -35,6 +35,7 @@ import {
   defaultUncleHoQuotes,
   defaultUncleHoSettings,
   defaultUsers,
+  MILITARY_FALLBACK_AVATAR,
 } from './data/initialData';
 import { cloudStorage, isSupabaseConfigured, safeStore } from './utils/storage';
 import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
@@ -242,6 +243,15 @@ export function App() {
   const [uncleHoSettings, setUncleHoSettings] = useState<UncleHoSettings>(() =>
     safeStore.get('mangyang_uncle_ho_settings', defaultUncleHoSettings)
   );
+
+  const [dailyPosters, setDailyPosters] = useState<Record<string, any>>(() => {
+    try {
+      const cached = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      return cached ? JSON.parse(cached) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>(() => {
     try {
@@ -474,6 +484,18 @@ export function App() {
       if (config.footer_config) {
         mergedConfig.footer_config = config.footer_config;
       }
+      if (config.home_layout || config.layout_settings) {
+        mergedConfig.layoutSettings = config.layout_settings || config.home_layout || mergedConfig.layoutSettings;
+      }
+      if (config.categories_config) {
+        mergedConfig.categories_config = config.categories_config;
+      }
+      if (config.home_category_columns) {
+        mergedConfig.homeCategoryColumns = config.home_category_columns;
+      }
+      if (config.daily_widgets || config.dailyWidgets) {
+        mergedConfig.dailyWidgets = config.daily_widgets || config.dailyWidgets;
+      }
 
       const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
       if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
@@ -544,6 +566,7 @@ export function App() {
       });
 
       safeCacheDailyPosters(posterMap);
+      setDailyPosters(posterMap);
 
       if (posterMap['uncle_ho']) {
         const hoData = posterMap['uncle_ho'];
@@ -572,12 +595,13 @@ export function App() {
         ['safety', 'traffic', 'good_deed'].forEach((k) => {
           const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
           const val = posterMap[k] || posterMap[cleanKey];
-          if (val && val.image_data) {
+          if (val && (val.image_data || val.title)) {
             const idx = existingWidgets.findIndex(
               (w) =>
                 w.id === cleanKey ||
                 (k === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
-                (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation'))
+                (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation')) ||
+                (k === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
             );
             const item: DailyWidgetItem = {
               id: cleanKey,
@@ -589,7 +613,7 @@ export function App() {
                   ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
                   : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
               title: val.title || '',
-              imageUrl: val.image_data,
+              imageUrl: val.image_data || '',
               aspectRatioMode: (val.aspect_ratio as any) || 'auto',
               updatedAt: val.updated_at,
             };
@@ -1220,7 +1244,7 @@ export function App() {
       rankUnit: rankUnitStr,
       username: data.username,
       password: data.password,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      avatar: MILITARY_FALLBACK_AVATAR,
       totalActiveMinutes: 0,
       sessionCount: 0,
       isOnline: false,
@@ -1347,7 +1371,7 @@ export function App() {
         position: profile.position,
         rankUnit: `${profile.rank} - ${profile.unit}`,
         militaryCode: profile.militaryCode,
-        avatar: profile.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        avatar: profile.avatar || MILITARY_FALLBACK_AVATAR,
         role: 'user',
         totalActiveMinutes: profile.totalActiveMinutes || 0,
         sessionCount: profile.sessionCount || 0,
@@ -1454,7 +1478,7 @@ export function App() {
           position: newP.position,
           rankUnit: `${newP.rank} - ${newP.unit}`,
           militaryCode: newP.militaryCode,
-          avatar: newP.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+          avatar: newP.avatar || MILITARY_FALLBACK_AVATAR,
           role: options.defaultRole || 'user',
           totalActiveMinutes: 0,
           sessionCount: 0,
@@ -1532,7 +1556,7 @@ export function App() {
         fullName: acc.fullName,
         rankUnit: acc.rankUnit,
         militaryCode: acc.militaryCode,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        avatar: MILITARY_FALLBACK_AVATAR,
         role: acc.role,
         totalActiveMinutes: 0,
         sessionCount: 0,
@@ -2214,6 +2238,11 @@ export function App() {
             military_utilities: newConfig.quickActionCards || newConfig.military_utilities,
             site_info: newConfig.site_info,
             footer_config: newConfig.footer_config,
+            home_layout: newConfig.layoutSettings,
+            layout_settings: newConfig.layoutSettings,
+            categories_config: newConfig.categories_config,
+            home_category_columns: newConfig.homeCategoryColumns,
+            daily_widgets: newConfig.dailyWidgets,
             config_json: newConfig,
             config: newConfig,
             data: newConfig,
@@ -2747,6 +2776,7 @@ export function App() {
                 lectures={lectures}
                 uncleHoQuotes={uncleHoQuotes}
                 uncleHoSettings={uncleHoSettings}
+                dailyPosters={dailyPosters}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
                 isLoading={isLoadingData}
