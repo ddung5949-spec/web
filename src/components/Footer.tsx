@@ -59,11 +59,6 @@ export const Footer: React.FC<FooterProps> = ({
     siteConfig?.slogan ||
     'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG';
 
-  const logoUrl =
-    siteConfig?.customLogoUrl ||
-    siteConfig?.logo_url ||
-    MILITARY_DEFAULT_LOGO;
-
   const showBackToTop =
     siteConfig?.footer_config?.toggles?.show_back_to_top ??
     (siteConfig?.footerShowBackToTop !== false);
@@ -77,87 +72,93 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   return (
-    <footer
-      id="main-app-footer"
-      className="w-full text-white mt-8 transition-colors duration-300 relative shadow-inner select-none"
-      style={{
-        backgroundColor: mainBg,
-        borderTop: `2px solid ${accentColor}`,
-      }}
-    >
-      {/* Nút Back to top */}
-      {showBackToTop && <BackToTop />}
+    <>
+      {/* Nút Back to top: Nằm hoàn toàn NGOÀI thẻ footer, trên nền trong suốt/xám tự nhiên của trang */}
+      {showBackToTop && <BackToTop className="my-3 sm:my-4" />}
 
-      {/* KHỐI XANH LÁ: Siêu gọn py-1.5 sm:py-2, dàn 1 hàng ngang duy nhất */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2 relative flex items-center justify-center">
-        {/* Nút "Sửa chân trang" (dành riêng cho Admin) */}
-        {isAdmin && (onOpenCustomization || onUpdateSiteConfig) && (
-          <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10">
-            <button
-              type="button"
-              id="admin-edit-footer-btn"
-              onClick={handleOpenEdit}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-red-950 text-[10px] sm:text-xs font-bold rounded shadow transition-all cursor-pointer border border-amber-200 active:scale-95"
-              title="Quản trị viên chỉnh sửa nội dung chân trang"
-            >
-              <Sliders className="w-3 h-3" />
-              <span className="hidden sm:inline">Sửa</span>
-            </button>
-          </div>
-        )}
-
-        {/* 1 hàng ngang duy nhất: Logo nhỏ + Tên cổng thông tin & Đơn vị */}
-        <div className="flex items-center justify-center gap-2 sm:gap-2.5 text-center flex-wrap px-2">
-          <div className="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center shrink-0">
-            <img
-              src={logoUrl}
-              alt="Logo Quân đội Nhân dân Việt Nam"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = MILITARY_DEFAULT_LOGO;
-              }}
-              className="w-full h-full object-contain drop-shadow-xs"
-            />
-          </div>
-
-          <span
-            className="font-bold text-xs sm:text-sm uppercase tracking-wide leading-tight"
-            style={{ color: accentColor }}
-          >
-            TRUYỀN THÔNG ĐOÀN MANG YANG — {unitName}
-          </span>
-        </div>
-      </div>
-
-      {/* DẢI SLOGAN ĐÁY TRANG: py-1 sm:py-1.5, co giãn text-[10px] sm:text-xs */}
-      <div
-        id="footer-slogan-bar"
-        className="w-full py-1 sm:py-1.5 px-3 sm:px-4 overflow-hidden border-t border-yellow-500/20"
-        style={{ backgroundColor: sloganBg }}
+      {/* Thẻ <footer> nền xanh: Bắt đầu bên dưới nút "Lên đầu trang" với chiều cao mỏng py-2 */}
+      <footer
+        id="main-app-footer"
+        className="w-full text-white transition-colors duration-300 relative shadow-inner select-none"
+        style={{
+          backgroundColor: mainBg,
+          borderTop: `2px solid ${accentColor}`,
+        }}
       >
-        <div className="max-w-5xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
-          <div className="h-[1px] flex-1 max-w-[50px] sm:max-w-[100px] md:max-w-[140px] bg-gradient-to-r from-transparent to-amber-400/70"></div>
-          <p
-            className="px-2 text-[10px] sm:text-xs font-black uppercase text-center leading-tight whitespace-normal break-words"
-            style={{ color: accentColor }}
-          >
-            {sloganText}
-          </p>
-          <div className="h-[1px] flex-1 max-w-[50px] sm:max-w-[100px] md:max-w-[140px] bg-gradient-to-l from-transparent to-amber-400/70"></div>
-        </div>
-      </div>
+        {/* KHỐI XANH LÁ: py-2, dàn hàng ngang linh hoạt flex-wrap căn giữa, không mất chữ */}
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-12 py-2 relative flex items-center justify-center">
+          {/* Nút "Sửa chân trang" (dành riêng cho Admin) */}
+          {isAdmin && (onOpenCustomization || onUpdateSiteConfig) && (
+            <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10">
+              <button
+                type="button"
+                id="admin-edit-footer-btn"
+                onClick={handleOpenEdit}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-400 hover:bg-amber-300 text-red-950 text-[10px] font-bold rounded shadow transition-all cursor-pointer border border-amber-200 active:scale-95"
+                title="Quản trị viên chỉnh sửa nội dung chân trang"
+              >
+                <Sliders className="w-3 h-3" />
+                <span className="hidden md:inline">Sửa</span>
+              </button>
+            </div>
+          )}
 
-      {/* Footer Manager Modal for Admin */}
-      {isFooterModalOpen && onUpdateSiteConfig && (
-        <FooterManagerModal
-          siteConfig={siteConfig}
-          onSave={(updated) => {
-            onUpdateSiteConfig(updated);
-          }}
-          onClose={() => setIsFooterModalOpen(false)}
-        />
-      )}
-    </footer>
+          {/* Hàng nội dung chính: Logo Vector Quân đội SVG + Tên cổng thông tin & Đơn vị (co giãn flex-wrap, text-[10px] sm:text-xs) */}
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-center flex-wrap px-1 max-w-full">
+            {/* Logo vector SVG chuẩn: Sao vàng nền đỏ, viền vàng kim, không phụ thuộc ảnh mạng ngoài */}
+            <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center shrink-0">
+              <svg
+                viewBox="0 0 100 100"
+                className="w-full h-full drop-shadow-sm"
+                aria-label="Huy hiệu Quân đội Nhân dân Việt Nam"
+              >
+                <circle cx="50" cy="50" r="46" fill="#B91C1C" stroke="#FBBF24" strokeWidth="5" />
+                <polygon
+                  points="50,14 61,38 86,38 66,54 74,78 50,63 26,78 34,54 14,38 39,38"
+                  fill="#FBBF24"
+                />
+              </svg>
+            </div>
+
+            <p
+              className="font-bold text-[10px] sm:text-xs uppercase tracking-wide leading-tight text-center break-words"
+              style={{ color: accentColor }}
+            >
+              TRUYỀN THÔNG ĐOÀN MANG YANG <span className="opacity-75">—</span> {unitName}
+            </p>
+          </div>
+        </div>
+
+        {/* DẢI SLOGAN ĐÁY TRANG: py-1.5 nền xanh sẫm, chữ vàng kim rõ nét không bao giờ mất chữ */}
+        <div
+          id="footer-slogan-bar"
+          className="w-full py-1.5 px-3 sm:px-4 overflow-hidden border-t border-yellow-500/20"
+          style={{ backgroundColor: sloganBg }}
+        >
+          <div className="max-w-5xl mx-auto flex items-center justify-center gap-2 sm:gap-3">
+            <div className="h-[1px] flex-1 max-w-[50px] sm:max-w-[100px] md:max-w-[140px] bg-gradient-to-r from-transparent to-amber-400/80"></div>
+            <p
+              className="px-2 text-[10px] sm:text-xs md:text-sm font-black uppercase text-center leading-tight whitespace-normal break-words tracking-wider"
+              style={{ color: accentColor }}
+            >
+              {sloganText}
+            </p>
+            <div className="h-[1px] flex-1 max-w-[50px] sm:max-w-[100px] md:max-w-[140px] bg-gradient-to-l from-transparent to-amber-400/80"></div>
+          </div>
+        </div>
+
+        {/* Footer Manager Modal for Admin */}
+        {isFooterModalOpen && onUpdateSiteConfig && (
+          <FooterManagerModal
+            siteConfig={siteConfig}
+            onSave={(updated) => {
+              onUpdateSiteConfig(updated);
+            }}
+            onClose={() => setIsFooterModalOpen(false)}
+          />
+        )}
+      </footer>
+    </>
   );
 };
 
