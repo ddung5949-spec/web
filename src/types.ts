@@ -508,6 +508,7 @@ export interface SiteConfig {
   font_settings?: FontSettings;
   logoType?: 'official_vector' | 'custom_image';
   customLogoUrl?: string;
+  logo_url?: string;
   enableLogoBeam?: boolean;
   enableLogoGlow?: boolean;
   logoSizePx?: number;
@@ -558,6 +559,9 @@ export interface SiteConfig {
       bg?: string;
       slogan_bg?: string;
       accent?: string;
+      mainBg?: string;
+      sloganBg?: string;
+      textColor?: string;
     };
     toggles?: {
       show_logo?: boolean;
@@ -586,6 +590,7 @@ export interface SiteConfig {
   footerShowCustomLinks?: boolean;
   footerCustomLinks?: FooterCustomLink[];
   layoutSettings?: HomeLayoutSettings;
+  home_layout?: HomeLayoutSettings;
 }
 
 export interface HomeLayoutSettings {

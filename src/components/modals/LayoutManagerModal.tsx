@@ -25,6 +25,7 @@ import {
 import { HomeLayoutSettings, SidebarWidgetId, SidebarWidgetSetting, SiteConfig } from '../../types';
 import { defaultSidebarWidgets } from '../../data/initialData';
 import { toast } from '../Toast';
+import { getSupabase } from '../../utils/supabase';
 
 interface LayoutManagerModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ interface LayoutManagerModalProps {
   onSaveLayout: (newLayout: HomeLayoutSettings) => void;
 }
 
-const DEFAULT_LAYOUT: HomeLayoutSettings = {
+export const DEFAULT_LAYOUT: HomeLayoutSettings = {
   showUncleHoSection: true,
   showAnnouncementsWidget: true,
   showFeaturedSlider: true,
@@ -46,51 +47,96 @@ const DEFAULT_LAYOUT: HomeLayoutSettings = {
   sidebarWidgets: defaultSidebarWidgets,
 };
 
-function normalizeWidgetsList(list?: SidebarWidgetSetting[]): SidebarWidgetSetting[] {
+export function normalizeWidgetsList(list?: SidebarWidgetSetting[]): SidebarWidgetSetting[] {
   if (!list || list.length === 0) return defaultSidebarWidgets;
-  
-  // If list has old 'daily_widgets' and lacks 'safety_message', expand it
-  const hasDailyGroup = list.some((w) => w.id === 'daily_widgets');
-  const hasSafety = list.some((w) => w.id === 'safety_message' || w.id === 'widget_safety_message');
-  
-  if (hasDailyGroup && !hasSafety) {
-    const dailyGroup = list.find((w) => w.id === 'daily_widgets')!;
-    const expanded: SidebarWidgetSetting[] = [
-      {
-        id: 'safety_message',
-        name: 'Mỗi ngày 1 thông điệp an toàn',
-        side: dailyGroup.side,
-        order: dailyGroup.order,
-        enabled: dailyGroup.enabled,
-      },
-      {
-        id: 'traffic_situation',
-        name: 'Mỗi ngày một tình huống giao thông',
-        side: dailyGroup.side,
-        order: dailyGroup.order + 1,
-        enabled: dailyGroup.enabled,
-      },
-      {
-        id: 'good_deed',
-        name: 'Mỗi ngày một hành động đẹp',
-        side: dailyGroup.side,
-        order: dailyGroup.order + 2,
-        enabled: dailyGroup.enabled,
-      },
-    ];
 
-    const result: SidebarWidgetSetting[] = [];
+  // If list has old 'daily_widgets', expand it first
+  const hasDailyGroup = list.some((w) => w.id === 'daily_widgets');
+  let expandedList = [...list];
+  if (hasDailyGroup) {
+    const dailyGroup = list.find((w) => w.id === 'daily_widgets')!;
+    expandedList = [];
     list.forEach((w) => {
       if (w.id === 'daily_widgets') {
-        result.push(...expanded);
+        expandedList.push(
+          {
+            id: 'safety_message',
+            name: 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
+            side: 'right',
+            order: 1,
+            enabled: dailyGroup.enabled,
+          },
+          {
+            id: 'traffic_situation',
+            name: 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
+            side: 'right',
+            order: 2,
+            enabled: dailyGroup.enabled,
+          },
+          {
+            id: 'good_deed',
+            name: 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP',
+            side: 'left',
+            order: 2,
+            enabled: dailyGroup.enabled,
+          }
+        );
       } else {
-        result.push(w);
+        expandedList.push(w);
       }
     });
-    return result;
   }
 
-  return list;
+  const result: SidebarWidgetSetting[] = [];
+  const processed = new Set<string>();
+
+  const getWidget = (
+    id: SidebarWidgetId,
+    defaultSide: 'left' | 'right',
+    defaultOrder: number,
+    defaultName: string
+  ): SidebarWidgetSetting => {
+    const existing = expandedList.find((w) => w.id === id);
+    processed.add(id);
+    return {
+      id,
+      name: existing?.name || defaultName,
+      // Standard sides: Left = uncle_ho, good_deed; Right = safety_message, traffic_situation, quick_actions
+      side:
+        id === 'safety_message' || id === 'traffic_situation' || id === 'quick_actions'
+          ? 'right'
+          : id === 'uncle_ho' || id === 'good_deed'
+          ? 'left'
+          : existing?.side || defaultSide,
+      order: existing?.order !== undefined ? existing.order : defaultOrder,
+      enabled: existing?.enabled !== undefined ? existing.enabled : true,
+    };
+  };
+
+  result.push(getWidget('uncle_ho', 'left', 1, 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA'));
+  result.push(getWidget('good_deed', 'left', 2, 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'));
+  result.push(getWidget('safety_message', 'right', 1, 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'));
+  result.push(getWidget('traffic_situation', 'right', 2, 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'));
+  result.push(getWidget('quick_actions', 'right', 3, 'Tiện ích quân nhân'));
+
+  // Add remaining widgets like latest_news, announcements
+  expandedList.forEach((w) => {
+    if (!processed.has(w.id)) {
+      result.push(w);
+      processed.add(w.id);
+    }
+  });
+
+  const lefts = result.filter((w) => w.side === 'left').sort((a, b) => (a.order || 0) - (b.order || 0));
+  lefts.forEach((w, idx) => {
+    w.order = idx + 1;
+  });
+  const rights = result.filter((w) => w.side === 'right').sort((a, b) => (a.order || 0) - (b.order || 0));
+  rights.forEach((w, idx) => {
+    w.order = idx + 1;
+  });
+
+  return [...lefts, ...rights];
 }
 
 export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
@@ -186,8 +232,30 @@ export const LayoutManagerModal: React.FC<LayoutManagerModalProps> = ({
     }
   };
 
-  const handleSave = () => {
-    onSaveLayout(layout);
+  const handleSave = async () => {
+    const normalizedLayout: HomeLayoutSettings = {
+      ...layout,
+      sidebarWidgets: normalizeWidgetsList(layout.sidebarWidgets),
+    };
+
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            home_layout: normalizedLayout,
+            layout_settings: normalizedLayout,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      }
+    } catch (err) {
+      console.warn('[LayoutManagerModal] Supabase save error:', err);
+    }
+
+    onSaveLayout(normalizedLayout);
     toast.success('Đã lưu bố cục', 'Đã cập nhật và lưu cấu hình bố cục Trang chủ thành công!');
     onClose();
   };

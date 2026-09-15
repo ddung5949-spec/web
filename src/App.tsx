@@ -31,6 +31,7 @@ import {
   defaultMeetingSettings,
   defaultMilitaryProfiles,
   defaultRoles,
+  defaultSidebarWidgets,
   defaultSiteConfig,
   defaultUncleHoQuotes,
   defaultUncleHoSettings,
@@ -90,6 +91,7 @@ const QuickActionManagerModal = React.lazy(() =>
 const AccessDeniedModal = React.lazy(() =>
   import('./components/modals/AccessDeniedModal').then((m) => ({ default: m.AccessDeniedModal }))
 );
+import { normalizeWidgetsList } from './components/modals/LayoutManagerModal';
 const LayoutManagerModal = React.lazy(() =>
   import('./components/modals/LayoutManagerModal').then((m) => ({ default: m.LayoutManagerModal }))
 );
@@ -179,6 +181,31 @@ export function App() {
     } catch {
       // ignore
     }
+
+    // Ensure standardized 3-column layout initialization across all devices, private tabs, and reloads
+    const initialWidgets = normalizeWidgetsList(
+      initial.layoutSettings?.sidebarWidgets ||
+      initial.home_layout?.sidebarWidgets ||
+      initial.sidebarWidgets ||
+      defaultSidebarWidgets
+    );
+    const standardLayout = {
+      showUncleHoSection: true,
+      showAnnouncementsWidget: true,
+      showFeaturedSlider: true,
+      showSpotlightSection: true,
+      showLatestNewsWidget: true,
+      showQuickActionsWidget: true,
+      showCategoryColumns: true,
+      showQuickLibrarySection: true,
+      topColumnsOrder: ['left', 'middle', 'right'] as ('left' | 'middle' | 'right')[],
+      ...(initial.layoutSettings || initial.home_layout || {}),
+      sidebarWidgets: initialWidgets,
+    };
+    initial.layoutSettings = standardLayout;
+    initial.home_layout = standardLayout;
+    initial.sidebarWidgets = initialWidgets;
+
     return initial;
   });
 
@@ -485,7 +512,23 @@ export function App() {
         mergedConfig.footer_config = config.footer_config;
       }
       if (config.home_layout || config.layout_settings) {
-        mergedConfig.layoutSettings = config.layout_settings || config.home_layout || mergedConfig.layoutSettings;
+        const rawLayout = config.home_layout || config.layout_settings;
+        const normalizedLayout = {
+          showUncleHoSection: true,
+          showAnnouncementsWidget: true,
+          showFeaturedSlider: true,
+          showSpotlightSection: true,
+          showLatestNewsWidget: true,
+          showQuickActionsWidget: true,
+          showCategoryColumns: true,
+          showQuickLibrarySection: true,
+          topColumnsOrder: ['left', 'middle', 'right'] as ('left' | 'middle' | 'right')[],
+          ...rawLayout,
+          sidebarWidgets: normalizeWidgetsList(rawLayout?.sidebarWidgets),
+        };
+        mergedConfig.layoutSettings = normalizedLayout;
+        mergedConfig.home_layout = normalizedLayout;
+        mergedConfig.sidebarWidgets = normalizedLayout.sidebarWidgets;
       }
       if (config.categories_config) {
         mergedConfig.categories_config = config.categories_config;
@@ -2030,12 +2073,44 @@ export function App() {
   };
 
   // Home Layout Settings Handler
-  const handleSaveLayoutSettings = (newLayout: import('./types').HomeLayoutSettings) => {
+  const handleSaveLayoutSettings = async (newLayout: import('./types').HomeLayoutSettings) => {
+    const normalizedLayout: import('./types').HomeLayoutSettings = {
+      ...newLayout,
+      sidebarWidgets: normalizeWidgetsList(newLayout.sidebarWidgets),
+    };
     const updated: SiteConfig = {
       ...siteConfig,
-      layoutSettings: newLayout,
+      layoutSettings: normalizedLayout,
+      home_layout: normalizedLayout,
+      sidebarWidgets: normalizedLayout.sidebarWidgets,
     };
-    handleSaveCustomizer(updated);
+    setSiteConfig(updated);
+    safeStore.set('mangyang_site_config', updated);
+    try {
+      localStorage.setItem('site_config_cache', JSON.stringify(updated));
+      localStorage.setItem('mangyang_site_config', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('site_config').upsert(
+          {
+            id: 'default',
+            home_layout: normalizedLayout,
+            layout_settings: normalizedLayout,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      } catch (err) {
+        console.error('[App] Supabase error saving home_layout:', err);
+      }
+    }
+
+    await handleSaveCustomizer(updated);
     showToast(
       'success',
       'Đã lưu bố cục Trang chủ',

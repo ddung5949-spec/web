@@ -66,7 +66,7 @@ import { HomeSpotlightSection } from './HomeSpotlightSection';
 import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
 import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
-import { LayoutManagerModal } from './modals/LayoutManagerModal';
+import { LayoutManagerModal, normalizeWidgetsList } from './modals/LayoutManagerModal';
 import { getSupabase } from '../utils/supabase';
 
 interface HomeViewProps {
@@ -280,7 +280,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Dynamic Sidebar Widgets setup
   const configuredSidebarWidgets: SidebarWidgetSetting[] = React.useMemo(() => {
-    const fromLayout = siteConfig?.layoutSettings?.sidebarWidgets;
+    const fromLayout = siteConfig?.layoutSettings?.sidebarWidgets || siteConfig?.home_layout?.sidebarWidgets;
     const fromConfig = siteConfig?.sidebarWidgets;
     const list =
       fromLayout && fromLayout.length > 0
@@ -289,49 +289,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
         ? fromConfig
         : defaultSidebarWidgets;
 
-    // Check if list has old 'daily_widgets' and lacks 'safety_message', expand it
-    const hasDailyGroup = list.some((w) => w.id === 'daily_widgets');
-    const hasSafety = list.some((w) => w.id === 'safety_message' || w.id === 'widget_safety_message');
-
-    if (hasDailyGroup && !hasSafety) {
-      const dailyGroup = list.find((w) => w.id === 'daily_widgets')!;
-      const expanded: SidebarWidgetSetting[] = [
-        {
-          id: 'safety_message',
-          name: 'Mỗi ngày 1 thông điệp an toàn',
-          side: dailyGroup.side,
-          order: dailyGroup.order,
-          enabled: dailyGroup.enabled,
-        },
-        {
-          id: 'traffic_situation',
-          name: 'Mỗi ngày một tình huống giao thông',
-          side: dailyGroup.side,
-          order: dailyGroup.order + 1,
-          enabled: dailyGroup.enabled,
-        },
-        {
-          id: 'good_deed',
-          name: 'Mỗi ngày một hành động đẹp',
-          side: dailyGroup.side,
-          order: dailyGroup.order + 2,
-          enabled: dailyGroup.enabled,
-        },
-      ];
-
-      const result: SidebarWidgetSetting[] = [];
-      list.forEach((w) => {
-        if (w.id === 'daily_widgets') {
-          result.push(...expanded);
-        } else {
-          result.push(w);
-        }
-      });
-      return result;
-    }
-
-    return list;
-  }, [siteConfig?.layoutSettings?.sidebarWidgets, siteConfig?.sidebarWidgets]);
+    return normalizeWidgetsList(list);
+  }, [siteConfig?.layoutSettings?.sidebarWidgets, siteConfig?.home_layout?.sidebarWidgets, siteConfig?.sidebarWidgets]);
 
   const leftWidgets = React.useMemo(() => {
     return configuredSidebarWidgets
@@ -567,7 +526,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div
           className={`grid grid-cols-1 gap-4 lg:gap-5 items-start w-full ${
             hasLeftColumn && hasMiddleColumn && hasRightColumn
-              ? 'lg:grid-cols-[21.5%_1fr_21.5%]'
+              ? 'lg:grid-cols-[22%_1fr_22%] xl:grid-cols-[21.5%_1fr_21.5%]'
               : hasLeftColumn && hasMiddleColumn && !hasRightColumn
               ? 'lg:grid-cols-[23%_1fr]'
               : !hasLeftColumn && hasMiddleColumn && hasRightColumn
