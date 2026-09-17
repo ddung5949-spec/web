@@ -547,6 +547,31 @@ export function App() {
         mergedConfig.military_utilities = rawUtils;
       }
 
+      // Đồng bộ Lời Bác dạy từ uncle_ho_data
+      const uhData = config.uncle_ho_data || mergedConfig.uncle_ho_data;
+      if (uhData) {
+        if (Array.isArray(uhData.quotes) && uhData.quotes.length > 0) {
+          setUncleHoQuotes(uhData.quotes);
+          try {
+            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(uhData.quotes));
+            localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(uhData.quotes));
+          } catch {}
+        }
+        if (Array.isArray(uhData.images) && uhData.images.length > 0) {
+          const cleanImgs = uhData.images.filter((x: string) => x && !x.includes('unsplash.com'));
+          setUncleHoSettings((prev) => ({
+            ...prev,
+            ...(uhData.settings || {}),
+            images: cleanImgs,
+            bannerTitle: uhData.settings?.bannerTitle || prev.bannerTitle,
+          }));
+          try {
+            localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
+            localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
+          } catch {}
+        }
+      }
+
       const hoImgs = config.uncle_ho_images || mergedConfig.uncle_ho_images || mergedConfig.uncleHoSettings?.images;
       if (Array.isArray(hoImgs) && hoImgs.length > 0) {
         const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
@@ -613,6 +638,13 @@ export function App() {
 
       if (posterMap['uncle_ho']) {
         const hoData = posterMap['uncle_ho'];
+        if (hoData.extra_data?.quotes && Array.isArray(hoData.extra_data.quotes) && hoData.extra_data.quotes.length > 0) {
+          setUncleHoQuotes(hoData.extra_data.quotes);
+          try {
+            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(hoData.extra_data.quotes));
+            localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(hoData.extra_data.quotes));
+          } catch {}
+        }
         const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
         if (Array.isArray(hoImages) && hoImages.length > 0) {
           const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));

@@ -150,6 +150,17 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       localStorage.setItem('uncle_ho_images', JSON.stringify(slideshowImages));
       localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(slideshowImages));
 
+      const cfgRaw = localStorage.getItem('site_config_cache');
+      const cfgObj = cfgRaw ? JSON.parse(cfgRaw) : {};
+      cfgObj.uncle_ho_data = {
+        quotes: quotesList,
+        images: slideshowImages,
+        settings: { ...settings, images: slideshowImages },
+        updated_at: nowIso,
+      };
+      cfgObj.uncle_ho_images = slideshowImages;
+      localStorage.setItem('site_config_cache', JSON.stringify(cfgObj));
+
       const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
       const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
       cacheMap['uncle_ho'] = {
@@ -166,23 +177,31 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       // ignore
     }
 
-    // Direct Supabase upsert to daily_posters and site_config
+    // Direct Supabase upsert to site_config (uncle_ho_data) and daily_posters
     const supabase = getSupabase();
     if (supabase) {
       try {
+        const updatedData = {
+          quotes: quotesList,
+          images: slideshowImages,
+          settings: { ...settings, images: slideshowImages },
+          updated_at: nowIso,
+        };
+
+        await supabase.from('site_config').upsert({
+          id: 'default',
+          uncle_ho_data: updatedData,
+          uncle_ho_images: slideshowImages,
+          updated_at: nowIso,
+        }, { onConflict: 'id' });
+
         await supabase.from('daily_posters').upsert({
           id: 'uncle_ho',
           title: settings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
           image_data: slideshowImages[0] || '',
           aspect_ratio: 'auto',
-          content: 'Album ảnh và Lời Bác Hồ dạy',
-          extra_data: { images: slideshowImages, bannerTitle: settings.bannerTitle },
-          updated_at: nowIso,
-        }, { onConflict: 'id' });
-
-        await supabase.from('site_config').upsert({
-          id: 'default',
-          uncle_ho_images: slideshowImages,
+          content: quotesList[0]?.quote || 'Album ảnh và Lời Bác Hồ dạy',
+          extra_data: { images: slideshowImages, quotes: quotesList, bannerTitle: settings.bannerTitle },
           updated_at: nowIso,
         }, { onConflict: 'id' });
       } catch (dbErr) {
@@ -252,11 +271,42 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
     setQuotesList(updatedList);
     onSaveQuotes(updatedList);
 
-    // Sync to daily_posters table
+    const nowIso = new Date().toISOString();
+    const updatedData = {
+      quotes: updatedList,
+      images: slideshowImages,
+      settings: {
+        ...settings,
+        images: slideshowImages,
+      },
+      updated_at: nowIso,
+    };
+
+    // Cache to localStorage
+    try {
+      localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(updatedList));
+      localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(updatedList));
+
+      const cfgRaw = localStorage.getItem('site_config_cache');
+      const cfgObj = cfgRaw ? JSON.parse(cfgRaw) : {};
+      cfgObj.uncle_ho_data = updatedData;
+      localStorage.setItem('site_config_cache', JSON.stringify(cfgObj));
+    } catch {}
+
+    // Direct Supabase upsert to site_config (uncle_ho_data) and daily_posters
     const supabase = getSupabase();
     if (supabase) {
       (async () => {
         try {
+          await supabase.from('site_config').upsert(
+            {
+              id: 'default',
+              uncle_ho_data: updatedData,
+              updated_at: nowIso,
+            },
+            { onConflict: 'id' }
+          );
+
           await supabase.from('daily_posters').upsert(
             {
               id: 'uncle_ho',
@@ -264,13 +314,13 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
               image_data: slideshowImages[0] || '',
               aspect_ratio: 'auto',
               content: newItem.quote,
-              extra_data: { images: slideshowImages, quote: newItem, bannerTitle: settings.bannerTitle },
-              updated_at: new Date().toISOString(),
+              extra_data: { images: slideshowImages, quote: newItem, quotes: updatedList, bannerTitle: settings.bannerTitle },
+              updated_at: nowIso,
             },
             { onConflict: 'id' }
           );
-        } catch {
-          // ignore
+        } catch (err) {
+          console.warn('[UncleHoManagerModal] Error upserting to Supabase:', err);
         }
       })();
     }
@@ -285,6 +335,44 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
     const updated = quotesList.filter((q) => q.id !== id);
     setQuotesList(updated);
     onSaveQuotes(updated);
+
+    const nowIso = new Date().toISOString();
+    const updatedData = {
+      quotes: updated,
+      images: slideshowImages,
+      settings: {
+        ...settings,
+        images: slideshowImages,
+      },
+      updated_at: nowIso,
+    };
+
+    try {
+      localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(updated));
+      localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(updated));
+
+      const cfgRaw = localStorage.getItem('site_config_cache');
+      const cfgObj = cfgRaw ? JSON.parse(cfgRaw) : {};
+      cfgObj.uncle_ho_data = updatedData;
+      localStorage.setItem('site_config_cache', JSON.stringify(cfgObj));
+    } catch {}
+
+    const supabase = getSupabase();
+    if (supabase) {
+      (async () => {
+        try {
+          await supabase.from('site_config').upsert(
+            {
+              id: 'default',
+              uncle_ho_data: updatedData,
+              updated_at: nowIso,
+            },
+            { onConflict: 'id' }
+          );
+        } catch {}
+      })();
+    }
+
     if (editingQuoteId === id) {
       handleCreateNewQuote();
     }
@@ -446,6 +534,8 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
                             src={imgUrl}
                             alt={`Ảnh Bác ${index + 1}`}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            decoding="async"
                           />
                           <div className="absolute top-2 left-2 bg-red-900/90 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300/60">
                             Ảnh {index + 1} {index === 0 ? '(Chính)' : ''}

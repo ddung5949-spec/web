@@ -59,49 +59,62 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
   const todayStr = `${todayDay}/${todayMonth}`;
 
-  // Ngày đang được chọn
-  const [selectedDayStr, setSelectedDayStr] = useState<string>(() => {
-    if (settings?.autoSelectToday) {
-      const matchToday = quotes?.find((q) => q.dayMonth === todayStr);
-      if (matchToday) return todayStr;
-    }
-    if (settings?.activeQuoteId) {
-      const matchActive = quotes?.find((q) => q.id === settings.activeQuoteId);
-      if (matchActive) return matchActive.dayMonth;
-    }
-    return quotes?.[0]?.dayMonth || todayStr;
-  });
-
   // State Slideshow cố định (Album ảnh Bác Hồ)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [fetchedAlbumImages, setFetchedAlbumImages] = useState<string[]>([]);
 
-  // Tải trực tiếp ảnh Bác Hồ từ Supabase bảng 'daily_posters' (id: 'uncle_ho') để luôn đồng bộ cho mọi người dùng
+  // Tải trực tiếp ảnh và nội dung Bác Hồ từ Supabase bảng site_config (uncle_ho_data) và daily_posters để luôn đồng bộ tức thì cho tất cả người xem
   useEffect(() => {
     let isMounted = true;
     const fetchUncleHoFromSupabase = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
-        const { data, error } = await supabase.from('daily_posters').select('*').eq('id', 'uncle_ho').maybeSingle();
-        if (error) {
-          console.warn('[UncleHoDailySection] Notice fetching uncle_ho:', error.message);
+
+        // 1. Kiểm tra bảng site_config (uncle_ho_data)
+        const { data: cfgData } = await supabase
+          .from('site_config')
+          .select('uncle_ho_data, uncle_ho_images')
+          .eq('id', 'default')
+          .maybeSingle();
+
+        if (isMounted && cfgData) {
+          const uhData = cfgData.uncle_ho_data;
+          if (uhData?.images && Array.isArray(uhData.images) && uhData.images.length > 0) {
+            const clean = uhData.images.filter((img: string) => img && !img.includes('unsplash.com'));
+            if (clean.length > 0) {
+              setFetchedAlbumImages(clean);
+            }
+          } else if (cfgData.uncle_ho_images && Array.isArray(cfgData.uncle_ho_images)) {
+            const clean = cfgData.uncle_ho_images.filter((img: string) => img && !img.includes('unsplash.com'));
+            if (clean.length > 0) {
+              setFetchedAlbumImages(clean);
+            }
+          }
         }
-        if (data) {
+
+        // 2. Kiểm tra bảng daily_posters (id: 'uncle_ho')
+        const { data, error } = await supabase
+          .from('daily_posters')
+          .select('*')
+          .eq('id', 'uncle_ho')
+          .maybeSingle();
+
+        if (!error && data && isMounted) {
           const imgs: string[] = [];
           if (data.extra_data?.images && Array.isArray(data.extra_data.images)) {
             imgs.push(...data.extra_data.images.filter((img: string) => img && !img.includes('unsplash.com')));
           } else if (data.image_data && !data.image_data.includes('unsplash.com')) {
             imgs.push(data.image_data);
           }
-          if (imgs.length > 0 && isMounted) {
-            setFetchedAlbumImages(imgs);
+          if (imgs.length > 0) {
+            setFetchedAlbumImages((prev) => (prev.length > 0 ? prev : imgs));
           }
         }
       } catch (err) {
-        console.warn('Error fetching uncle_ho images from Supabase:', err);
+        console.warn('Error fetching uncle_ho from Supabase:', err);
       }
     };
     fetchUncleHoFromSupabase();
@@ -112,7 +125,6 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // State xem nhanh Bối cảnh lịch sử & Bài học vận dụng
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Lấy Album ảnh Slideshow (luôn đảm bảo có ảnh Bác Hồ chất lượng cao, không bao giờ để trống)
   const albumImages: string[] = useMemo(() => {
@@ -167,15 +179,28 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     return () => clearInterval(interval);
   }, [isPlaying, albumImages.length]);
 
-  // Quote hiện tại theo ngày được chọn
+  // Quote hiện tại hiển thị cố định theo ngày thực tế của hệ thống (Ví dụ ngày 17/09)
   const currentQuote: UncleHoQuote = useMemo(() => {
-    const matched = quotes.find((q) => q.dayMonth === selectedDayStr);
+    // 1. Tìm câu trích dẫn cho ngày hôm nay từ danh sách quotes
+    const matched = quotes.find((q) => q.dayMonth === todayStr);
     if (matched) return matched;
 
-    // Fallback nếu chưa có dữ liệu cho ngày này
+    // 2. Kiểm tra cache localStorage uncle_ho_data nếu có
+    try {
+      const cfgCache = localStorage.getItem('site_config_cache');
+      if (cfgCache) {
+        const parsed = JSON.parse(cfgCache);
+        if (parsed?.uncle_ho_data?.quotes && Array.isArray(parsed.uncle_ho_data.quotes)) {
+          const found = parsed.uncle_ho_data.quotes.find((q: UncleHoQuote) => q.dayMonth === todayStr);
+          if (found) return found;
+        }
+      }
+    } catch {}
+
+    // 3. Fallback chuẩn xác cho ngày hôm nay
     return {
-      id: `default-${selectedDayStr}`,
-      dayMonth: selectedDayStr,
+      id: `default-${todayStr}`,
+      dayMonth: todayStr,
       yearRecorded: '1945',
       quote: 'Dân ta xin nhớ chữ đồng: Đồng tình, đồng sức, đồng lòng, đồng minh.',
       context:
@@ -187,7 +212,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       status: 'active',
       isAutoPublish: true,
     };
-  }, [quotes, selectedDayStr]);
+  }, [quotes, todayStr]);
 
   // Chuyển slide tiếp theo / trước đó
   const handlePrevSlide = (e: React.MouseEvent) => {
@@ -201,13 +226,6 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
     if (albumImages.length <= 1) return;
     setCurrentSlideIndex((prev) => (prev + 1) % albumImages.length);
   };
-
-  // Danh sách các ngày có sẵn trong CSDL
-  const availableDates = useMemo(() => {
-    const dates = quotes.map((q) => q.dayMonth).filter(Boolean);
-    if (!dates.includes(todayStr)) dates.unshift(todayStr);
-    return Array.from(new Set(dates));
-  }, [quotes, todayStr]);
 
   return (
     <div
@@ -337,70 +355,20 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
         </div>
       </div>
 
-      {/* 3. BỘ CHỌN NGÀY & ĐIỀU HƯỚNG */}
-      <div className="px-3 py-1.5 flex items-center justify-between bg-amber-100/60 border-y border-amber-300/60 text-xs">
+      {/* 3. NGÀY HIỂN THỊ CỐ ĐỊNH THEO THỜI GIAN THỰC TẾ HỆ THỐNG */}
+      <div className="px-3.5 py-1.5 flex items-center justify-between bg-amber-100/70 border-y border-amber-300/60 text-xs">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-3.5 h-3.5 text-[#8B0000]" />
-          <span className="font-bold text-red-950 text-[11px]">
-            Ngày {currentQuote.dayMonth}
+          <span className="font-bold text-red-950 text-[11px] sm:text-xs">
+            Hôm nay, Ngày {todayStr}
             {currentQuote.yearRecorded ? ` • Năm ${currentQuote.yearRecorded}` : ''}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Nút chọn nhanh Hôm nay */}
-          {selectedDayStr !== todayStr && (
-            <button
-              type="button"
-              onClick={() => setSelectedDayStr(todayStr)}
-              className="text-[10px] font-bold bg-[#8B0000] hover:bg-red-900 text-amber-200 px-2 py-0.5 rounded-full transition-all cursor-pointer shadow-xs"
-            >
-              Hôm nay ({todayStr})
-            </button>
-          )}
-
-          {/* Nút mở danh sách chọn ngày */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-              className="text-[10px] font-bold bg-white hover:bg-amber-50 text-gray-800 px-2 py-0.5 rounded-md border border-amber-300 cursor-pointer shadow-2xs flex items-center gap-1"
-            >
-              <span>Chọn ngày</span>
-              <ChevronRight className="w-3 h-3 text-gray-500" />
-            </button>
-
-            {/* Dropdown danh sách ngày có sẵn */}
-            {isDatePickerOpen && (
-              <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-xl border border-amber-300 z-30 p-1.5 max-h-48 overflow-y-auto">
-                <p className="text-[10px] font-bold text-gray-500 px-2 py-1 border-b border-gray-100">
-                  Chọn ngày xem Lời Bác dạy:
-                </p>
-                {availableDates.map((dateStr) => (
-                  <button
-                    key={`opt-date-${dateStr}`}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDayStr(dateStr);
-                      setIsDatePickerOpen(false);
-                    }}
-                    className={`w-full text-left px-2 py-1 rounded text-xs font-semibold flex items-center justify-between cursor-pointer ${
-                      dateStr === selectedDayStr
-                        ? 'bg-[#8B0000] text-amber-200'
-                        : 'text-gray-700 hover:bg-amber-100/60'
-                    }`}
-                  >
-                    <span>Ngày {dateStr}</span>
-                    {dateStr === todayStr && (
-                      <span className="text-[9px] px-1 rounded bg-amber-400 text-red-900 font-bold">
-                        Hôm nay
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <span className="text-[10px] font-extrabold bg-[#8B0000] text-amber-200 px-2.5 py-0.5 rounded-full shadow-2xs tracking-wide">
+            Ngày này năm xưa
+          </span>
         </div>
       </div>
 
@@ -448,7 +416,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
                 <h3 className="text-sm font-black uppercase text-amber-300">
-                  LỜI BÁC DẠY NGÀY {currentQuote.dayMonth}
+                  LỜI BÁC DẠY NGÀY {todayStr}
                   {currentQuote.yearRecorded ? ` (NĂM ${currentQuote.yearRecorded})` : ''}
                 </h3>
               </div>

@@ -669,6 +669,8 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
                           ? 'aspect-video object-cover'
                           : 'max-h-56 w-auto object-contain'
                       }`}
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <span className="text-gray-400 text-xs italic">Chưa chọn ảnh</span>

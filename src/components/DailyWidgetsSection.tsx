@@ -356,6 +356,8 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
                         src={formImage}
                         alt="Preview"
                         className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   )}
