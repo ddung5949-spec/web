@@ -4,9 +4,6 @@ import { PageView, SiteConfig, User } from '../types';
 import { BackToTop } from './BackToTop';
 import { FooterManagerModal } from './modals/FooterManagerModal';
 
-const MILITARY_DEFAULT_LOGO =
-  'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Emblem_of_the_Vietnam_People%27s_Army.svg/300px-Emblem_of_the_Vietnam_People%27s_Army.svg.png';
-
 interface FooterProps {
   siteConfig: SiteConfig;
   currentUser?: User | null;
@@ -59,6 +56,11 @@ export const Footer: React.FC<FooterProps> = ({
     siteConfig?.slogan ||
     'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG';
 
+  const logoSrc =
+    siteConfig?.logo_url ||
+    siteConfig?.customLogoUrl ||
+    '/logo.png';
+
   const showBackToTop =
     siteConfig?.footer_config?.toggles?.show_back_to_top ??
     (siteConfig?.footerShowBackToTop !== false);
@@ -103,22 +105,18 @@ export const Footer: React.FC<FooterProps> = ({
             </div>
           )}
 
-          {/* Hàng nội dung chính: Logo Vector Quân đội SVG + Tên cổng thông tin & Đơn vị (co giãn flex-wrap, text-[10px] sm:text-xs) */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-center flex-wrap px-1 max-w-full">
-            {/* Logo vector SVG chuẩn: Sao vàng nền đỏ, viền vàng kim, không phụ thuộc ảnh mạng ngoài */}
-            <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center shrink-0">
-              <svg
-                viewBox="0 0 100 100"
-                className="w-full h-full drop-shadow-sm"
-                aria-label="Huy hiệu Quân đội Nhân dân Việt Nam"
-              >
-                <circle cx="50" cy="50" r="46" fill="#B91C1C" stroke="#FBBF24" strokeWidth="5" />
-                <polygon
-                  points="50,14 61,38 86,38 66,54 74,78 50,63 26,78 34,54 14,38 39,38"
-                  fill="#FBBF24"
-                />
-              </svg>
-            </div>
+          {/* Hàng nội dung chính: Logo đơn vị chính thức + Tên cổng thông tin & Đơn vị (1 hàng ngang, flex-wrap) */}
+          <div className="flex items-center justify-center gap-2 sm:gap-2.5 text-center flex-wrap px-1 max-w-full">
+            {/* Ảnh Logo đơn vị chính thức lấy từ Header */}
+            <img
+              src={logoSrc}
+              alt="Logo Đơn vị"
+              className="w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow shrink-0"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src =
+                  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="46" fill="%23B91C1C" stroke="%23FBBF24" stroke-width="5"/%3E%3Cpolygon points="50,14 61,38 86,38 66,54 74,78 50,63 26,78 34,54 14,38 39,38" fill="%23FBBF24"/%3E%3C/svg%3E';
+              }}
+            />
 
             <p
               className="font-bold text-[10px] sm:text-xs uppercase tracking-wide leading-tight text-center break-words"
