@@ -23,6 +23,7 @@ import { MILITARY_FALLBACK_AVATAR, defaultCategoriesConfig } from '../data/initi
 
 interface HeaderProps {
   siteConfig: SiteConfig;
+  categories?: any[];
   currentUser: User | null;
   roles?: RoleDefinition[];
   onOpenAuth: (tab: 'login' | 'register') => void;
@@ -37,6 +38,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   siteConfig,
+  categories,
   currentUser,
   roles = [],
   onOpenAuth,
@@ -107,12 +109,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   const headerCategories = React.useMemo(() => {
     const list =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
       siteConfig?.categories_config ||
       (siteConfig as any)?.categoriesConfig ||
       (siteConfig as any)?.categories;
     if (Array.isArray(list) && list.length > 0) return list;
     return defaultCategoriesConfig;
-  }, [siteConfig?.categories_config]);
+  }, [categories, siteConfig?.categories_config]);
 
   const isAdmin = currentUser?.role === 'admin';
   const isCommander = currentUser?.role === 'commander';

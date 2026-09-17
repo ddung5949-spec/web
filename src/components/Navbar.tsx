@@ -28,6 +28,7 @@ interface NavbarProps {
   pendingDraftsCount: number;
   onOpenCustomizer: () => void;
   siteConfig?: SiteConfig;
+  categories?: any[];
   armyGreenColor?: string;
   primaryRedColor?: string;
 }
@@ -39,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingDraftsCount,
   onOpenCustomizer,
   siteConfig,
+  categories,
   armyGreenColor = '#143d2b',
   primaryRedColor = '#b91c1c',
 }) => {
@@ -56,8 +58,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         ? [...siteConfig.navTabs]
         : [...defaultNavTabs];
 
-    // Include dynamically configured categories from categories_config if not already in tabs
+    // Include dynamically configured categories from categories or categories_config if not already in tabs
     const categoriesList =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
       siteConfig?.categories_config ||
       (siteConfig as any)?.categoriesConfig ||
       (siteConfig as any)?.categories;
@@ -91,7 +94,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Helper to resolve display tab title according to priorities:
   // category_config.navName -> section.shortLabel -> tab.short_name -> tab.nav_title -> tab.label
   const getTabLabel = (tab: NavTabItem): string => {
-    const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
+    const categoriesList =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      siteConfig?.categories_config ||
+      (siteConfig as any)?.categoriesConfig ||
+      (siteConfig as any)?.categories;
     const catItem = Array.isArray(categoriesList)
       ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage)
       : undefined;
@@ -245,6 +252,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             // Resolve dynamic subcategories from categories_config
             const categoriesList =
+              (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
               siteConfig?.categories_config ||
               (siteConfig as any)?.categoriesConfig ||
               (siteConfig as any)?.categories;

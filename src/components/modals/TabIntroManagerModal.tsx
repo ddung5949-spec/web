@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Save, X, Sparkles, Shield, Crosshair, Heart, FolderLock, Laptop, Landmark } from 'lucide-react';
+import { Edit3, Save, X, Sparkles, Shield, Crosshair, Heart, FolderLock, Laptop, Landmark, Loader2 } from 'lucide-react';
 import { SiteConfig, SiteSectionsConfig } from '../../types';
+import { getSupabase } from '../../utils/supabase';
+import { defaultCategoriesConfig } from '../../data/initialData';
 
 interface TabIntroManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   siteConfig: SiteConfig;
   initialTab?: string;
-  onSaveSiteConfig: (config: SiteConfig) => void;
+  onSaveSiteConfig: (config: SiteConfig) => void | Promise<void>;
+  onSave?: (updatedCategories: any[]) => void | Promise<void>;
 }
 
 export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
@@ -16,8 +19,10 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
   siteConfig,
   initialTab = 'doc',
   onSaveSiteConfig,
+  onSave,
 }) => {
   const [selectedTab, setSelectedTab] = useState<string>(initialTab);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [title, setTitle] = useState('');
   const [shortLabel, setShortLabel] = useState('');
@@ -53,43 +58,96 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanShort = shortLabel.trim();
-    const cleanTitle = title.trim();
-    const updatedSections: SiteSectionsConfig = {
-      ...siteConfig.sections,
-      [selectedTab]: {
-        ...(siteConfig.sections as any)[selectedTab],
-        title: cleanTitle,
-        shortLabel: cleanShort,
-        short_name: cleanShort,
-        nav_title: cleanShort,
-        subTitle: subTitle.trim(),
-        desc: desc.trim(),
-      },
-    };
-
-    // Also update navTabs if corresponding tab is present
-    const updatedNavTabs = (siteConfig.navTabs || []).map((t) => {
-      if (t.id === selectedTab || t.targetPage === selectedTab) {
-        return {
-          ...t,
-          label: cleanShort || cleanTitle || t.label,
+    setIsSaving(true);
+    try {
+      const cleanShort = shortLabel.trim();
+      const cleanTitle = title.trim();
+      const updatedSections: SiteSectionsConfig = {
+        ...siteConfig.sections,
+        [selectedTab]: {
+          ...(siteConfig.sections as any)[selectedTab],
+          title: cleanTitle,
+          shortLabel: cleanShort,
           short_name: cleanShort,
           nav_title: cleanShort,
-        };
+          subTitle: subTitle.trim(),
+          desc: desc.trim(),
+        },
+      };
+
+      // Also update navTabs if corresponding tab is present
+      const updatedNavTabs = (siteConfig.navTabs || []).map((t) => {
+        if (t.id === selectedTab || t.targetPage === selectedTab) {
+          return {
+            ...t,
+            label: cleanShort || cleanTitle || t.label,
+            short_name: cleanShort,
+            nav_title: cleanShort,
+          };
+        }
+        return t;
+      });
+
+      const currentCats =
+        siteConfig?.categories_config ||
+        (siteConfig as any)?.categoriesConfig ||
+        (siteConfig as any)?.categories ||
+        defaultCategoriesConfig;
+
+      const updatedCategoriesConfig = (currentCats || []).map((cat: any) => {
+        if (cat.id === selectedTab || cat.targetPage === selectedTab) {
+          return {
+            ...cat,
+            name: cleanTitle || cat.name,
+            navName: cleanShort || cat.navName,
+            shortLabel: cleanShort || cat.shortLabel,
+          };
+        }
+        return cat;
+      });
+
+      const updatedConfig: SiteConfig = {
+        ...siteConfig,
+        sections: updatedSections,
+        navTabs: updatedNavTabs.length > 0 ? updatedNavTabs : siteConfig.navTabs,
+        categories_config: updatedCategoriesConfig,
+        categoriesConfig: updatedCategoriesConfig,
+        categories: updatedCategoriesConfig,
+      };
+
+      // Direct Supabase upsert for site_config
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('site_config').upsert(
+            {
+              id: 'default',
+              categories_config: updatedCategoriesConfig,
+              navigation_tabs: updatedNavTabs.length > 0 ? updatedNavTabs : updatedCategoriesConfig,
+              sections: updatedSections,
+              config_json: updatedConfig,
+              data: updatedConfig,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+        } catch (dbErr) {
+          console.error('[TabIntroManagerModal] Supabase error:', dbErr);
+        }
       }
-      return t;
-    });
 
-    onSaveSiteConfig({
-      ...siteConfig,
-      sections: updatedSections,
-      navTabs: updatedNavTabs.length > 0 ? updatedNavTabs : siteConfig.navTabs,
-    });
-
-    onClose();
+      if (onSave) {
+        await onSave(updatedCategoriesConfig);
+      }
+      await onSaveSiteConfig(updatedConfig);
+      setIsSaving(false);
+      onClose();
+    } catch (err) {
+      setIsSaving(false);
+      console.error(err);
+    }
   };
 
   return (
@@ -228,10 +286,20 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg flex items-center gap-2 shadow-sm cursor-pointer"
+              disabled={isSaving}
+              className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white font-bold rounded-lg flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 transition-all"
             >
-              <Save className="w-4 h-4" />
-              <span>LƯU NỘI DUNG GIỚI THIỆU</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang lưu lên máy chủ...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>LƯU NỘI DUNG GIỚI THIỆU</span>
+                </>
+              )}
             </button>
           </div>
         </form>

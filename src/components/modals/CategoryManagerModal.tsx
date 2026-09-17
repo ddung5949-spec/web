@@ -110,26 +110,31 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 categories: updatedList,
               });
             }
-            await supabase.from('site_config').upsert(
+            const { error: upErr } = await supabase.from('site_config').upsert(
               {
                 id: 'default',
                 categories_config: categoriesConfig,
+                navigation_tabs: categoriesConfig,
                 updated_at: new Date().toISOString(),
               },
               { onConflict: 'id' }
             );
+            if (upErr) {
+              console.error('[CategoryManagerModal] Supabase categories error:', upErr);
+            }
 
             currentCfg.categories_config = categoriesConfig;
             localStorage.setItem('cached_site_config', JSON.stringify(currentCfg));
             localStorage.setItem('site_config_cache', JSON.stringify(currentCfg));
+            localStorage.setItem('cached_categories', JSON.stringify(categoriesConfig));
           }
         } catch (dbErr) {
           console.warn('[CategoryManagerModal] Direct Supabase upsert notice:', dbErr);
         }
       }
 
-      if (onSaveCategories) await onSaveCategories(updatedList);
       if (onSave) await onSave(updatedList);
+      if (onSaveCategories) await onSaveCategories(updatedList);
       setIsSaving(false);
       setSaveSuccessMessage('Đã lưu cấu trúc danh mục thành công vào Cơ sở dữ liệu!');
       setTimeout(() => {
@@ -432,7 +437,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang lưu lên CSDL...</span>
+                <span>Đang lưu lên máy chủ...</span>
               </>
             ) : (
               <>

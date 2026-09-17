@@ -23,6 +23,7 @@ import {
 } from './types';
 import {
   defaultArticles,
+  defaultCategoriesConfig,
   defaultDailyWidgets,
   defaultDocuments,
   defaultLectures,
@@ -207,6 +208,33 @@ export function App() {
     initial.sidebarWidgets = initialWidgets;
 
     return initial;
+  });
+
+  // Categories & Tabbar State (Synchronized 100% with Supabase & Stale-While-Revalidate Cache)
+  const [categories, setCategories] = useState<any[]>(() => {
+    try {
+      const cached =
+        localStorage.getItem('cached_categories') ||
+        localStorage.getItem('categories_config_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const siteCfgCache =
+        localStorage.getItem('cached_site_config') ||
+        localStorage.getItem('site_config_cache');
+      if (siteCfgCache) {
+        const parsed = JSON.parse(siteCfgCache);
+        const list =
+          parsed?.categories_config ||
+          parsed?.categoriesConfig ||
+          parsed?.categories;
+        if (Array.isArray(list) && list.length > 0) return list;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultCategoriesConfig;
   });
 
   const [users, setUsers] = useState<User[]>(() =>
@@ -554,8 +582,26 @@ export function App() {
         mergedConfig.home_layout = normalizedLayout;
         mergedConfig.sidebarWidgets = normalizedLayout.sidebarWidgets;
       }
-      if (config.categories_config) {
-        mergedConfig.categories_config = config.categories_config;
+      const catsList =
+        config.categories_config ||
+        config.categories ||
+        parsed.categories_config ||
+        parsed.categoriesConfig ||
+        parsed.categories;
+      if (Array.isArray(catsList) && catsList.length > 0) {
+        setCategories(catsList);
+        try {
+          localStorage.setItem('cached_categories', JSON.stringify(catsList));
+        } catch {}
+        mergedConfig.categories_config = catsList;
+        mergedConfig.categoriesConfig = catsList;
+        mergedConfig.categories = catsList;
+      }
+
+      const navTabsList = config.navigation_tabs || parsed.navigation_tabs || parsed.navTabs;
+      if (Array.isArray(navTabsList) && navTabsList.length > 0) {
+        mergedConfig.navigation_tabs = navTabsList;
+        mergedConfig.navTabs = navTabsList;
       }
       if (config.home_category_columns) {
         mergedConfig.homeCategoryColumns = config.home_category_columns;
@@ -774,6 +820,12 @@ export function App() {
         .then(
           ({ data, error }) => {
             if (isMounted && !error && data) {
+              if (data.categories_config && Array.isArray(data.categories_config) && data.categories_config.length > 0) {
+                setCategories(data.categories_config);
+                try {
+                  localStorage.setItem('cached_categories', JSON.stringify(data.categories_config));
+                } catch {}
+              }
               processSiteConfigData(data);
               try {
                 localStorage.setItem('cached_site_config', JSON.stringify(data));
@@ -2297,9 +2349,34 @@ export function App() {
     cloudStorage.saveMeetingRooms(limited);
   };
 
-  const handleSaveDocCategories = (newCats: string[]) => {
+  const handleSaveDocCategories = async (newCats: string[]) => {
+    const currentCategoriesList =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      siteConfig?.categories_config ||
+      defaultCategoriesConfig;
+
+    const updatedCategoriesConfig = (currentCategoriesList || []).map((cat: any) => {
+      if (
+        cat.id === 'doc' ||
+        cat.targetPage === 'doc' ||
+        cat.name === 'Văn bản' ||
+        cat.navName === 'Văn bản' ||
+        cat.shortLabel === 'Văn bản'
+      ) {
+        return {
+          ...cat,
+          subcategories: newCats,
+          categories: newCats,
+        };
+      }
+      return cat;
+    });
+
     const updated: SiteConfig = {
       ...siteConfig,
+      categories_config: updatedCategoriesConfig,
+      categoriesConfig: updatedCategoriesConfig,
+      categories: updatedCategoriesConfig,
       sections: {
         ...siteConfig.sections,
         doc: {
@@ -2308,7 +2385,9 @@ export function App() {
         },
       },
     };
-    handleSaveCustomizer(updated);
+
+    await handleSaveCategories(updatedCategoriesConfig);
+    await handleSaveCustomizer(updated);
     showToast('success', 'Đã lưu danh mục văn bản', 'Danh mục văn bản đã được lưu và đồng bộ lên Cơ sở dữ liệu.');
   };
 
@@ -2585,9 +2664,68 @@ export function App() {
     showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
   };
 
+  // Master Categories & Tabbar Save Handler (BẮT BUỘC ĐẨY LÊN SUPABASE)
+  const handleSaveCategories = async (updatedCategories: any[]) => {
+    // 1. Cập nhật giao diện tức thì
+    setCategories(updatedCategories);
+    try {
+      localStorage.setItem('cached_categories', JSON.stringify(updatedCategories));
+    } catch {}
+
+    setSiteConfig((prev) => {
+      const updated = {
+        ...prev,
+        categories_config: updatedCategories,
+        categoriesConfig: updatedCategories,
+        categories: updatedCategories,
+      };
+      try {
+        localStorage.setItem('cached_site_config', JSON.stringify(updated));
+        localStorage.setItem('site_config_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 2. BẮT BUỘC GHI TRỰC TIẾP LÊN SUPABASE DATABASE
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        alert('❌ Không tìm thấy kết nối Supabase!');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('site_config')
+        .upsert(
+          {
+            id: 'default',
+            categories_config: updatedCategories,
+            navigation_tabs: updatedCategories, // Đồng bộ luôn cả thanh Tabbar
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        console.error('Lỗi Supabase:', error);
+        alert('❌ LỖI KHÔNG LƯU ĐƯỢC LÊN DATABASE: ' + error.message);
+        return;
+      }
+
+      alert('✅ ĐÃ LƯU VÀ ĐỒNG BỘ LÊN DATABASE SUPABASE THÀNH CÔNG! Mọi thiết bị sẽ nhận được thay đổi.');
+    } catch (err: any) {
+      alert('❌ Lỗi kết nối mạng: ' + err.message);
+    }
+  };
+
   // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ & Chuyên mục mở rộng)
   const handleSaveSectionCategories = async (sectionKey: SectionType, newCats: string[]) => {
-    const currentCategoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories || [];
+    const currentCategoriesList =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      siteConfig?.categories_config ||
+      (siteConfig as any)?.categoriesConfig ||
+      (siteConfig as any)?.categories ||
+      defaultCategoriesConfig;
 
     let updatedCategoriesConfig: any[] = [];
     const found = Array.isArray(currentCategoriesList) && currentCategoriesList.some(
@@ -2650,26 +2788,9 @@ export function App() {
       localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
     } catch {}
 
-    // Direct Supabase upsert for instant persistence across devices
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        await supabase.from('site_config').upsert(
-          {
-            id: 'default',
-            categories_config: updatedCategoriesConfig,
-            categories: updatedCategoriesConfig,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-      } catch (err) {
-        console.warn('[App] Direct site_config categories_config upsert notice:', err);
-      }
-    }
-
+    // Ghi lên Supabase database & đồng bộ
+    await handleSaveCategories(updatedCategoriesConfig);
     await handleSaveCustomizer(updatedConfig);
-    showToast('success', 'Đã lưu danh mục chuyên mục', 'Cấu trúc danh mục mới đã được đồng bộ trực tiếp lên Cơ sở dữ liệu.');
   };
 
   const handleRenameSectionCategory = (sectionKey: SectionType, oldCat: string, newCat: string) => {
@@ -2710,8 +2831,33 @@ export function App() {
 
   // Lecture Categories Handlers
   const handleSaveLectureCategories = async (newCats: string[]) => {
+    const currentCategoriesList =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      siteConfig?.categories_config ||
+      defaultCategoriesConfig;
+
+    const updatedCategoriesConfig = (currentCategoriesList || []).map((cat: any) => {
+      if (
+        cat.id === 'lecture' ||
+        cat.targetPage === 'lecture' ||
+        cat.name === 'Bài giảng số' ||
+        cat.navName === 'Bài giảng số' ||
+        cat.shortLabel === 'Bài giảng số'
+      ) {
+        return {
+          ...cat,
+          subcategories: newCats,
+          categories: newCats,
+        };
+      }
+      return cat;
+    });
+
     const updatedConfig: SiteConfig = {
       ...siteConfig,
+      categories_config: updatedCategoriesConfig,
+      categoriesConfig: updatedCategoriesConfig,
+      categories: updatedCategoriesConfig,
       sections: {
         ...siteConfig.sections,
         lecture: {
@@ -2720,6 +2866,8 @@ export function App() {
         },
       },
     };
+
+    await handleSaveCategories(updatedCategoriesConfig);
     await handleSaveCustomizer(updatedConfig);
     showToast('success', 'Đã lưu danh mục bài giảng số', 'Danh mục bài giảng số đã được đồng bộ lên Cơ sở dữ liệu.');
   };
@@ -2893,6 +3041,7 @@ export function App() {
       {/* 1. Header */}
       <Header
         siteConfig={siteConfig}
+        categories={categories}
         currentUser={currentUser}
         roles={roles}
         onOpenAuth={(tab) => setAuthModal({ isOpen: true, tab })}
@@ -2913,6 +3062,7 @@ export function App() {
         pendingDraftsCount={pendingDraftsCount}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
         siteConfig={siteConfig}
+        categories={categories}
         armyGreenColor={siteConfig.colorGreen}
         primaryRedColor={siteConfig.colorRed}
       />
@@ -3256,6 +3406,7 @@ export function App() {
             siteConfig={siteConfig}
             onClose={() => setTabIntroModal({ isOpen: false, tabKey: 'doc' })}
             onSaveSiteConfig={handleSaveCustomizer}
+            onSave={handleSaveCategories}
           />
         )}
 
