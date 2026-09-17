@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crosshair,
@@ -10,6 +11,7 @@ import {
   Heart,
   Home,
   Laptop,
+  Layers,
   Link as LinkIcon,
   Newspaper,
   Palette,
@@ -45,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navScrollRef = useRef<HTMLUListElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [activeDropdownTabId, setActiveDropdownTabId] = useState<string | null>(null);
 
   // Compute configured nav tabs with order and visibility
   const configuredNavTabs = React.useMemo<NavTabItem[]>(() => {
@@ -52,6 +55,32 @@ export const Navbar: React.FC<NavbarProps> = ({
       siteConfig?.navTabs && siteConfig.navTabs.length > 0
         ? [...siteConfig.navTabs]
         : [...defaultNavTabs];
+
+    // Include dynamically configured categories from categories_config if not already in tabs
+    const categoriesList =
+      siteConfig?.categories_config ||
+      (siteConfig as any)?.categoriesConfig ||
+      (siteConfig as any)?.categories;
+
+    if (Array.isArray(categoriesList) && categoriesList.length > 0) {
+      categoriesList.forEach((cat: any, index: number) => {
+        const exists = tabs.some(
+          (t) => t.id === cat.id || t.targetPage === cat.id || t.targetPage === cat.targetPage
+        );
+        if (!exists && cat.id) {
+          tabs.push({
+            id: cat.id,
+            label: cat.name || cat.navName || cat.id,
+            short_name: cat.navName || cat.shortLabel || cat.name,
+            targetPage: (cat.targetPage || cat.id) as PageView,
+            type: cat.type || 'internal',
+            externalUrl: cat.externalUrl,
+            enabled: true,
+            order: 20 + index,
+          });
+        }
+      });
+    }
 
     // Filter enabled tabs and sort by order
     return tabs
@@ -214,12 +243,36 @@ export const Navbar: React.FC<NavbarProps> = ({
             const target = (tab.targetPage || tab.id) as PageView;
             const isActive = currentPage === target;
 
+            // Resolve dynamic subcategories from categories_config
+            const categoriesList =
+              siteConfig?.categories_config ||
+              (siteConfig as any)?.categoriesConfig ||
+              (siteConfig as any)?.categories;
+            const catItem = Array.isArray(categoriesList)
+              ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage || c.name === tab.label)
+              : undefined;
+            const subcategories: string[] = catItem?.subcategories || catItem?.categories || [];
+            const hasSubcategories = subcategories && subcategories.length > 0;
+            const isDropdownOpen = activeDropdownTabId === tab.id;
+
             return (
-              <li key={tab.id} className="shrink-0">
+              <li
+                key={tab.id}
+                className="shrink-0 relative group"
+                onMouseEnter={() => {
+                  if (hasSubcategories) setActiveDropdownTabId(tab.id);
+                }}
+                onMouseLeave={() => {
+                  if (hasSubcategories) setActiveDropdownTabId(null);
+                }}
+              >
                 <button
                   type="button"
                   id={`nav-${tab.id}`}
-                  onClick={() => onSelectPage(target)}
+                  onClick={() => {
+                    onSelectPage(target);
+                    setActiveDropdownTabId(null);
+                  }}
                   style={{
                     backgroundColor: isActive ? primaryRedColor : 'transparent',
                   }}
@@ -229,7 +282,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span>{displayLabel}</span>
+                  {hasSubcategories && (
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 ml-0.5 text-amber-300/80 transition-transform duration-200 ${
+                        isDropdownOpen ? 'rotate-180 text-amber-300' : ''
+                      }`}
+                    />
+                  )}
                 </button>
+
+                {/* Dropdown Menu Danh mục con */}
+                {hasSubcategories && isDropdownOpen && (
+                  <div
+                    id={`nav-dropdown-${tab.id}`}
+                    className="absolute left-0 top-full min-w-[210px] bg-[#143d2b] border border-amber-400/50 shadow-2xl rounded-b-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
+                  >
+                    <div className="px-3 py-1.5 border-b border-white/10 text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center justify-between">
+                      <span>{displayLabel}</span>
+                      <span className="text-[9px] text-white/50 font-normal">Chuyên mục</span>
+                    </div>
+                    <div className="py-1 max-h-64 overflow-y-auto">
+                      {subcategories.map((sub, sIdx) => (
+                        <button
+                          key={sIdx}
+                          type="button"
+                          onClick={() => {
+                            onSelectPage(target);
+                            setActiveDropdownTabId(null);
+                          }}
+                          className="w-full text-left px-3.5 py-1.5 text-xs text-white/90 hover:text-amber-200 hover:bg-black/40 transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                          <span className="truncate">{sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}

@@ -75,9 +75,11 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Tab 2: Quản lý Nội dung theo ngày
+  const now = new Date();
+  const currentTodayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [quotesList, setQuotesList] = useState<UncleHoQuote[]>(quotes);
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
-  const [selectedDayMonth, setSelectedDayMonth] = useState('28/08');
+  const [selectedDayMonth, setSelectedDayMonth] = useState(currentTodayStr);
   const [formYear, setFormYear] = useState('1945');
   const [formQuote, setFormQuote] = useState('');
   const [formContext, setFormContext] = useState('');
@@ -287,13 +289,14 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
       localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(updatedList));
       localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(updatedList));
 
-      const cfgRaw = localStorage.getItem('site_config_cache');
+      const cfgRaw = localStorage.getItem('cached_site_config') || localStorage.getItem('site_config_cache');
       const cfgObj = cfgRaw ? JSON.parse(cfgRaw) : {};
       cfgObj.uncle_ho_data = updatedData;
+      localStorage.setItem('cached_site_config', JSON.stringify(cfgObj));
       localStorage.setItem('site_config_cache', JSON.stringify(cfgObj));
     } catch {}
 
-    // Direct Supabase upsert to site_config (uncle_ho_data) and daily_posters
+    // Direct Supabase upsert to site_config (uncle_ho_data), daily_posters, and uncle_ho_teachings
     const supabase = getSupabase();
     if (supabase) {
       (async () => {
@@ -319,6 +322,21 @@ export const UncleHoManagerModal: React.FC<UncleHoManagerModalProps> = ({
             },
             { onConflict: 'id' }
           );
+
+          try {
+            await supabase.from('uncle_ho_teachings').upsert(
+              {
+                id: newItem.id,
+                day_month: newItem.dayMonth,
+                year_recorded: newItem.yearRecorded,
+                quote: newItem.quote,
+                context: newItem.context,
+                lesson: newItem.lesson,
+                updated_at: nowIso,
+              },
+              { onConflict: 'id' }
+            );
+          } catch {}
         } catch (err) {
           console.warn('[UncleHoManagerModal] Error upserting to Supabase:', err);
         }

@@ -16,10 +16,12 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from '../Toast';
+import { getSupabase } from '../../utils/supabase';
 
 export interface CategoryManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  sectionKey?: string;
   sectionTitle: string;
   sectionSubtitle?: string;
   themeColor?: string;
@@ -35,6 +37,7 @@ export interface CategoryManagerModalProps {
 export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   isOpen,
   onClose,
+  sectionKey,
   sectionTitle,
   sectionSubtitle,
   themeColor = '#b91c1c',
@@ -65,6 +68,66 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     setIsSaving(true);
     setSaveSuccessMessage(null);
     try {
+      // 1. Direct Supabase Upsert for instant multi-device sync
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const cachedRaw =
+            localStorage.getItem('cached_site_config') ||
+            localStorage.getItem('site_config_cache');
+          let currentCfg: any = {};
+          if (cachedRaw) {
+            try {
+              currentCfg = JSON.parse(cachedRaw);
+            } catch {}
+          }
+          let categoriesConfig =
+            currentCfg.categories_config ||
+            currentCfg.categoriesConfig ||
+            currentCfg.categories ||
+            [];
+          if (Array.isArray(categoriesConfig)) {
+            const matchIndex = categoriesConfig.findIndex(
+              (c: any) =>
+                (sectionKey && c.id === sectionKey) ||
+                c.name === sectionTitle ||
+                c.navName === sectionTitle ||
+                c.shortLabel === sectionTitle
+            );
+            if (matchIndex >= 0) {
+              categoriesConfig[matchIndex] = {
+                ...categoriesConfig[matchIndex],
+                subcategories: updatedList,
+                categories: updatedList,
+              };
+            } else if (sectionKey) {
+              categoriesConfig.push({
+                id: sectionKey,
+                name: sectionTitle,
+                navName: sectionTitle,
+                targetPage: sectionKey,
+                subcategories: updatedList,
+                categories: updatedList,
+              });
+            }
+            await supabase.from('site_config').upsert(
+              {
+                id: 'default',
+                categories_config: categoriesConfig,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+
+            currentCfg.categories_config = categoriesConfig;
+            localStorage.setItem('cached_site_config', JSON.stringify(currentCfg));
+            localStorage.setItem('site_config_cache', JSON.stringify(currentCfg));
+          }
+        } catch (dbErr) {
+          console.warn('[CategoryManagerModal] Direct Supabase upsert notice:', dbErr);
+        }
+      }
+
       if (onSaveCategories) await onSaveCategories(updatedList);
       if (onSave) await onSave(updatedList);
       setIsSaving(false);

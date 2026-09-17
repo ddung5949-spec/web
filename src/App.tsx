@@ -217,7 +217,10 @@ export function App() {
 
   const [articles, setArticles] = useState<Article[]>(() => {
     try {
-      const cached = localStorage.getItem('articles_cache') || localStorage.getItem('mangyang_articles');
+      const cached =
+        localStorage.getItem('cached_articles') ||
+        localStorage.getItem('articles_cache') ||
+        localStorage.getItem('mangyang_articles');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -225,12 +228,15 @@ export function App() {
     } catch {
       // ignore
     }
-    return defaultArticles;
+    return [];
   });
 
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
-      const cached = localStorage.getItem('documents_cache') || localStorage.getItem('mangyang_documents');
+      const cached =
+        localStorage.getItem('cached_documents') ||
+        localStorage.getItem('documents_cache') ||
+        localStorage.getItem('mangyang_documents');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -238,12 +244,15 @@ export function App() {
     } catch {
       // ignore
     }
-    return defaultDocuments;
+    return [];
   });
 
   const [lectures, setLectures] = useState<LectureItem[]>(() => {
     try {
-      const cached = localStorage.getItem('lectures_cache') || localStorage.getItem('mangyang_lectures');
+      const cached =
+        localStorage.getItem('cached_lectures') ||
+        localStorage.getItem('lectures_cache') ||
+        localStorage.getItem('mangyang_lectures');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -251,15 +260,24 @@ export function App() {
     } catch {
       // ignore
     }
-    return defaultLectures;
+    return [];
   });
 
   const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>(() => {
     try {
-      const cached = localStorage.getItem('uncle_ho_quotes_cache') || localStorage.getItem('mangyang_uncle_ho_quotes');
+      const cached =
+        localStorage.getItem('uncle_ho_quotes_cache') ||
+        localStorage.getItem('mangyang_uncle_ho_quotes');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const siteCfgCache = localStorage.getItem('cached_site_config') || localStorage.getItem('site_config_cache');
+      if (siteCfgCache) {
+        const parsed = JSON.parse(siteCfgCache);
+        if (parsed?.uncle_ho_data?.quotes && Array.isArray(parsed.uncle_ho_data.quotes)) {
+          return parsed.uncle_ho_data.quotes;
+        }
       }
     } catch {
       // ignore
@@ -273,7 +291,10 @@ export function App() {
 
   const [dailyPosters, setDailyPosters] = useState<Record<string, any>>(() => {
     try {
-      const cached = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      const cached =
+        localStorage.getItem('cached_posters') ||
+        localStorage.getItem('daily_posters') ||
+        localStorage.getItem('daily_posters_cache');
       return cached ? JSON.parse(cached) : {};
     } catch {
       return {};
@@ -436,6 +457,7 @@ export function App() {
           }
           return copy;
         });
+        localStorage.setItem('cached_articles', JSON.stringify(lightweight));
         localStorage.setItem('articles_cache', JSON.stringify(lightweight));
         localStorage.setItem('mangyang_articles', JSON.stringify(lightweight));
       } catch (e) {
@@ -446,6 +468,7 @@ export function App() {
     const safeCacheDocuments = (list: DocumentItem[]) => {
       try {
         const lightweight = list.slice(0, 20);
+        localStorage.setItem('cached_documents', JSON.stringify(lightweight));
         localStorage.setItem('documents_cache', JSON.stringify(lightweight));
         localStorage.setItem('mangyang_documents', JSON.stringify(lightweight));
       } catch (e) {
@@ -463,6 +486,7 @@ export function App() {
             lightweight[k] = v;
           }
         });
+        localStorage.setItem('cached_posters', JSON.stringify(lightweight));
         localStorage.setItem('daily_posters', JSON.stringify(lightweight));
         localStorage.setItem('daily_posters_cache', JSON.stringify(lightweight));
       } catch (e) {
@@ -736,13 +760,12 @@ export function App() {
       safeCacheDocuments(mappedDocs);
     };
 
-    // 1. TÁCH RỜI TRUY VẤN - NẠP ĐỘC LẬP TỪNG BẢNG (INDEPENDENT FETCHING)
-    // Bảng nào xong trước lập tức cập nhật giao diện trước, không đợi nhau!
-    const fetchGlobalDataIndependently = () => {
+    // 1. TẠO HÀM fetchMasterData() NẠP SONG SONG ĐỘC LẬP (NON-BLOCKING) THEO CHUẨN STALE-WHILE-REVALIDATE
+    const fetchMasterData = () => {
       const supabase = getSupabase();
       if (!supabase) return;
 
-      // 1.1 Cấu hình trang & Menu (Nạp trước)
+      // 1.1 Tải cấu hình & Chuyên mục & Layout
       supabase
         .from('site_config')
         .select('*')
@@ -752,27 +775,32 @@ export function App() {
           ({ data, error }) => {
             if (isMounted && !error && data) {
               processSiteConfigData(data);
+              try {
+                localStorage.setItem('cached_site_config', JSON.stringify(data));
+                localStorage.setItem('site_config_cache', JSON.stringify(data));
+              } catch {}
             }
           },
           () => {}
         );
 
-      // 1.2 Bài viết trang chủ (Chỉ lấy bài mới nhất & các cột cần thiết, KHÔNG nạp content)
-      (supabase.from('articles') as any)
-        .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at')
-        .order('created_at', { ascending: false })
-        .limit(16)
+      // 1.2 Tải bài viết trang chủ (Chỉ lấy các trường tóm tắt, TUYỆT ĐỐI không lấy 'content' để giảm 90% dung lượng)
+      supabase
+        .from('articles')
+        .select('id, title, summary, category, sub_category, author, author_role, image_url, views, published_at, is_featured')
+        .order('published_at', { ascending: false })
+        .limit(10)
         .then(
-          ({ data, error }: any) => {
+          ({ data, error }) => {
             if (!isMounted) return;
             if (!error && data && Array.isArray(data) && data.length > 0) {
               processArticlesData(data);
             } else {
-              // Fallback nếu cột mở rộng chưa có
+              // Fallback nếu schema chưa migrate sang tên cột mới
               (supabase.from('articles') as any)
-                .select('id, title, category, author, date, image, excerpt, summary, views, status, section_key, created_at')
+                .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at')
                 .order('created_at', { ascending: false })
-                .limit(16)
+                .limit(10)
                 .then(
                   ({ data: fbData }: any) => {
                     if (isMounted && fbData && Array.isArray(fbData) && fbData.length > 0) {
@@ -786,10 +814,10 @@ export function App() {
           () => {}
         );
 
-      // 1.3 Poster 4 chuyên mục (Nạp độc lập)
+      // 1.3 Tải Posters Infographic
       supabase
         .from('daily_posters')
-        .select('id, title, image_data, aspect_ratio, category_name, content, extra_data, updated_at')
+        .select('*')
         .then(
           ({ data, error }) => {
             if (isMounted && !error && data && Array.isArray(data) && data.length > 0) {
@@ -916,7 +944,7 @@ export function App() {
         );
     };
 
-    fetchGlobalDataIndependently();
+    fetchMasterData();
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
     const unsub = cloudStorage.subscribeAll({
@@ -2561,24 +2589,46 @@ export function App() {
   const handleSaveSectionCategories = async (sectionKey: SectionType, newCats: string[]) => {
     const currentCategoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories || [];
 
-    const updatedCategoriesConfig = Array.isArray(currentCategoriesList)
-      ? currentCategoriesList.map((cat: any) => {
-          if (
-            cat.id === sectionKey ||
-            cat.targetPage === sectionKey ||
-            cat.name === sectionKey ||
-            cat.navName === sectionKey ||
-            cat.shortLabel === sectionKey
-          ) {
-            return {
-              ...cat,
-              subcategories: newCats,
-              categories: newCats,
-            };
-          }
-          return cat;
-        })
-      : [];
+    let updatedCategoriesConfig: any[] = [];
+    const found = Array.isArray(currentCategoriesList) && currentCategoriesList.some(
+      (cat: any) =>
+        cat.id === sectionKey ||
+        cat.targetPage === sectionKey ||
+        cat.name === sectionKey ||
+        cat.navName === sectionKey ||
+        cat.shortLabel === sectionKey
+    );
+
+    if (found) {
+      updatedCategoriesConfig = currentCategoriesList.map((cat: any) => {
+        if (
+          cat.id === sectionKey ||
+          cat.targetPage === sectionKey ||
+          cat.name === sectionKey ||
+          cat.navName === sectionKey ||
+          cat.shortLabel === sectionKey
+        ) {
+          return {
+            ...cat,
+            subcategories: newCats,
+            categories: newCats,
+          };
+        }
+        return cat;
+      });
+    } else {
+      updatedCategoriesConfig = [
+        ...(Array.isArray(currentCategoriesList) ? currentCategoriesList : []),
+        {
+          id: sectionKey,
+          name: sectionKey,
+          navName: sectionKey,
+          targetPage: sectionKey,
+          subcategories: newCats,
+          categories: newCats,
+        },
+      ];
+    }
 
     const updatedConfig: SiteConfig = {
       ...siteConfig,
@@ -2593,6 +2643,12 @@ export function App() {
         },
       },
     };
+
+    try {
+      localStorage.setItem('cached_site_config', JSON.stringify(updatedConfig));
+      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+    } catch {}
 
     // Direct Supabase upsert for instant persistence across devices
     const supabase = getSupabase();

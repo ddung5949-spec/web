@@ -504,6 +504,7 @@ export const SectionView: React.FC<SectionViewProps> = ({
       {isCategoryModalOpen && onSaveCategories && (
         <CategoryManagerModal
           isOpen={isCategoryModalOpen}
+          sectionKey={sectionKey}
           sectionTitle={sectionTitle}
           categories={availableCategories}
           itemCountByCategory={(() => {
