@@ -15,6 +15,7 @@ import {
   Link as LinkIcon,
   Newspaper,
   Palette,
+  Search,
   Shield,
   Users,
 } from 'lucide-react';
@@ -27,6 +28,8 @@ interface NavbarProps {
   currentUser: User | null;
   pendingDraftsCount: number;
   onOpenCustomizer: () => void;
+  onOpenCategoryManager?: () => void;
+  onOpenGlobalSearch?: () => void;
   siteConfig?: SiteConfig;
   categories?: any[];
   armyGreenColor?: string;
@@ -39,6 +42,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   pendingDraftsCount,
   onOpenCustomizer,
+  onOpenCategoryManager,
+  onOpenGlobalSearch,
   siteConfig,
   categories,
   armyGreenColor = '#143d2b',
@@ -358,6 +363,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             </li>
           )}
 
+          {/* Quản lý Chuyên mục (Chỉ dành cho Admin) */}
+          {isAdmin && onOpenCategoryManager && (
+            <li className="shrink-0">
+              <button
+                type="button"
+                id="nav-category-manager"
+                onClick={onOpenCategoryManager}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase bg-emerald-700 hover:bg-emerald-600 text-white transition-colors cursor-pointer whitespace-nowrap border-r border-white/10"
+                title="Quản lý cấu trúc chuyên mục và tabbar website"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Chuyên mục</span>
+              </button>
+            </li>
+          )}
+
           {/* Tab Phân quyền Người dùng (Chỉ dành cho Admin) */}
           {isAdmin && (
             <li className="shrink-0">
@@ -389,6 +410,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Palette className="w-4 h-4" />
                 <span>Tùy chỉnh</span>
+              </button>
+            </li>
+          )}
+
+          {/* Nút Tìm kiếm toàn hệ thống */}
+          {onOpenGlobalSearch && (
+            <li className="shrink-0">
+              <button
+                type="button"
+                id="nav-global-search"
+                onClick={onOpenGlobalSearch}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase bg-black/25 hover:bg-black/45 text-amber-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap border-l border-white/10"
+                title="Tìm kiếm bài viết, tài liệu, bài giảng... (Ctrl + K)"
+              >
+                <Search className="w-4 h-4 text-amber-400" />
+                <span>Tìm kiếm</span>
               </button>
             </li>
           )}

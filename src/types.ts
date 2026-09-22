@@ -520,6 +520,7 @@ export interface SiteConfig {
   categories?: CategoryConfig[] | string[];
   customMenuItems?: CustomMenuItem[];
   navTabs?: NavTabItem[];
+  navigation_tabs?: any[];
   dailyWidgets?: DailyWidgetItem[];
   dailyPosters?: DailyWidgetItem[] | Record<string, any>;
   daily_widgets?: DailyWidgetItem[] | Record<string, any>;

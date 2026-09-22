@@ -4,12 +4,14 @@ import {
   CheckSquare,
   ChevronDown,
   Clock,
+  Edit2,
   Heart,
   Layers,
   Lock,
   LogOut,
   Megaphone,
   Palette,
+  Search,
   Shield,
   ShieldCheck,
   UserCheck,
@@ -34,6 +36,8 @@ interface HeaderProps {
   onOpenCustomizer?: () => void;
   onOpenUncleHoManager?: () => void;
   onOpenAnnouncementManager?: () => void;
+  onOpenCategoryManager?: () => void;
+  onOpenGlobalSearch?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -49,6 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCustomizer,
   onOpenUncleHoManager,
   onOpenAnnouncementManager,
+  onOpenCategoryManager,
+  onOpenGlobalSearch,
 }) => {
   const [currentDateString, setCurrentDateString] = useState<string>('');
   const [currentTimeString, setCurrentTimeString] = useState<string>('');
@@ -179,6 +185,23 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
+            {/* 1.4. Global Search Trigger Button */}
+            {onOpenGlobalSearch && (
+              <button
+                type="button"
+                id="header-global-search-trigger"
+                onClick={onOpenGlobalSearch}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer border bg-black/25 hover:bg-black/45 border-amber-300/50 text-amber-200 hover:text-white shadow-xs group"
+                title="Tìm kiếm tin bài, văn bản, bài giảng... (Ctrl + K)"
+              >
+                <Search className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline">Tìm kiếm</span>
+                <span className="hidden lg:inline-flex items-center text-[9px] font-mono px-1 py-0.2 bg-black/40 border border-white/20 rounded-xs text-amber-200/90 font-bold ml-0.5">
+                  Ctrl K
+                </span>
+              </button>
+            )}
+
             {/* 1.5. Dynamic Category Quick Selector */}
             {onSelectPage && (
               <div className="relative" ref={catMenuRef}>
@@ -212,7 +235,22 @@ export const Header: React.FC<HeaderProps> = ({
                         <Layers className="w-3.5 h-3.5 text-amber-300" />
                         Danh sách chuyên mục
                       </span>
-                      <span className="text-[10px] text-white/70">100% Đồng bộ</span>
+                      {currentUser?.role === 'admin' && onOpenCategoryManager ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCatMenuOpen(false);
+                            onOpenCategoryManager();
+                          }}
+                          className="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-red-950 font-black text-[10px] rounded-md shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Quản lý cấu trúc danh mục website"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          <span>Quản lý</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-white/70">100% Đồng bộ</span>
+                      )}
                     </div>
                     <div className="max-h-80 overflow-y-auto py-1 divide-y divide-white/5">
                       {headerCategories.map((cat: any) => (

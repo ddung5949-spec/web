@@ -96,6 +96,10 @@ import { normalizeWidgetsList } from './components/modals/LayoutManagerModal';
 const LayoutManagerModal = React.lazy(() =>
   import('./components/modals/LayoutManagerModal').then((m) => ({ default: m.LayoutManagerModal }))
 );
+const CategoryManagerModal = React.lazy(() =>
+  import('./components/modals/CategoryManagerModal').then((m) => ({ default: m.CategoryManagerModal }))
+);
+import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { getSupabase, supabase, supabaseAuth, supabaseDb } from './utils/supabase';
 
 // Home Widgets for 3-Column Layout
@@ -119,6 +123,20 @@ export function App() {
       ...defaultSiteConfig,
       ...(cachedObj && typeof cachedObj === 'object' ? cachedObj : {}),
     };
+
+    // Hydrate categories directly from Admin cache without mock data flicker
+    try {
+      const cachedCats = localStorage.getItem('cached_categories') || localStorage.getItem('categories_config_cache');
+      if (cachedCats) {
+        const parsedCats = JSON.parse(cachedCats);
+        if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+          initial.categories_config = parsedCats;
+          initial.categoriesConfig = parsedCats;
+          initial.categories = parsedCats;
+          initial.navigation_tabs = parsedCats;
+        }
+      }
+    } catch {}
 
     // Ensure titles are consistent with standardized branding
     if (!initial.title || initial.title === 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5') {
@@ -210,32 +228,17 @@ export function App() {
     return initial;
   });
 
-  // Categories & Tabbar State (Synchronized 100% with Supabase & Stale-While-Revalidate Cache)
+  // Categories & Tabbar State (Zero-Latency: strictly loaded from localStorage cache, no mock data fallback)
   const [categories, setCategories] = useState<any[]>(() => {
     try {
-      const cached =
-        localStorage.getItem('cached_categories') ||
-        localStorage.getItem('categories_config_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      const siteCfgCache =
-        localStorage.getItem('cached_site_config') ||
-        localStorage.getItem('site_config_cache');
-      if (siteCfgCache) {
-        const parsed = JSON.parse(siteCfgCache);
-        const list =
-          parsed?.categories_config ||
-          parsed?.categoriesConfig ||
-          parsed?.categories;
-        if (Array.isArray(list) && list.length > 0) return list;
-      }
+      const c = localStorage.getItem('cached_categories') || localStorage.getItem('categories_config_cache');
+      return c ? JSON.parse(c) : [];
     } catch {
-      // ignore
+      return [];
     }
-    return defaultCategoriesConfig;
   });
+
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
 
   const [users, setUsers] = useState<User[]>(() =>
     safeStore.get('mangyang_users', defaultUsers)
@@ -419,6 +422,19 @@ export function App() {
   }>({
     isOpen: false,
   });
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+
+  // Global keyboard shortcut for search (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsGlobalSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // Global Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -3052,6 +3068,8 @@ export function App() {
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
         onOpenUncleHoManager={() => setUncleHoManagerOpen(true)}
         onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
+        onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
+        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
       />
 
       {/* 2. Sticky Navbar */}
@@ -3061,6 +3079,8 @@ export function App() {
         currentUser={currentUser}
         pendingDraftsCount={pendingDraftsCount}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
+        onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
+        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         siteConfig={siteConfig}
         categories={categories}
         armyGreenColor={siteConfig.colorGreen}
@@ -3407,6 +3427,29 @@ export function App() {
             onClose={() => setTabIntroModal({ isOpen: false, tabKey: 'doc' })}
             onSaveSiteConfig={handleSaveCustomizer}
             onSave={handleSaveCategories}
+          />
+        )}
+
+        {isCategoryModalOpen && (
+          <CategoryManagerModal
+            isOpen={isCategoryModalOpen}
+            onClose={() => setIsCategoryModalOpen(false)}
+            onSave={(newCats) => setCategories(newCats)}
+            initialCategories={categories}
+          />
+        )}
+
+        {isGlobalSearchOpen && (
+          <GlobalSearchModal
+            isOpen={isGlobalSearchOpen}
+            onClose={() => setIsGlobalSearchOpen(false)}
+            articles={articles}
+            documents={documents}
+            lectures={lectures}
+            onOpenArticle={handleOpenArticle}
+            onSelectPage={handleSelectPage}
+            primaryRedColor={siteConfig.colorRed}
+            armyGreenColor={siteConfig.colorGreen}
           />
         )}
 
