@@ -59,9 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentDateString, setCurrentDateString] = useState<string>('');
   const [currentTimeString, setCurrentTimeString] = useState<string>('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState<boolean>(false);
-  const [isCatMenuOpen, setIsCatMenuOpen] = useState<boolean>(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const catMenuRef = useRef<HTMLDivElement>(null);
 
   // Live Clock & Date update
   useEffect(() => {
@@ -91,19 +89,15 @@ export const Header: React.FC<HeaderProps> = ({
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
-      if (catMenuRef.current && !catMenuRef.current.contains(event.target as Node)) {
-        setIsCatMenuOpen(false);
-      }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsUserMenuOpen(false);
-        setIsCatMenuOpen(false);
       }
     };
 
-    if (isUserMenuOpen || isCatMenuOpen) {
+    if (isUserMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -111,22 +105,11 @@ export const Header: React.FC<HeaderProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isUserMenuOpen, isCatMenuOpen]);
-
-  const headerCategories = React.useMemo(() => {
-    const list =
-      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
-      siteConfig?.categories_config ||
-      (siteConfig as any)?.categoriesConfig ||
-      (siteConfig as any)?.categories;
-    if (Array.isArray(list) && list.length > 0) return list;
-    return defaultCategoriesConfig;
-  }, [categories, siteConfig?.categories_config]);
+  }, [isUserMenuOpen]);
 
   const isAdmin = currentUser?.role === 'admin';
   const isCommander = currentUser?.role === 'commander';
   const isEditor = currentUser?.role === 'editor';
-  const isPartyMember = currentUser?.canJoinPartyMeeting;
 
   const matchedRole = roles.find((r) => r.id === currentUser?.role);
   const roleName = matchedRole?.name || (isAdmin ? 'Quản trị viên Hệ thống' : isCommander ? 'Chỉ huy đơn vị' : isEditor ? 'Ban Biên tập' : 'Cán bộ - Chiến sĩ');
@@ -200,95 +183,6 @@ export const Header: React.FC<HeaderProps> = ({
                   Ctrl K
                 </span>
               </button>
-            )}
-
-            {/* 1.5. Dynamic Category Quick Selector */}
-            {onSelectPage && (
-              <div className="relative" ref={catMenuRef}>
-                <button
-                  type="button"
-                  id="header-category-menu-trigger"
-                  onClick={() => setIsCatMenuOpen(!isCatMenuOpen)}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer border ${
-                    isCatMenuOpen
-                      ? 'bg-amber-400 text-red-950 border-amber-300 shadow-md'
-                      : 'bg-black/25 hover:bg-black/40 border-amber-300/40 text-amber-200 hover:text-white shadow-xs'
-                  }`}
-                  title="Danh sách chuyên mục"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Chuyên mục</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      isCatMenuOpen ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {isCatMenuOpen && (
-                  <div
-                    id="header-category-dropdown"
-                    className="absolute right-0 mt-1.5 w-64 sm:w-72 bg-[#143d2b] border border-amber-400/60 rounded-xl shadow-2xl z-50 overflow-hidden text-left animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
-                  >
-                    <div className="bg-gradient-to-r from-red-900 to-[#1b4d36] px-3.5 py-2 border-b border-amber-400/40 flex items-center justify-between">
-                      <span className="text-xs font-bold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-amber-300" />
-                        Danh sách chuyên mục
-                      </span>
-                      {currentUser?.role === 'admin' && onOpenCategoryManager ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCatMenuOpen(false);
-                            onOpenCategoryManager();
-                          }}
-                          className="px-2 py-0.5 bg-amber-400 hover:bg-amber-300 text-red-950 font-black text-[10px] rounded-md shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
-                          title="Quản lý cấu trúc danh mục website"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>Quản lý</span>
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-white/70">100% Đồng bộ</span>
-                      )}
-                    </div>
-                    <div className="max-h-80 overflow-y-auto py-1 divide-y divide-white/5">
-                      {headerCategories.map((cat: any) => (
-                        <div key={cat.id} className="p-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSelectPage((cat.targetPage || cat.id) as PageView);
-                              setIsCatMenuOpen(false);
-                            }}
-                            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 hover:bg-black/30 hover:text-white transition-colors flex items-center justify-between cursor-pointer"
-                          >
-                            <span>{cat.name || cat.navName}</span>
-                            <span className="text-[10px] text-white/50 font-normal">Xem tất cả ›</span>
-                          </button>
-                          {cat.subcategories && cat.subcategories.length > 0 && (
-                            <div className="pl-3 pr-1 py-1 flex flex-wrap gap-1">
-                              {cat.subcategories.map((sub: string, sIdx: number) => (
-                                <button
-                                  key={sIdx}
-                                  type="button"
-                                  onClick={() => {
-                                    onSelectPage((cat.targetPage || cat.id) as PageView);
-                                    setIsCatMenuOpen(false);
-                                  }}
-                                  className="text-[10px] bg-black/20 hover:bg-black/50 text-white/80 hover:text-amber-200 px-2 py-0.5 rounded border border-white/10 transition-colors cursor-pointer"
-                                >
-                                  {sub}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
 
             {/* 2. User Account or Login/Register Area */}
@@ -365,12 +259,6 @@ export const Header: React.FC<HeaderProps> = ({
                           <RoleIcon className="w-3 h-3" />
                           <span>{roleName}</span>
                         </span>
-                        {isPartyMember && (
-                          <span className="bg-pink-900/90 text-amber-300 text-[10px] px-2 py-0.5 rounded font-bold border border-pink-700 flex items-center gap-1">
-                            <UsersRound className="w-2.5 h-2.5" />
-                            <span>Đảng viên</span>
-                          </span>
-                        )}
                       </div>
                     </div>
 
@@ -385,11 +273,6 @@ export const Header: React.FC<HeaderProps> = ({
                       {currentUser.canUploadDocs && (
                         <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-semibold border border-emerald-200">
                           Đăng tài liệu
-                        </span>
-                      )}
-                      {currentUser.canJoinPartyMeeting && (
-                        <span className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-semibold border border-purple-200">
-                          Họp Đảng ủy
                         </span>
                       )}
                       {isAdmin && (

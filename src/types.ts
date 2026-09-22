@@ -321,7 +321,7 @@ export interface SiteSectionsConfig {
     desc: string;
     categories?: string[];
   };
-  meeting: {
+  meeting?: {
     title: string;
     shortLabel: string;
     subTitle?: string;
@@ -638,7 +638,6 @@ export type PageView =
   | 'bac'
   | 'doc'
   | 'lecture'
-  | 'meeting'
   | 'approvals'
   | 'users'
   | 'article_detail'

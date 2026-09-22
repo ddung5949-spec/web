@@ -181,24 +181,6 @@ export const defaultCategoriesConfig: CategoryConfig[] = [
     order: 5,
     enabled: true,
   },
-  {
-    id: 'meeting',
-    name: 'Phòng Họp Đảng ủy Trực tuyến',
-    navName: 'HỌP ĐẢNG ỦY',
-    shortLabel: 'Họp Đảng ủy',
-    description: 'Không gian họp số hóa, thảo luận và biểu quyết thông qua từng văn kiện, nghị quyết',
-    subcategories: [
-      'Nghị quyết Đảng ủy',
-      'Văn kiện Đại hội',
-      'Kế hoạch công tác',
-      'Dự thảo báo cáo',
-    ],
-    sectionKey: 'meeting',
-    targetPage: 'meeting',
-    type: 'internal',
-    order: 6,
-    enabled: true,
-  },
 ];
 
 export const defaultDailyWidgets: DailyWidgetItem[] = [
@@ -502,12 +484,6 @@ export const defaultSiteConfig: SiteConfig = {
         'Tin học & Chuyển đổi số',
         'Tài liệu bồi dưỡng Sĩ quan',
       ],
-    },
-    meeting: {
-      title: 'Phòng Họp Đảng ủy Trực tuyến',
-      shortLabel: 'Họp Đảng ủy',
-      subTitle: 'Không gian họp số hóa, thảo luận và biểu quyết thông qua từng văn kiện, nghị quyết cấp ủy',
-      desc: 'Không gian biểu quyết dự thảo nghị quyết và thảo luận công tác lãnh đạo của Đảng ủy.',
     },
   },
   customMenuItems: [

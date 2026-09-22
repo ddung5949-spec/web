@@ -35,7 +35,6 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
     { id: 'bac', name: 'Học tập theo Bác', icon: Heart, color: 'text-amber-600' },
     { id: 'doc', name: 'Văn bản - Chỉ thị', icon: FolderLock, color: 'text-blue-700' },
     { id: 'lecture', name: 'Bài giảng số', icon: Laptop, color: 'text-teal-700' },
-    { id: 'meeting', name: 'Họp Đảng ủy', icon: Landmark, color: 'text-pink-700' },
   ];
 
   // Load current values when selectedTab changes or modal opens

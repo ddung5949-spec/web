@@ -51,7 +51,6 @@ import { SectionView } from './components/SectionView';
 import { ArticleDetailView } from './components/ArticleDetailView';
 import { DocumentArchiveView } from './components/DocumentArchiveView';
 import { LectureLibraryView } from './components/LectureLibraryView';
-import { PartyMeetingRoom } from './components/PartyMeetingRoom';
 import { ApprovalsView } from './components/ApprovalsView';
 import { UserManagementView } from './components/UserManagementView';
 import { Footer } from './components/Footer';
@@ -1233,15 +1232,6 @@ export function App() {
   // Navigation Handlers
   const handleSelectPage = (page: PageView) => {
     // Access Control Guards
-    if (page === 'meeting' && !currentUser?.canJoinPartyMeeting && currentUser?.role !== 'admin') {
-      setAccessDeniedModal({
-        isOpen: true,
-        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP PHÒNG HỌP ĐẢNG ỦY',
-        message: 'Đồng chí chưa được cấp quyền tham gia Phòng họp Đảng ủy. Vui lòng liên hệ Ban Tổ chức Đảng ủy hoặc Quản trị viên để được phân quyền!',
-        requiredRole: 'Đảng viên / Đại biểu chỉ định hoặc Quản trị viên',
-      });
-      return;
-    }
     if (page === 'doc' && !currentUser?.canViewDoc && currentUser?.role !== 'admin') {
       setAccessDeniedModal({
         isOpen: true,
@@ -1480,7 +1470,7 @@ export function App() {
 
     setCurrentUser(null);
     showToast('info', 'Đã đăng xuất', 'Bạn đã đăng xuất khỏi hệ thống thành công.');
-    if (currentPage === 'meeting' || currentPage === 'approvals' || currentPage === 'users') {
+    if (currentPage === 'approvals' || currentPage === 'users') {
       setCurrentPage('home');
     }
   };
@@ -3037,19 +3027,6 @@ export function App() {
       heightSize: 'md',
       enabled: true,
     },
-    {
-      id: 'card-meeting',
-      title: 'HỌP ĐẢNG ỦY & DƯ LUẬN',
-      subtitle: 'Phòng họp trực tuyến & Biểu quyết',
-      iconName: 'meeting',
-      type: 'internal',
-      targetPage: 'meeting',
-      bgGradient: 'from-rose-900 via-pink-900 to-purple-950',
-      borderColor: 'border-pink-500/30',
-      textColor: 'text-pink-200',
-      heightSize: 'md',
-      enabled: true,
-    },
   ];
 
   return (
@@ -3267,29 +3244,6 @@ export function App() {
               />
             )}
 
-            {currentPage === 'meeting' && (
-              <PartyMeetingRoom
-                currentUser={currentUser}
-                allUsers={users}
-                meetingRooms={meetingRooms}
-                onSaveMeetingRoom={handleSaveMeetingRoom}
-                onDeleteMeetingRoom={handleDeleteMeetingRoom}
-                onSaveMeetingRooms={handleSaveMeetingRooms}
-                meetingDocuments={meetingDocuments}
-                onSaveMeetingDocument={handleSaveMeetingDocument}
-                onDeleteMeetingDocument={handleDeleteMeetingDocument}
-                meetingSettings={meetingSettings}
-                onSaveMeetingSettings={handleSaveMeetingSettings}
-                meetingVotes={meetingVotes}
-                onCastVote={handleCastVote}
-                onResetVotes={handleResetVotes}
-                onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
-                siteConfig={siteConfig}
-                onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
-              />
-            )}
-
             {currentPage === 'approvals' && (
               <ApprovalsView
                 pendingArticles={articles.filter((a) => a.status === 'pending')}
@@ -3434,7 +3388,16 @@ export function App() {
           <CategoryManagerModal
             isOpen={isCategoryModalOpen}
             onClose={() => setIsCategoryModalOpen(false)}
-            onSave={(newCats) => setCategories(newCats)}
+            onSave={(newCats) => {
+              setCategories(newCats);
+              setSiteConfig((prev) => ({
+                ...prev,
+                categories_config: newCats,
+                navigation_tabs: newCats,
+                categoriesConfig: newCats,
+                categories: newCats,
+              }));
+            }}
             initialCategories={categories}
           />
         )}

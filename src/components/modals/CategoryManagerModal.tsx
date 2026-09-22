@@ -130,49 +130,65 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       }
     }
 
+    // Filter out any legacy meeting items
+    const filterMeeting = (items: any[]): any[] => {
+      if (!Array.isArray(items)) return [];
+      return items.filter(
+        (it) => it && it.id !== 'meeting' && it.targetPage !== 'meeting' && it.sectionKey !== 'meeting'
+      );
+    };
+
+    const cleanCategoriesToSave = filterMeeting(categoriesToSave);
+
     try {
       // 1. Gọi TRỰC TIẾP supabase.from('site_config').upsert
       const supabase = getSupabase();
       if (supabase) {
-        const { error: upErr } = await supabase.from('site_config').upsert(
-          {
-            id: 'default',
-            categories_config: categoriesToSave,
-            navigation_tabs: categoriesToSave,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
+        const { error: upErr } = await supabase
+          .from('site_config')
+          .upsert(
+            {
+              id: 'default',
+              categories_config: cleanCategoriesToSave,
+              navigation_tabs: cleanCategoriesToSave,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+
         if (upErr) {
-          console.error('[CategoryManagerModal] Supabase categories error:', upErr);
+          setIsSaving(false);
+          window.alert('Lỗi lưu Database: ' + upErr.message);
+          return;
         }
       }
 
-      // 2. Lưu đồng thời vào localStorage.setItem('cached_categories', ...)
-      localStorage.setItem('cached_categories', JSON.stringify(categoriesToSave));
+      // 2. Cập nhật đồng thời vào State toàn cục và ghi đè localStorage.setItem('cached_categories', ...)
+      localStorage.setItem('cached_categories', JSON.stringify(cleanCategoriesToSave));
       try {
-        const cachedSiteCfg = localStorage.getItem('cached_site_config');
+        const cachedSiteCfg = localStorage.getItem('cached_site_config') || localStorage.getItem('site_config_cache');
         if (cachedSiteCfg) {
           const cfg = JSON.parse(cachedSiteCfg);
-          cfg.categories_config = categoriesToSave;
-          cfg.navigation_tabs = categoriesToSave;
+          cfg.categories_config = cleanCategoriesToSave;
+          cfg.navigation_tabs = cleanCategoriesToSave;
           localStorage.setItem('cached_site_config', JSON.stringify(cfg));
+          localStorage.setItem('site_config_cache', JSON.stringify(cfg));
         }
       } catch {}
 
       // 3. Callback props
-      if (onSave) await onSave(updatedList);
-      if (onSaveCategories) await onSaveCategories(updatedList);
+      if (onSave) await onSave(cleanCategoriesToSave);
+      if (onSaveCategories) await onSaveCategories(cleanCategoriesToSave);
 
       setIsSaving(false);
 
-      // 4. PHẢI hiển thị window.alert rồi mới gọi onClose()
-      window.alert('✅ ĐÃ LƯU & ĐỒNG BỘ LÊN DATABASE THÀNH CÔNG!');
+      // 4. Hiển thị thông báo thành công và đóng modal
+      window.alert('✅ Đã lưu và đồng bộ thanh chuyên mục lên hệ thống thành công!');
       onClose();
     } catch (e: any) {
       setIsSaving(false);
       console.error('Error saving categories:', e);
-      window.alert('❌ Có lỗi khi lưu lên database: ' + (e?.message || 'Lỗi kết nối'));
+      window.alert('Lỗi lưu Database: ' + (e?.message || 'Lỗi kết nối'));
     }
   };
 

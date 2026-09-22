@@ -30,7 +30,6 @@ const ICON_OPTIONS = [
   { id: 'exam', label: 'Cuộc thi / Huy hiệu', icon: Award },
   { id: 'doc', label: 'Tài liệu / Văn bản', icon: FolderLock },
   { id: 'video', label: 'Bài giảng / Video', icon: GraduationCap },
-  { id: 'meeting', label: 'Phòng họp / Biểu quyết', icon: Shield },
   { id: 'book', label: 'Sách báo / Tạp chí', icon: BookOpen },
   { id: 'link', label: 'Liên kết ngoài', icon: Link },
 ];
@@ -331,7 +330,6 @@ export const QuickActionManagerModal: React.FC<QuickActionManagerModalProps> = (
                             >
                               <option value="doc">Thư viện tài liệu văn bản</option>
                               <option value="lecture">Bài giảng & Video số</option>
-                              <option value="meeting">Phòng họp Đảng ủy</option>
                               <option value="ctd">Công tác Đảng - CTCT</option>
                               <option value="hl">Huấn luyện - SSCĐ</option>
                               <option value="bac">Học tập theo Bác</option>

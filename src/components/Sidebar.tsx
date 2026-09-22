@@ -30,14 +30,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   siteConfig,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const canJoinMeeting = currentUser?.canJoinPartyMeeting || isAdmin;
 
   const ctdLabel = siteConfig?.sections?.ctd?.shortLabel || 'Công tác Đảng - CTCT';
   const hlLabel = siteConfig?.sections?.hl?.shortLabel || 'Huấn luyện & SSCĐ';
   const bacLabel = siteConfig?.sections?.bac?.shortLabel || 'Học tập theo Bác';
   const docLabel = siteConfig?.sections?.doc?.shortLabel || 'Kho Văn bản - Tài liệu';
   const lectureLabel = siteConfig?.sections?.lecture?.shortLabel || 'Bài giảng điện tử';
-  const meetingLabel = siteConfig?.sections?.meeting?.shortLabel || 'Phòng Họp Đảng ủy';
 
   const getNavItemClass = (id: PageView) => {
     const isActive = currentPage === id;

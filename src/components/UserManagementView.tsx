@@ -352,15 +352,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
           <FolderLock className="w-3.5 h-3.5 text-blue-600" />
           <span>Kho Văn bản</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => onSelectSection && onSelectSection('meeting')}
-          className="px-3 py-1.5 rounded-full text-xs font-bold shrink-0 bg-white text-gray-700 hover:bg-pink-50 hover:text-pink-700 border border-gray-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-        >
-          <Shield className="w-3.5 h-3.5 text-pink-600" />
-          <span>Phòng Họp Đảng ủy</span>
-        </button>
       </div>
 
       {/* 3. Sub-Navigation Tabs (Hồ sơ Quân nhân | Phân quyền & Tài khoản | Thống kê Hoạt động) */}

@@ -90,9 +90,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       });
     }
 
-    // Filter enabled tabs and sort by order
+    // Filter enabled tabs, exclude meeting, and sort by order
     return tabs
-      .filter((t) => t.enabled !== false)
+      .filter((t) => t.enabled !== false && t.id !== 'meeting' && t.targetPage !== 'meeting')
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [siteConfig?.navTabs, siteConfig?.sections, siteConfig?.categories_config]);
 
@@ -208,13 +208,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       className="sticky top-0 z-50 shadow-md select-none border-b border-black/15"
       style={{ backgroundColor: armyGreenColor }}
     >
-      <div className="w-full max-w-[1850px] mx-auto px-2 sm:px-5 lg:px-8 relative flex items-center">
-        {/* Left Scroll Button (When overflowed) */}
+      <div className="w-full max-w-[1850px] mx-auto relative flex items-center justify-center">
+        {/* Left Scroll Button (When overflowed on mobile/tablet) */}
         {canScrollLeft && (
           <button
             type="button"
             onClick={scrollLeftAction}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-full px-1.5 bg-gradient-to-r from-black/80 via-black/50 to-transparent hover:from-black text-amber-300 flex items-center justify-center cursor-pointer transition-all"
+            className="md:hidden absolute left-0 top-1/2 -translate-y-1/2 z-20 h-full px-1.5 bg-gradient-to-r from-black/80 via-black/50 to-transparent hover:from-black text-amber-300 flex items-center justify-center cursor-pointer transition-all"
             title="Cuộn sang trái"
           >
             <div className="w-6 h-6 rounded-full bg-black/70 border border-amber-400/40 flex items-center justify-center shadow-md">
@@ -223,11 +223,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* 1-Line Horizontal Category Scroll Container */}
+        {/* Centered & Auto Responsive Tabbar Container */}
         <ul
           ref={navScrollRef}
           onWheel={handleWheel}
-          className="flex items-center flex-nowrap whitespace-nowrap list-none m-0 p-0 overflow-x-auto no-scrollbar scroll-smooth w-full py-0"
+          className="w-full flex items-center justify-start md:justify-center flex-nowrap md:flex-wrap gap-1 sm:gap-2 px-2 py-1.5 list-none m-0 overflow-x-auto md:overflow-visible no-scrollbar scroll-smooth"
         >
           {configuredNavTabs.map((tab) => {
             const Icon = getTabIcon(tab.id, tab.type);
@@ -240,10 +240,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     href={tab.externalUrl || '#'}
                     target={tab.openNewTab !== false ? '_blank' : undefined}
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase text-amber-200 hover:text-amber-100 hover:bg-black/25 transition-colors border-r border-white/10 whitespace-nowrap"
+                    className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase text-amber-200 hover:text-white hover:bg-black/25 transition-all rounded-md border border-white/10 hover:border-amber-300/40 whitespace-nowrap"
                     title={`Mở liên kết: ${tab.externalUrl}`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0 opacity-80" />
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 opacity-85" />
                     <span>{displayLabel}</span>
                     <ExternalLink className="w-3 h-3 shrink-0 opacity-75" />
                   </a>
@@ -289,11 +289,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   style={{
                     backgroundColor: isActive ? primaryRedColor : 'transparent',
                   }}
-                  className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase transition-colors border-r border-white/10 cursor-pointer whitespace-nowrap ${
-                    isActive ? 'text-white shadow-xs' : 'text-white/90 hover:bg-black/20 hover:text-amber-200'
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase transition-all rounded-md cursor-pointer whitespace-nowrap border ${
+                    isActive
+                      ? 'text-white border-amber-300 shadow-md ring-1 ring-amber-300/60'
+                      : 'text-amber-100 hover:text-white hover:bg-black/25 border-white/10 hover:border-amber-300/40'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                   <span>{displayLabel}</span>
                   {hasSubcategories && (
                     <ChevronDown
@@ -343,13 +345,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 id="nav-approvals"
                 onClick={() => onSelectPage('approvals')}
-                className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase transition-colors cursor-pointer whitespace-nowrap border-r border-white/10 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase transition-all cursor-pointer whitespace-nowrap rounded-md border border-emerald-400/40 ${
                   currentPage === 'approvals'
-                    ? 'bg-emerald-800 text-white'
-                    : 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                    ? 'bg-emerald-700 text-white shadow-md'
+                    : 'bg-emerald-800/80 hover:bg-emerald-700 text-amber-200 hover:text-white'
                 }`}
               >
-                <CheckSquare className="w-4 h-4" />
+                <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Duyệt Bài</span>
                 {pendingDraftsCount > 0 && (
                   <span
@@ -370,10 +372,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 id="nav-category-manager"
                 onClick={onOpenCategoryManager}
-                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase bg-emerald-700 hover:bg-emerald-600 text-white transition-colors cursor-pointer whitespace-nowrap border-r border-white/10"
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase bg-amber-400 hover:bg-amber-300 text-red-950 transition-all cursor-pointer whitespace-nowrap rounded-md border border-amber-300 shadow-xs"
                 title="Quản lý cấu trúc chuyên mục và tabbar website"
               >
-                <Layers className="w-4 h-4" />
+                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-950" />
                 <span>Chuyên mục</span>
               </button>
             </li>
@@ -386,13 +388,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 id="nav-users"
                 onClick={() => onSelectPage('users')}
-                className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase transition-colors cursor-pointer whitespace-nowrap border-r border-white/10 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase transition-all cursor-pointer whitespace-nowrap rounded-md border border-amber-500/40 ${
                   currentPage === 'users'
-                    ? 'bg-amber-700 text-white'
-                    : 'bg-amber-600 hover:bg-amber-500 text-white'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'bg-amber-700/80 hover:bg-amber-600 text-white'
                 }`}
               >
-                <Users className="w-4 h-4" />
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Phân quyền</span>
               </button>
             </li>
@@ -405,10 +407,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 id="nav-customizer"
                 onClick={onOpenCustomizer}
-                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase bg-sky-700 hover:bg-sky-600 text-white transition-colors cursor-pointer whitespace-nowrap"
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase bg-sky-800/80 hover:bg-sky-700 text-white transition-all cursor-pointer whitespace-nowrap rounded-md border border-sky-400/30"
                 title="Tùy chỉnh màu sắc, logo và thanh điều hướng website"
               >
-                <Palette className="w-4 h-4" />
+                <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Tùy chỉnh</span>
               </button>
             </li>
@@ -421,22 +423,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 id="nav-global-search"
                 onClick={onOpenGlobalSearch}
-                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-3 text-xs md:text-[13px] font-bold uppercase bg-black/25 hover:bg-black/45 text-amber-300 hover:text-white transition-colors cursor-pointer whitespace-nowrap border-l border-white/10"
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase bg-black/25 hover:bg-black/45 text-amber-300 hover:text-white transition-all cursor-pointer whitespace-nowrap rounded-md border border-amber-300/40 shadow-xs"
                 title="Tìm kiếm bài viết, tài liệu, bài giảng... (Ctrl + K)"
               >
-                <Search className="w-4 h-4 text-amber-400" />
+                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
                 <span>Tìm kiếm</span>
               </button>
             </li>
           )}
         </ul>
 
-        {/* Right Scroll Button (When overflowed) */}
+        {/* Right Scroll Button (When overflowed on mobile/tablet) */}
         {canScrollRight && (
           <button
             type="button"
             onClick={scrollRightAction}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-full px-1.5 bg-gradient-to-l from-black/80 via-black/50 to-transparent hover:from-black text-amber-300 flex items-center justify-center cursor-pointer transition-all"
+            className="md:hidden absolute right-0 top-1/2 -translate-y-1/2 z-20 h-full px-1.5 bg-gradient-to-l from-black/80 via-black/50 to-transparent hover:from-black text-amber-300 flex items-center justify-center cursor-pointer transition-all"
             title="Cuộn sang phải xem thêm chuyên mục"
           >
             <div className="w-6 h-6 rounded-full bg-black/70 border border-amber-400/40 flex items-center justify-center shadow-md animate-pulse">

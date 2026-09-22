@@ -170,27 +170,6 @@ export const HomeRightSidebar: React.FC<HomeRightSidebarProps> = ({
           </div>
           <ChevronRight className="w-4 h-4 text-white/60 group-hover:text-cyan-200 group-hover:translate-x-0.5 transition-all" />
         </div>
-
-        {/* 4. PHÒNG HỌP ĐẢNG ỦY (Pink / Purple) */}
-        <div
-          onClick={() => onSelectSection('meeting')}
-          className="group p-2.5 rounded-xl bg-linear-to-r from-rose-900 via-pink-900 to-purple-950 text-white shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center justify-between border border-pink-500/30"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-              <Shield className="w-4 h-4 text-pink-300" />
-            </div>
-            <div>
-              <div className="font-black text-xs uppercase tracking-wide text-pink-200">
-                HỌP ĐẢNG ỦY & DƯ LUẬN
-              </div>
-              <div className="text-[10px] text-white/80 line-clamp-1">
-                Phòng họp trực tuyến & Biểu quyết
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-white/60 group-hover:text-pink-200 group-hover:translate-x-0.5 transition-all" />
-        </div>
       </div>
 
       {/* Admin Customizer trigger */}

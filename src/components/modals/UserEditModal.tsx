@@ -287,50 +287,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={role === 'admin' ? true : canJoinPartyMeeting}
-                    disabled={role === 'admin'}
-                    onChange={(e) => setCanJoinPartyMeeting(e.target.checked)}
-                    className="rounded text-pink-600 w-4 h-4"
-                  />
-                  <span>Tham gia phòng họp Đảng ủy</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={role === 'admin' ? true : canCreateMeeting}
-                    disabled={role === 'admin'}
-                    onChange={(e) => setCanCreateMeeting(e.target.checked)}
-                    className="rounded text-pink-700 w-4 h-4"
-                  />
-                  <span className="font-semibold text-pink-900">Tạo phòng họp Đảng ủy mới</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={role === 'admin' ? true : canUploadMeetingDoc}
-                    disabled={role === 'admin'}
-                    onChange={(e) => setCanUploadMeetingDoc(e.target.checked)}
-                    className="rounded text-pink-600 w-4 h-4"
-                  />
-                  <span>Tải tài liệu vào phòng họp</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={role === 'admin' ? true : canDeleteMeetingDoc}
-                    disabled={role === 'admin'}
-                    onChange={(e) => setCanDeleteMeetingDoc(e.target.checked)}
-                    className="rounded text-pink-600 w-4 h-4"
-                  />
-                  <span>Xóa tài liệu phòng họp</span>
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
                     checked={role === 'admin' ? true : canViewCollaborativeEdits}
                     disabled={role === 'admin'}
                     onChange={(e) => setCanViewCollaborativeEdits(e.target.checked)}

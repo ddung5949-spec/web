@@ -341,42 +341,6 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={permissions.canJoinPartyMeeting}
-                      onChange={(e) =>
-                        setPermissions({ ...permissions, canJoinPartyMeeting: e.target.checked })
-                      }
-                      className="rounded text-pink-600 w-4 h-4"
-                    />
-                    <span>Vào phòng họp Đảng ủy</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={permissions.canUploadMeetingDoc}
-                      onChange={(e) =>
-                        setPermissions({ ...permissions, canUploadMeetingDoc: e.target.checked })
-                      }
-                      className="rounded text-pink-600 w-4 h-4"
-                    />
-                    <span>Tải tài liệu vào phòng họp</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={permissions.canDeleteMeetingDoc}
-                      onChange={(e) =>
-                        setPermissions({ ...permissions, canDeleteMeetingDoc: e.target.checked })
-                      }
-                      className="rounded text-pink-600 w-4 h-4"
-                    />
-                    <span>Xóa tài liệu phòng họp</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
                       checked={permissions.canViewCollaborativeEdits}
                       onChange={(e) =>
                         setPermissions({
@@ -387,21 +351,6 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
                       className="rounded text-amber-600 w-4 h-4"
                     />
                     <span>Xem chỉnh sửa cộng tác</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={permissions.canCreateMeeting}
-                      onChange={(e) =>
-                        setPermissions({
-                          ...permissions,
-                          canCreateMeeting: e.target.checked,
-                        })
-                      }
-                      className="rounded text-pink-700 w-4 h-4"
-                    />
-                    <span className="font-semibold text-pink-900">Tạo phòng họp Đảng ủy</span>
                   </label>
                 </div>
               </div>
@@ -468,15 +417,6 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
                       )}
                       {role.defaultPermissions?.canUploadDoc && (
                         <span className="text-blue-700 font-medium">✓ Đăng VB</span>
-                      )}
-                      {role.defaultPermissions?.canJoinPartyMeeting && (
-                        <span className="text-pink-700 font-medium">✓ Họp Đảng ủy</span>
-                      )}
-                      {role.defaultPermissions?.canCreateMeeting && (
-                        <span className="text-pink-900 font-bold bg-pink-50 px-1 rounded">✓ Tạo phòng họp</span>
-                      )}
-                      {role.defaultPermissions?.canUploadMeetingDoc && (
-                        <span className="text-pink-700 font-medium">✓ Tải TL họp</span>
                       )}
                     </div>
                   </div>
