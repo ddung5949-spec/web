@@ -10,11 +10,7 @@ export interface RoleDefinition {
   defaultPermissions?: {
     canViewDoc?: boolean;
     canUploadDoc?: boolean;
-    canJoinPartyMeeting?: boolean;
-    canUploadMeetingDoc?: boolean;
-    canDeleteMeetingDoc?: boolean;
     canViewCollaborativeEdits?: boolean;
-    canCreateMeeting?: boolean;
   };
 }
 
@@ -73,11 +69,7 @@ export interface User {
   canUploadDoc?: boolean;
   canUploadDocs?: boolean;
   canViewSecretDocs?: boolean;
-  canJoinPartyMeeting?: boolean;
-  canUploadMeetingDoc?: boolean;
-  canDeleteMeetingDoc?: boolean;
   canViewCollaborativeEdits?: boolean;
-  canCreateMeeting?: boolean;
 }
 
 export type SectionType = 'ctd' | 'hl' | 'bac';
@@ -146,136 +138,8 @@ export interface LectureItem {
   downloads?: number;
 }
 
-export type VoteChoice = 'Tán thành' | 'Không tán thành' | 'Có ý kiến khác' | 'Ý kiến khác';
-
-export interface MeetingVote {
-  docId?: number;
-  userId: number;
-  voterName: string;
-  rankUnit: string;
-  choice: VoteChoice;
-  time: string;
-  note?: string;
-}
-
-export interface MeetingDocumentItem {
-  id: number;
-  code: string;
-  title: string;
-  category: string;
-  contentHtml?: string;
-  fileType?: 'word' | 'pdf' | 'excel' | 'powerpoint' | 'text' | string;
-  fileName?: string;
-  fileSize?: string;
-  fileUrl?: string;
-  uploadedBy: string;
-  date: string;
-  isSecret?: boolean;
-  sections?: CollabSectionBlock[];
-  version?: number;
-  lastSavedAt?: string;
-  lastSavedBy?: string;
-  history?: CollabHistoryItem[];
-}
-
-export interface RoomPresenceItem {
-  id: string; // `${roomId}_${userId}`
-  roomId: string;
-  userId: number;
-  userName: string;
-  userAvatar?: string;
-  rankUnit?: string;
-  color: string; // Color assigned for cursor and badge
-  activeDocId?: number;
-  activeSectionId?: string;
-  cursorSnippet?: string; // e.g. "Đoạn 2: Phương hướng"
-  isTyping?: boolean;
-  lastActive: number; // timestamp in ms
-}
-
-export interface CollabSectionBlock {
-  id: string; // e.g. "sec-1", "sec-2"
-  title: string; // e.g. "I. ĐÁNH GIÁ TÌNH HÌNH & KẾT QUẢ ĐẠT ĐƯỢC"
-  content: string; // HTML / Rich content of this section
-  lockedBy?: {
-    userId: number;
-    userName: string;
-    userColor: string;
-    timestamp: number;
-  } | null;
-  lastModifiedBy?: string;
-  lastModifiedAt?: string;
-}
-
-export interface CollabHistoryItem {
-  id: string;
-  version: number;
-  timestamp: string;
-  authorName: string;
-  authorRankUnit?: string;
-  summary: string;
-  contentHtml: string;
-  sections?: CollabSectionBlock[];
-}
-
-export interface CollabDocData {
-  roomId: string;
-  docId: number;
-  title: string;
-  code?: string;
-  category?: string;
-  contentHtml: string;
-  sections?: CollabSectionBlock[];
-  version: number;
-  lastSavedAt: string;
-  lastSavedBy: string;
-  history?: CollabHistoryItem[];
-}
-
-export interface RoomBroadcastAction {
-  id: string;
-  roomId: string;
-  userId: number;
-  userName: string;
-  userColor?: string;
-  type: 'join' | 'edit_start' | 'edit_section' | 'save' | 'vote' | 'speech_request';
-  message: string;
-  timestamp: number;
-}
-
-export interface MeetingRoomSettings {
-  passwordRequired: boolean;
-  roomPassword?: string;
-  meetingTitle: string;
-  meetingSessionNumber: string;
-  chairPerson: string;
-  secretary: string;
-}
-
-export interface MeetingRoomItem {
-  id: string; // e.g. "room-1", "room-2", "room-3"
-  roomCode: string; // e.g. "PH-01", "PH-ĐU-95"
-  title: string; // Tên phòng họp, e.g. "Hội nghị Ban Chấp hành Đảng bộ Trung đoàn 95, Sư đoàn 2"
-  sessionNumber?: string; // Kỳ họp số, e.g. "Kỳ họp thứ 14 (Khóa XII)"
-  chairPerson: string; // Chủ trì
-  secretary: string; // Thư ký
-  description?: string; // Ghi chú / Mục đích
-  unitTarget?: string; // e.g. "Đảng ủy Trung đoàn 95", "Đảng ủy Tiểu đoàn 1", ...
-  passwordRequired: boolean;
-  roomPassword?: string;
-  createdByUserId?: number;
-  createdByUserName?: string;
-  createdAt: string; // ISO string or format
-  status: 'scheduled' | 'in_progress' | 'ended'; // Trạng thái cuộc họp
-  startTime?: string; // Thời gian bắt đầu (vd: "08:00 20/08/2026")
-  endTime?: string; // Thời gian kết thúc (vd: "11:30 20/08/2026")
-  totalDurationMinutes?: number; // Tổng thời lượng đã họp
-  documents: MeetingDocumentItem[]; // Danh sách tài liệu riêng của phòng họp này
-  votes: Record<string, MeetingVote>; // key: `${docId}_${userId}`
-}
-
 export interface CategoryConfig {
-  id: string; // e.g. 'ctd', 'hl', 'bac', 'doc', 'lecture', 'meeting', 'cat-1'
+  id: string; // e.g. 'ctd', 'hl', 'bac', 'doc', 'lecture', 'cat-1'
   name: string; // Tên đầy đủ của chuyên mục (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'Công tác Đảng - CTCT')
   navName: string; // Tên hiển thị viết tắt trên Menu Navbar (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'CTĐ - CTCT')
   shortLabel?: string;
