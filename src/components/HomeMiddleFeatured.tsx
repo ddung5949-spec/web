@@ -91,7 +91,11 @@ export const HomeMiddleFeatured: React.FC<HomeMiddleFeaturedProps> = ({
               <div className="absolute top-3.5 left-3.5 z-10">
                 <span className="bg-red-700 text-white text-[11px] sm:text-xs font-black uppercase px-3 py-1.5 rounded-md shadow-md border border-red-500/60 backdrop-blur-xs flex items-center gap-1.5 tracking-wider">
                   <Flag className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                  <span>{currentArticle.category || 'CÔNG TÁC TUYÊN HUẤN'}</span>
+                  <span>
+                    {typeof currentArticle.category === 'string'
+                      ? currentArticle.category
+                      : ((currentArticle.category as any)?.name || (currentArticle.category as any)?.label || 'CÔNG TÁC TUYÊN HUẤN')}
+                  </span>
                 </span>
               </div>
 

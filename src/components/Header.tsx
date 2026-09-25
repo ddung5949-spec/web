@@ -11,7 +11,6 @@ import {
   LogOut,
   Megaphone,
   Palette,
-  Search,
   Shield,
   ShieldCheck,
   UserCheck,
@@ -37,7 +36,6 @@ interface HeaderProps {
   onOpenUncleHoManager?: () => void;
   onOpenAnnouncementManager?: () => void;
   onOpenCategoryManager?: () => void;
-  onOpenGlobalSearch?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -54,7 +52,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenUncleHoManager,
   onOpenAnnouncementManager,
   onOpenCategoryManager,
-  onOpenGlobalSearch,
 }) => {
   const [currentDateString, setCurrentDateString] = useState<string>('');
   const [currentTimeString, setCurrentTimeString] = useState<string>('');
@@ -111,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isCommander = currentUser?.role === 'commander';
   const isEditor = currentUser?.role === 'editor';
 
-  const matchedRole = roles.find((r) => r.id === currentUser?.role);
+  const matchedRole = (roles || []).find((r) => r?.id === currentUser?.role);
   const roleName = matchedRole?.name || (isAdmin ? 'Quản trị viên Hệ thống' : isCommander ? 'Chỉ huy đơn vị' : isEditor ? 'Ban Biên tập' : 'Cán bộ - Chiến sĩ');
   const roleColor = matchedRole?.color || (isAdmin ? '#b91c1c' : isCommander ? '#065f46' : isEditor ? '#1e40af' : '#0f766e');
   const RoleIcon = isAdmin ? ShieldCheck : isCommander ? Shield : isEditor ? UserCog : UserCheck;
@@ -167,23 +164,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{currentDateString}</span>
               </div>
             </div>
-
-            {/* 1.4. Global Search Trigger Button */}
-            {onOpenGlobalSearch && (
-              <button
-                type="button"
-                id="header-global-search-trigger"
-                onClick={onOpenGlobalSearch}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold transition-all cursor-pointer border bg-black/25 hover:bg-black/45 border-amber-300/50 text-amber-200 hover:text-white shadow-xs group"
-                title="Tìm kiếm tin bài, văn bản, bài giảng... (Ctrl + K)"
-              >
-                <Search className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline">Tìm kiếm</span>
-                <span className="hidden lg:inline-flex items-center text-[9px] font-mono px-1 py-0.2 bg-black/40 border border-white/20 rounded-xs text-amber-200/90 font-bold ml-0.5">
-                  Ctrl K
-                </span>
-              </button>
-            )}
 
             {/* 2. User Account or Login/Register Area */}
             {currentUser ? (

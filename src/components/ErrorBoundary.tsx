@@ -24,15 +24,56 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error in component tree:', error, errorInfo);
+    console.warn('Caught handled error in component tree:', error, errorInfo);
   }
 
   public handleReset = () => {
+    try {
+      sessionStorage.clear();
+      // Clean corrupt cached articles if present
+      const cachedArts = localStorage.getItem('cached_articles');
+      if (cachedArts && (cachedArts.includes('"subcategories"') || cachedArts.includes('"sectionKey"'))) {
+        try {
+          const parsed = JSON.parse(cachedArts);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.map((a: any) => {
+              if (a && typeof a.category === 'object') {
+                return { ...a, category: a.category?.name || 'Tin tức hoạt động' };
+              }
+              return a;
+            });
+            localStorage.setItem('cached_articles', JSON.stringify(cleaned));
+          }
+        } catch {
+          localStorage.removeItem('cached_articles');
+        }
+      }
+    } catch {}
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public handleGoHome = () => {
+    try {
+      sessionStorage.clear();
+      const cachedArts = localStorage.getItem('cached_articles');
+      if (cachedArts && (cachedArts.includes('"subcategories"') || cachedArts.includes('"sectionKey"'))) {
+        try {
+          const parsed = JSON.parse(cachedArts);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.map((a: any) => {
+              if (a && typeof a.category === 'object') {
+                return { ...a, category: a.category?.name || 'Tin tức hoạt động' };
+              }
+              return a;
+            });
+            localStorage.setItem('cached_articles', JSON.stringify(cleaned));
+          }
+        } catch {
+          localStorage.removeItem('cached_articles');
+        }
+      }
+    } catch {}
     this.setState({ hasError: false, error: null });
     window.location.href = '/';
   };

@@ -23,7 +23,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg overflow-hidden border border-[#e2e8f0] shadow-xs hover:border-[#cbd5e1] transition-all cursor-pointer flex flex-col sm:flex-row group mb-3.5"
+      className="bg-white rounded-lg overflow-hidden border border-[#e2e8f0] shadow-xs hover:border-[#cbd5e1] hover:scale-105 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col sm:flex-row group mb-3.5 transform"
     >
       <div className="sm:w-48 md:w-52 h-40 sm:h-auto shrink-0 relative overflow-hidden bg-[#f1f5f9]">
         <img
@@ -32,13 +32,15 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
             MILITARY_FALLBACK_BANNER
           }
           alt={article.title}
-          className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           loading="lazy"
           decoding="async"
         />
         <div className="absolute top-2 left-2">
           <span className="bg-white/95 text-[#b91c1c] text-[10px] font-bold px-2 py-0.5 rounded border border-[#e2e8f0] uppercase tracking-wider shadow-xs">
-            {article.category}
+            {typeof article.category === 'string'
+              ? article.category
+              : ((article.category as any)?.name || (article.category as any)?.label || 'TIN TỨC')}
           </span>
         </div>
       </div>

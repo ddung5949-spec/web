@@ -65,7 +65,7 @@ export const HomeAnnouncementsWidget: React.FC<HomeAnnouncementsWidgetProps> = (
             <div
               key={ann.id || idx}
               onClick={() => handleClickItem(ann)}
-              className={`group p-2.5 rounded-xl bg-white hover:bg-amber-50/90 border transition-all duration-200 shadow-2xs flex items-start gap-2.5 cursor-pointer ${
+              className={`group p-2.5 rounded-xl bg-white hover:bg-amber-50/90 border transition-all duration-200 shadow-2xs hover:scale-105 hover:shadow-lg transform flex items-start gap-2.5 cursor-pointer ${
                 ann.highlight
                   ? 'border-amber-400 ring-1 ring-amber-300/60'
                   : 'border-amber-200/90 hover:border-amber-400'

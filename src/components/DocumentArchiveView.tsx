@@ -89,7 +89,10 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   const canUpload = !!(currentUser && (isAdmin || currentUser.canUploadDoc || currentUser.role === 'editor'));
 
   // Categories from config
-  const configuredCategories = siteConfig.sections?.doc?.categories || DEFAULT_CATEGORIES;
+  const rawCategories = siteConfig.sections?.doc?.categories || DEFAULT_CATEGORIES;
+  const configuredCategories = (Array.isArray(rawCategories) ? rawCategories : [])
+    .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.label || c?.shortLabel || String(c || ''))))
+    .filter(Boolean);
 
   // States
   const [searchTerm, setSearchTerm] = useState('');
@@ -379,16 +382,17 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                 </span>
               </button>
 
-              {configuredCategories.map((cat) => {
+              {configuredCategories.map((cat, catIdx) => {
+                const catStr = typeof cat === 'string' ? cat : (cat?.name || cat?.label || String(cat || ''));
                 const count = documents.filter(
-                  (d) => d.category?.toLowerCase() === cat.toLowerCase()
+                  (d) => d.category?.toLowerCase() === catStr.toLowerCase()
                 ).length;
-                const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+                const isSelected = selectedCategory.toLowerCase() === catStr.toLowerCase();
                 return (
                   <button
-                    key={cat}
+                    key={`${catStr}-${catIdx}`}
                     type="button"
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => setSelectedCategory(catStr)}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
                         ? 'bg-blue-700 text-white font-bold shadow-xs'
@@ -397,7 +401,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                   >
                     <div className="flex items-center gap-2 truncate">
                       <ChevronRight className={`w-3 h-3 shrink-0 ${isSelected ? 'text-amber-300' : 'text-gray-400'}`} />
-                      <span className="truncate">{cat}</span>
+                      <span className="truncate">{catStr}</span>
                     </div>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${

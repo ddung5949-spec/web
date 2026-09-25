@@ -15,7 +15,6 @@ import {
   Link as LinkIcon,
   Newspaper,
   Palette,
-  Search,
   Shield,
   Users,
 } from 'lucide-react';
@@ -29,7 +28,6 @@ interface NavbarProps {
   pendingDraftsCount: number;
   onOpenCustomizer: () => void;
   onOpenCategoryManager?: () => void;
-  onOpenGlobalSearch?: () => void;
   siteConfig?: SiteConfig;
   categories?: any[];
   armyGreenColor?: string;
@@ -43,7 +41,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingDraftsCount,
   onOpenCustomizer,
   onOpenCategoryManager,
-  onOpenGlobalSearch,
   siteConfig,
   categories,
   armyGreenColor = '#143d2b',
@@ -58,10 +55,33 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Compute configured nav tabs with order and visibility
   const configuredNavTabs = React.useMemo<NavTabItem[]>(() => {
-    const tabs: NavTabItem[] =
-      siteConfig?.navTabs && siteConfig.navTabs.length > 0
-        ? [...siteConfig.navTabs]
-        : [...defaultNavTabs];
+    const rawTabs = siteConfig?.navTabs && siteConfig.navTabs.length > 0
+      ? siteConfig.navTabs
+      : defaultNavTabs;
+
+    // Normalize tabs in case any elements are raw CategoryConfig objects
+    const tabs: NavTabItem[] = (rawTabs || []).map((t: any, idx: number) => {
+      if (typeof t !== 'object' || t === null) {
+        return {
+          id: String(t),
+          label: String(t),
+          enabled: true,
+          order: idx,
+          type: 'internal' as const,
+        };
+      }
+      return {
+        id: String(t.id || `tab-${idx}`),
+        label: typeof t.label === 'string' ? t.label : (typeof t.name === 'string' ? t.name : (typeof t.navName === 'string' ? t.navName : String(t.id || ''))),
+        short_name: typeof t.short_name === 'string' ? t.short_name : (typeof t.shortLabel === 'string' ? t.shortLabel : (typeof t.navName === 'string' ? t.navName : undefined)),
+        targetPage: (t.targetPage || t.id) as PageView,
+        type: t.type || 'internal',
+        externalUrl: t.externalUrl,
+        openNewTab: t.openNewTab,
+        enabled: t.enabled !== false,
+        order: typeof t.order === 'number' ? t.order : idx,
+      };
+    });
 
     // Include dynamically configured categories from categories or categories_config if not already in tabs
     const categoriesList =
@@ -72,18 +92,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     if (Array.isArray(categoriesList) && categoriesList.length > 0) {
       categoriesList.forEach((cat: any, index: number) => {
+        if (!cat || typeof cat !== 'object') return;
         const exists = tabs.some(
           (t) => t.id === cat.id || t.targetPage === cat.id || t.targetPage === cat.targetPage
         );
         if (!exists && cat.id) {
           tabs.push({
-            id: cat.id,
-            label: cat.name || cat.navName || cat.id,
-            short_name: cat.navName || cat.shortLabel || cat.name,
+            id: String(cat.id),
+            label: typeof cat.name === 'string' ? cat.name : (typeof cat.navName === 'string' ? cat.navName : String(cat.id)),
+            short_name: typeof cat.navName === 'string' ? cat.navName : (typeof cat.shortLabel === 'string' ? cat.shortLabel : cat.name),
             targetPage: (cat.targetPage || cat.id) as PageView,
             type: cat.type || 'internal',
             externalUrl: cat.externalUrl,
-            enabled: true,
+            enabled: cat.enabled !== false,
             order: 20 + index,
           });
         }
@@ -94,35 +115,63 @@ export const Navbar: React.FC<NavbarProps> = ({
     return tabs
       .filter((t) => t.enabled !== false && t.id !== 'meeting' && t.targetPage !== 'meeting')
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [siteConfig?.navTabs, siteConfig?.sections, siteConfig?.categories_config]);
+  }, [siteConfig?.navTabs, siteConfig?.sections, siteConfig?.categories_config, categories]);
 
   // Helper to resolve display tab title according to priorities:
   // category_config.navName -> section.shortLabel -> tab.short_name -> tab.nav_title -> tab.label
-  const getTabLabel = (tab: NavTabItem): string => {
+  const getTabLabel = (tab: any): string => {
+    if (!tab) return '';
     const categoriesList =
       (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
       siteConfig?.categories_config ||
       (siteConfig as any)?.categoriesConfig ||
       (siteConfig as any)?.categories;
+
+    const targetKey = typeof tab === 'string' ? tab : tab?.id || tab?.targetPage;
+
     const catItem = Array.isArray(categoriesList)
-      ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage)
+      ? categoriesList.find((c: any) => c && (c.id === targetKey || c.targetPage === targetKey))
       : undefined;
 
     if (catItem) {
       const catLabel = catItem.navName || catItem.shortLabel || catItem.name;
-      if (catLabel) return catLabel;
+      if (typeof catLabel === 'string' && catLabel.trim() !== '') return catLabel;
     }
 
-    const sectionConfig = (siteConfig?.sections as any)?.[tab.id] || (siteConfig?.sections as any)?.[tab.targetPage as string];
-    const resolved =
-      (sectionConfig && ((sectionConfig as any).short_name || (sectionConfig as any).nav_title || sectionConfig.shortLabel || sectionConfig.title || (sectionConfig as any).name)) ||
+    const sectionConfig =
+      (siteConfig?.sections as any)?.[targetKey] ||
+      (siteConfig?.sections as any)?.[tab?.targetPage as string];
+
+    const candidate =
+      (sectionConfig &&
+        ((sectionConfig as any).short_name ||
+          (sectionConfig as any).nav_title ||
+          sectionConfig.shortLabel ||
+          sectionConfig.title ||
+          (sectionConfig as any).name)) ||
       tab.short_name ||
       tab.nav_title ||
       tab.name ||
       tab.title ||
       tab.label ||
       tab.id;
-    return resolved;
+
+    if (typeof candidate === 'string') {
+      return candidate;
+    }
+    if (candidate && typeof candidate === 'object') {
+      return (
+        candidate.navName ||
+        candidate.shortLabel ||
+        candidate.short_name ||
+        candidate.name ||
+        candidate.title ||
+        candidate.label ||
+        candidate.id ||
+        ''
+      );
+    }
+    return String(candidate || '');
   };
 
   const getTabIcon = (tabId: string, type: string) => {
@@ -264,7 +313,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             const catItem = Array.isArray(categoriesList)
               ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage || c.name === tab.label)
               : undefined;
-            const subcategories: string[] = catItem?.subcategories || catItem?.categories || [];
+            const rawSubcategories = catItem?.subcategories || catItem?.categories || [];
+            const subcategories: string[] = Array.isArray(rawSubcategories) ? rawSubcategories : [];
             const hasSubcategories = subcategories && subcategories.length > 0;
             const isDropdownOpen = activeDropdownTabId === tab.id;
 
@@ -317,20 +367,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span className="text-[9px] text-white/50 font-normal">Chuyên mục</span>
                     </div>
                     <div className="py-1 max-h-64 overflow-y-auto">
-                      {subcategories.map((sub, sIdx) => (
-                        <button
-                          key={sIdx}
-                          type="button"
-                          onClick={() => {
-                            onSelectPage(target);
-                            setActiveDropdownTabId(null);
-                          }}
-                          className="w-full text-left px-3.5 py-1.5 text-xs text-white/90 hover:text-amber-200 hover:bg-black/40 transition-colors flex items-center gap-2 cursor-pointer"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                          <span className="truncate">{sub}</span>
-                        </button>
-                      ))}
+                      {subcategories.map((sub: any, sIdx: number) => {
+                        const subName = typeof sub === 'string' ? sub : (sub?.name || sub?.title || sub?.label || String(sub || ''));
+                        return (
+                          <button
+                            key={sIdx}
+                            type="button"
+                            onClick={() => {
+                              onSelectPage(target);
+                              setActiveDropdownTabId(null);
+                            }}
+                            className="w-full text-left px-3.5 py-1.5 text-xs text-white/90 hover:text-amber-200 hover:bg-black/40 transition-colors flex items-center gap-2 cursor-pointer"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            <span className="truncate">{subName}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -412,22 +465,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Tùy chỉnh</span>
-              </button>
-            </li>
-          )}
-
-          {/* Nút Tìm kiếm toàn hệ thống */}
-          {onOpenGlobalSearch && (
-            <li className="shrink-0">
-              <button
-                type="button"
-                id="nav-global-search"
-                onClick={onOpenGlobalSearch}
-                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase bg-black/25 hover:bg-black/45 text-amber-300 hover:text-white transition-all cursor-pointer whitespace-nowrap rounded-md border border-amber-300/40 shadow-xs"
-                title="Tìm kiếm bài viết, tài liệu, bài giảng... (Ctrl + K)"
-              >
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                <span>Tìm kiếm</span>
               </button>
             </li>
           )}

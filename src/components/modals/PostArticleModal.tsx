@@ -94,9 +94,12 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
 
   const currentSectionConfig =
     siteConfig?.sections?.[selectedSection] || defaultSiteConfig.sections[selectedSection];
-  const categories = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
+  const rawCats = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
     ? configuredCategory.subcategories
     : currentSectionConfig?.categories || [];
+  const categories: string[] = (Array.isArray(rawCats) ? rawCats : [])
+    .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.label || c?.shortLabel || String(c || ''))))
+    .filter(Boolean);
 
   // Initialize form state ONLY when modal transitions from closed to open or a different article is selected
   useEffect(() => {
@@ -435,11 +438,17 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         images: rawImagesList,
       });
 
+      const finalCategoryStr = (
+        typeof category === 'string'
+          ? category
+          : (category as any)?.name || (category as any)?.label || categories[0] || 'Thông tin chung'
+      ).trim();
+
       if (isEditing && articleToEdit && onUpdateArticle) {
         const updated: Article = {
           ...articleToEdit,
           title: title.trim(),
-          category: category || categories[0] || 'Thông tin chung',
+          category: finalCategoryStr,
           author: author.trim(),
           image: finalImage,
           images: finalImagesList,
@@ -456,7 +465,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       } else {
         const res = await onSubmitArticle({
           title: title.trim(),
-          category: category || categories[0] || 'Thông tin chung',
+          category: finalCategoryStr,
           author: author.trim(),
           image: finalImage,
           images: finalImagesList,

@@ -70,7 +70,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
     siteConfig?.sections?.lecture?.desc ||
     'Kho lưu trữ slide trình chiếu, giáo án và học liệu đa phương tiện phục vụ huấn luyện toàn Trung đoàn 95, Sư đoàn 2';
 
-  const availableCategories = siteConfig?.sections?.lecture?.categories || [
+  const rawCategories = siteConfig?.sections?.lecture?.categories || [
     'Giáo án Chính trị',
     'Huấn luyện Quân sự',
     'Kỹ thuật Khí tài & Hậu cần',
@@ -78,6 +78,9 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
     'Tin học & Chuyển đổi số',
     'Tài liệu bồi dưỡng Sĩ quan',
   ];
+  const availableCategories = (Array.isArray(rawCategories) ? rawCategories : [])
+    .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.label || c?.shortLabel || String(c || ''))))
+    .filter(Boolean);
 
   const handleDownloadLecture = (lec: LectureItem) => {
     // Increment download count
@@ -301,16 +304,17 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
                 </span>
               </button>
 
-              {availableCategories.map((cat) => {
+              {availableCategories.map((cat, catIdx) => {
+                const catStr = typeof cat === 'string' ? cat : (cat?.name || cat?.label || String(cat || ''));
                 const count = lectures.filter(
-                  (l) => l.target === cat || (l as any).category === cat
+                  (l) => l.target === catStr || (l as any).category === catStr
                 ).length;
-                const isSelected = selectedCategory === cat;
+                const isSelected = selectedCategory === catStr;
                 return (
                   <button
-                    key={cat}
+                    key={`${catStr}-${catIdx}`}
                     type="button"
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => setSelectedCategory(catStr)}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
                         ? 'bg-teal-700 text-white font-bold shadow-xs'
@@ -323,7 +327,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
                           isSelected ? 'text-amber-300' : 'text-gray-400'
                         }`}
                       />
-                      <span className="truncate text-left">{cat}</span>
+                      <span className="truncate text-left">{catStr}</span>
                     </div>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${

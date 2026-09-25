@@ -11,12 +11,12 @@ interface HomeLatestNewsWidgetProps {
 }
 
 export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
-  articles,
+  articles = [],
   isLoading = false,
   onOpenArticle,
   onSelectSection,
 }) => {
-  const latestArticles = articles.slice(0, 5);
+  const latestArticles = (articles || []).slice(0, 5);
 
   return (
     <div className={`bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden flex flex-col justify-between h-full min-h-[340px] transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}>
@@ -40,13 +40,13 @@ export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
       </div>
 
       {/* Latest Articles List */}
-      <div className="p-3 divide-y divide-gray-100 flex-1 flex flex-col justify-around">
+      <div className="p-3 space-y-2 flex-1 flex flex-col justify-around">
         {latestArticles.length > 0 ? (
           latestArticles.map((art) => (
             <div
               key={art.id}
               onClick={() => onOpenArticle(art)}
-              className="py-1.5 first:pt-0 last:pb-0 group cursor-pointer"
+              className="p-2 rounded-xl group cursor-pointer hover:bg-amber-50/50 border border-transparent hover:border-red-200/70 hover:scale-105 hover:shadow-lg transition-all duration-200 transform bg-white"
             >
               <div className="flex items-start gap-2">
                 <span className="text-red-600 font-bold text-xs mt-0.5 shrink-0 select-none">
@@ -58,7 +58,9 @@ export const HomeLatestNewsWidget: React.FC<HomeLatestNewsWidgetProps> = ({
                   </h4>
                   <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
                     <span className="text-red-800 font-semibold bg-red-50 px-1 rounded">
-                      {art.category}
+                      {typeof art.category === 'string'
+                        ? art.category
+                        : ((art.category as any)?.name || (art.category as any)?.label || 'Tin tức')}
                     </span>
                     <span>•</span>
                     <span>{art.date}</span>

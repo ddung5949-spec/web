@@ -121,7 +121,9 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({
                   <span className="bg-amber-100 text-amber-800 text-[10px] font-black uppercase px-2 py-0.5 rounded border border-amber-200">
                     DỰ THẢO CHỜ DUYỆT
                   </span>
-                  <span className="text-xs text-red-700 font-bold">[{art.category}]</span>
+                  <span className="text-xs text-red-700 font-bold">
+                    [{typeof art.category === 'string' ? art.category : ((art.category as any)?.name || (art.category as any)?.label || 'Dự thảo')}]
+                  </span>
                 </div>
 
                 <h3 className="text-sm font-bold text-gray-900 leading-snug">

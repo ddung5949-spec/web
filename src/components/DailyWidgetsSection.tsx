@@ -72,7 +72,7 @@ export const DailyWidgetsSection: React.FC<DailyWidgetsSectionProps> = ({
     defaultDailyWidgets[1],
     defaultDailyWidgets[2],
   ].map((def) => {
-    const custom = dailyWidgets?.find((w) => w.id === def.id);
+    const custom = (dailyWidgets || []).find((w) => w?.id === def.id);
     return custom ? { ...def, ...custom } : def;
   });
 

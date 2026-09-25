@@ -73,13 +73,13 @@ export const HomeRightSidebar: React.FC<HomeRightSidebarProps> = ({
         </div>
 
         {/* Latest Articles List */}
-        <div className="p-3 divide-y divide-gray-100 space-y-2">
+        <div className="p-3 space-y-2">
           {latestArticles.length > 0 ? (
             latestArticles.map((art) => (
               <div
                 key={art.id}
                 onClick={() => onOpenArticle(art)}
-                className="pt-2 first:pt-0 group cursor-pointer"
+                className="p-2 rounded-xl group cursor-pointer hover:bg-amber-50/50 border border-transparent hover:border-red-200/70 hover:scale-105 hover:shadow-lg transition-all duration-200 transform bg-white"
               >
                 <div className="flex items-start gap-2">
                   <span className="text-red-600 font-bold text-xs mt-0.5 shrink-0 select-none">
@@ -91,7 +91,9 @@ export const HomeRightSidebar: React.FC<HomeRightSidebarProps> = ({
                     </h4>
                     <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-1">
                       <span className="text-red-800 font-semibold bg-red-50 px-1 rounded">
-                        {art.category}
+                        {typeof art.category === 'string'
+                          ? art.category
+                          : ((art.category as any)?.name || (art.category as any)?.label || 'Tin tức')}
                       </span>
                       <span>•</span>
                       <span>{art.date}</span>

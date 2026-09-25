@@ -344,10 +344,21 @@ export const supabaseDb = {
     const rawStatus = (item.status || '').toString().toLowerCase().trim();
     const status: 'approved' | 'pending' = (rawStatus === 'pending' || rawStatus === 'draft') ? 'pending' : 'approved';
 
+    let catVal = 'Tin tức hoạt động';
+    if (typeof item.category === 'string') {
+      catVal = item.category.trim();
+    } else if (item.category && typeof item.category === 'object') {
+      catVal = (item.category.name || item.category.label || item.category.title || item.category.shortLabel || item.category.navName || String(item.category.id || '')).trim() || 'Tin tức hoạt động';
+    } else if (secKey === 'bac') {
+      catVal = 'Lời Bác dạy';
+    } else if (secKey === 'hl') {
+      catVal = 'Huấn luyện - SSCĐ';
+    }
+
     return {
       id: parsedId,
       title: item.title || 'Tin tức hoạt động',
-      category: (item.category || (secKey === 'bac' ? 'Lời Bác dạy' : secKey === 'hl' ? 'Huấn luyện - SSCĐ' : 'Tin tức hoạt động')).trim(),
+      category: catVal,
       author: item.author || 'Cán bộ - Chiến sĩ',
       date: formattedDate,
       image: item.image || item.thumbnail || MILITARY_FALLBACK_BANNER,

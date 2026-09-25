@@ -227,14 +227,18 @@ export function App() {
     return initial;
   });
 
-  // Categories & Tabbar State (Zero-Latency: strictly loaded from localStorage cache, no mock data fallback)
+  // Categories & Tabbar State (Zero-Latency: loaded from localStorage cache or standard unit fallback)
   const [categories, setCategories] = useState<any[]>(() => {
     try {
       const c = localStorage.getItem('cached_categories') || localStorage.getItem('categories_config_cache');
-      return c ? JSON.parse(c) : [];
+      if (c) {
+        const parsed = JSON.parse(c);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {
-      return [];
+      // ignore
     }
+    return defaultCategoriesConfig;
   });
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
@@ -245,6 +249,28 @@ export function App() {
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Helper đảm bảo mọi bài viết luôn có category là string chuẩn, ngăn ngừa lỗi Objects are not valid as a React child
+  const sanitizeArticle = (art: any): Article => {
+    if (!art || typeof art !== 'object') return art;
+    let catStr = 'Tin tức hoạt động';
+    if (typeof art.category === 'string') {
+      catStr = art.category.trim();
+    } else if (art.category && typeof art.category === 'object') {
+      catStr = (
+        art.category.name ||
+        art.category.label ||
+        art.category.shortLabel ||
+        art.category.navName ||
+        art.category.title ||
+        String(art.category.id || '')
+      ).trim() || 'Tin tức hoạt động';
+    }
+    return {
+      ...art,
+      category: catStr,
+    };
+  };
+
   const [articles, setArticles] = useState<Article[]>(() => {
     try {
       const cached =
@@ -253,7 +279,25 @@ export function App() {
         localStorage.getItem('mangyang_articles');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((a: any) => {
+            if (!a || typeof a !== 'object') return a;
+            let catStr = 'Tin tức hoạt động';
+            if (typeof a.category === 'string') {
+              catStr = a.category.trim();
+            } else if (a.category && typeof a.category === 'object') {
+              catStr = (
+                a.category.name ||
+                a.category.label ||
+                a.category.shortLabel ||
+                a.category.navName ||
+                a.category.title ||
+                String(a.category.id || '')
+              ).trim() || 'Tin tức hoạt động';
+            }
+            return { ...a, category: catStr };
+          });
+        }
       }
     } catch {
       // ignore
@@ -615,8 +659,31 @@ export function App() {
 
       const navTabsList = config.navigation_tabs || parsed.navigation_tabs || parsed.navTabs;
       if (Array.isArray(navTabsList) && navTabsList.length > 0) {
-        mergedConfig.navigation_tabs = navTabsList;
-        mergedConfig.navTabs = navTabsList;
+        // Ensure navTabs items have proper string label and not raw objects
+        const cleanTabs = navTabsList.map((t: any, idx: number) => {
+          if (typeof t !== 'object' || t === null) {
+            return {
+              id: String(t),
+              label: String(t),
+              enabled: true,
+              order: idx,
+              type: 'internal',
+            };
+          }
+          return {
+            id: String(t.id || `tab-${idx}`),
+            label: typeof t.label === 'string' ? t.label : (typeof t.name === 'string' ? t.name : (typeof t.navName === 'string' ? t.navName : String(t.id || ''))),
+            short_name: typeof t.short_name === 'string' ? t.short_name : (typeof t.shortLabel === 'string' ? t.shortLabel : (typeof t.navName === 'string' ? t.navName : undefined)),
+            targetPage: (t.targetPage || t.id),
+            type: t.type || 'internal',
+            externalUrl: t.externalUrl,
+            openNewTab: t.openNewTab,
+            enabled: t.enabled !== false,
+            order: typeof t.order === 'number' ? t.order : idx,
+          };
+        });
+        mergedConfig.navigation_tabs = cleanTabs;
+        mergedConfig.navTabs = cleanTabs;
       }
       if (config.home_category_columns) {
         mergedConfig.homeCategoryColumns = config.home_category_columns;
@@ -795,7 +862,8 @@ export function App() {
 
     // Helper: Process articles
     const processArticlesData = (articlesData: any[]) => {
-      const mappedArticles: Article[] = articlesData.map((row: any) => supabaseDb.mapRowToArticle(row));
+      const mappedArticles: Article[] = articlesData
+        .map((row: any) => sanitizeArticle(supabaseDb.mapRowToArticle(row)));
       setArticles(mappedArticles);
       safeCacheArticles(mappedArticles);
     };
@@ -823,8 +891,9 @@ export function App() {
 
     // 1. TẠO HÀM fetchMasterData() NẠP SONG SONG ĐỘC LẬP (NON-BLOCKING) THEO CHUẨN STALE-WHILE-REVALIDATE
     const fetchMasterData = () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
 
       // 1.1 Tải cấu hình & Chuyên mục & Layout
       supabase
@@ -1009,29 +1078,40 @@ export function App() {
           },
           () => {}
         );
+      } catch (err) {
+        console.warn('Bỏ qua lỗi mạng trong fetchMasterData, tiếp tục render trang:', err);
+      }
     };
 
-    fetchMasterData();
+    try {
+      fetchMasterData();
+    } catch (err) {
+      console.warn('Bỏ qua lỗi gọi fetchMasterData:', err);
+    }
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
-    const unsub = cloudStorage.subscribeAll({
+    let unsub = () => {};
+    try {
+      unsub = cloudStorage.subscribeAll({
       onArticlesChange: (freshArticles) => {
         if (isMounted && freshArticles) {
-          setArticles(freshArticles);
+          setArticles(freshArticles.map(sanitizeArticle));
         }
       },
       onArticleInsert: (newArt) => {
         if (isMounted && newArt) {
+          const safeArt = sanitizeArticle(newArt);
           setArticles((prev) => {
-            const next = [newArt, ...prev.filter((a) => String(a.id) !== String(newArt.id))];
+            const next = [safeArt, ...prev.filter((a) => String(a.id) !== String(safeArt.id))];
             return next;
           });
         }
       },
       onArticleUpdate: (updatedArt) => {
         if (isMounted && updatedArt) {
+          const safeArt = sanitizeArticle(updatedArt);
           setArticles((prev) => {
-            const next = prev.map((a) => (String(a.id) === String(updatedArt.id) ? updatedArt : a));
+            const next = prev.map((a) => (String(a.id) === String(safeArt.id) ? safeArt : a));
             return next;
           });
         }
@@ -1080,6 +1160,9 @@ export function App() {
         }
       },
     });
+    } catch (err) {
+      console.warn('Bỏ qua lỗi subscription:', err);
+    }
 
     // 4. Supabase Auth session checking & auto-listener
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -3046,7 +3129,6 @@ export function App() {
         onOpenUncleHoManager={() => setUncleHoManagerOpen(true)}
         onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
         onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
-        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
       />
 
       {/* 2. Sticky Navbar */}
@@ -3057,7 +3139,6 @@ export function App() {
         pendingDraftsCount={pendingDraftsCount}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
         onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
-        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
         siteConfig={siteConfig}
         categories={categories}
         armyGreenColor={siteConfig.colorGreen}

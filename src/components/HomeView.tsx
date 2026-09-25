@@ -98,7 +98,7 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
-  articles,
+  articles = [],
   documents = [],
   lectures = [],
   uncleHoQuotes = [],
@@ -130,7 +130,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onOpenCustomizer = () => {},
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
+  const approvedArticles = (articles || []).filter((a) => !a?.status || a.status === 'approved' || a.status !== 'pending');
 
   // Modals state for Admin
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
@@ -868,7 +868,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <div
                   key={col.id}
-                  className={`${colSpanClass} bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col justify-between h-auto hover:shadow-md transition-all group`}
+                  className={`${colSpanClass} bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col justify-between h-auto hover:shadow-lg transition-all duration-200 group`}
                 >
                   <div className="flex-1 flex flex-col">
                     {/* Column Header */}
@@ -926,12 +926,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         )}
                       </div>
                     ) : colArticles.length > 0 ? (
-                      <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
+                      <div className="p-3 space-y-2 flex-1">
                         {colArticles.map((art) => (
                           <div
                             key={art.id}
                             onClick={() => onOpenArticle(art)}
-                            className="pt-2 first:pt-0 group/item cursor-pointer"
+                            className="p-2.5 rounded-xl border border-gray-100 hover:border-red-200 bg-white hover:bg-amber-50/50 shadow-xs hover:shadow-lg hover:scale-105 transition-all duration-200 group/item cursor-pointer transform"
                           >
                             <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-red-700 leading-snug line-clamp-2 transition-colors">
                               {art.title}
@@ -1008,7 +1008,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
-              {documents.slice(0, 4).map((d) => (
+              {(documents || []).slice(0, 4).map((d) => (
                 <div key={d.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 group">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -1055,7 +1055,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
-              {lectures.slice(0, 4).map((l) => (
+              {(lectures || []).slice(0, 4).map((l) => (
                 <div key={l.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 group">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

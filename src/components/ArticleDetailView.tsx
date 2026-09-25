@@ -168,7 +168,9 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
           </button>
           <span>/</span>
           <span className="text-gray-500 font-medium truncate max-w-[240px] bg-gray-100 px-2 py-0.5 rounded text-[11px]">
-            {article.category}
+            {typeof article.category === 'string'
+              ? article.category
+              : ((article.category as any)?.name || (article.category as any)?.label || 'Tin tức')}
           </span>
         </nav>
 
@@ -697,7 +699,9 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
                     <span className="absolute top-1 left-1 bg-white/90 text-red-700 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">
-                      {rel.category}
+                      {typeof rel.category === 'string'
+                        ? rel.category
+                        : ((rel.category as any)?.name || (rel.category as any)?.label || 'Tin tức')}
                     </span>
                   </div>
                   <h4 className="text-xs font-bold text-gray-900 group-hover:text-red-700 transition-colors line-clamp-2 leading-snug">

@@ -26,7 +26,7 @@ interface HomeMiddleFeaturedSliderProps {
 export const HomeMiddleFeaturedSlider: React.FC<
   HomeMiddleFeaturedSliderProps
 > = ({
-  articles,
+  articles = [],
   currentUser,
   isLoading = false,
   onOpenArticle,
@@ -34,7 +34,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
   onDeleteArticle,
 }) => {
   const isAdmin = currentUser?.role === 'admin';
-  const featuredArticles = articles.slice(0, 5);
+  const featuredArticles = (articles || []).slice(0, 5);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -76,7 +76,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
   return (
     <div
       id="home-middle-featured-slider"
-      className={`bg-white rounded-xl shadow-md overflow-hidden relative group flex flex-col w-full transition-opacity duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}
+      className={`bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden relative group flex flex-col w-full transition-all duration-300 ${isLoading ? 'opacity-85' : 'opacity-100'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -94,7 +94,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
               }
               alt={currentArticle.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
               decoding="async"
             />
@@ -103,7 +103,11 @@ export const HomeMiddleFeaturedSlider: React.FC<
             <div className="absolute top-3.5 left-3.5 z-10">
               <span className="bg-red-700 text-white text-[11px] sm:text-xs font-black uppercase px-3 py-1.5 rounded-md shadow-md border border-red-500/60 backdrop-blur-xs flex items-center gap-1.5 tracking-wider">
                 <Flag className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                <span>{currentArticle.category || 'CÔNG TÁC TUYÊN HUẤN'}</span>
+                <span>
+                  {typeof currentArticle.category === 'string'
+                    ? currentArticle.category
+                    : ((currentArticle.category as any)?.name || (currentArticle.category as any)?.label || 'CÔNG TÁC TUYÊN HUẤN')}
+                </span>
               </span>
             </div>
 

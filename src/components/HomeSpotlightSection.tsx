@@ -30,7 +30,7 @@ interface HomeSpotlightSectionProps {
 }
 
 export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
-  articles,
+  articles = [],
   spotlightArticleId,
   currentUser,
   isLoading = false,
@@ -41,13 +41,15 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
   const isAdmin = currentUser?.role === 'admin';
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
 
+  const safeArticles = articles || [];
+
   // Find the primary spotlight article from real articles
   const primaryArticle =
-    (spotlightArticleId ? articles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
-    articles[0];
+    (spotlightArticleId ? safeArticles.find((a) => String(a.id) === String(spotlightArticleId)) : null) ||
+    safeArticles[0];
 
   // Secondary sub-featured articles
-  const subArticles = articles
+  const subArticles = safeArticles
     .filter((a) => String(a.id) !== String(primaryArticle?.id))
     .slice(0, 2);
 
@@ -107,7 +109,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
         {/* Top: Primary Featured Spotlight Card */}
         <div
           onClick={() => onOpenArticle(primaryArticle)}
-          className="group grid grid-cols-1 md:grid-cols-12 gap-4 bg-amber-50/40 hover:bg-amber-50/80 p-3.5 sm:p-4 rounded-xl border border-amber-200/90 transition-all duration-200 cursor-pointer shadow-xs"
+          className="group grid grid-cols-1 md:grid-cols-12 gap-4 bg-amber-50/40 hover:bg-amber-50/80 p-3.5 sm:p-4 rounded-xl border border-amber-200/90 transition-all duration-200 cursor-pointer shadow-xs hover:scale-105 hover:shadow-lg transform"
         >
           {/* Featured Image with Ratio */}
           <div className="md:col-span-5 relative rounded-lg overflow-hidden bg-slate-900 aspect-16/10 sm:aspect-4/3 md:aspect-16/10 shadow-sm">
@@ -115,13 +117,15 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
               src={primaryArticle.image || MILITARY_FALLBACK_BANNER}
               alt={primaryArticle.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
               decoding="async"
             />
             <div className="absolute top-2.5 left-2.5">
               <span className="bg-red-700 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-sm">
-                {primaryArticle.category}
+                {typeof primaryArticle.category === 'string'
+                  ? primaryArticle.category
+                  : ((primaryArticle.category as any)?.name || (primaryArticle.category as any)?.label || 'TIN TỨC')}
               </span>
             </div>
           </div>
@@ -170,7 +174,7 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
               <div
                 key={art.id}
                 onClick={() => onOpenArticle(art)}
-                className="group p-3 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-red-300 transition-all flex items-start gap-3 cursor-pointer shadow-xs"
+                className="group p-3 rounded-xl bg-white hover:bg-amber-50/50 border border-gray-200 hover:border-red-300 transition-all duration-200 flex items-start gap-3 cursor-pointer shadow-xs hover:scale-105 hover:shadow-lg transform"
               >
                 <div className="w-20 h-16 rounded-lg overflow-hidden bg-slate-900 shrink-0">
                   <img
@@ -187,7 +191,11 @@ export const HomeSpotlightSection: React.FC<HomeSpotlightSectionProps> = ({
                     {art.title}
                   </h5>
                   <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                    <span className="text-red-700 font-semibold">{art.category}</span>
+                    <span className="text-red-700 font-semibold">
+                      {typeof art.category === 'string'
+                        ? art.category
+                        : ((art.category as any)?.name || (art.category as any)?.label || 'Tin tức')}
+                    </span>
                     <span>•</span>
                     <span>{art.date}</span>
                   </div>

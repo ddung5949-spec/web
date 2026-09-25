@@ -146,16 +146,17 @@ export const TabContent: React.FC<TabContentProps> = ({
 
   // Lấy danh sách chuyên mục con cho tab động 100%
   const availableCategories = useMemo(() => {
+    let list: any[] = [];
     if (configuredCategory && Array.isArray(configuredCategory.subcategories) && configuredCategory.subcategories.length > 0) {
-      return configuredCategory.subcategories;
+      list = configuredCategory.subcategories;
+    } else if (configuredCategory && Array.isArray((configuredCategory as any).categories) && (configuredCategory as any).categories.length > 0) {
+      list = (configuredCategory as any).categories;
+    } else if (customSec && Array.isArray((customSec as any).categories) && (customSec as any).categories.length > 0) {
+      list = (customSec as any).categories as any[];
     }
-    if (configuredCategory && Array.isArray((configuredCategory as any).categories) && (configuredCategory as any).categories.length > 0) {
-      return (configuredCategory as any).categories;
-    }
-    if (customSec && Array.isArray((customSec as any).categories) && (customSec as any).categories.length > 0) {
-      return (customSec as any).categories as string[];
-    }
-    return [];
+    return list
+      .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.shortLabel || c?.navName || c?.label || String(c?.id || ''))))
+      .filter((s: string) => s && s.trim() !== '');
   }, [configuredCategory, customSec]);
 
   // Lọc theo Category và Từ khóa tìm kiếm
@@ -276,17 +277,21 @@ export const TabContent: React.FC<TabContentProps> = ({
                 </span>
               </button>
 
-              {availableCategories.map((cat) => {
+              {availableCategories.map((cat, catIdx) => {
+                const catStr = typeof cat === 'string' ? cat : (cat?.name || cat?.label || String(cat || ''));
                 const count = tabArticles.filter(
-                  (a) => a.category && a.category.trim().toLowerCase() === cat.trim().toLowerCase()
+                  (a) => {
+                    const aCat = typeof a.category === 'string' ? a.category : ((a.category as any)?.name || (a.category as any)?.label || '');
+                    return aCat && aCat.trim().toLowerCase() === catStr.trim().toLowerCase();
+                  }
                 ).length;
-                const isSelected = selectedCategory.trim().toLowerCase() === cat.trim().toLowerCase();
+                const isSelected = selectedCategory.trim().toLowerCase() === catStr.trim().toLowerCase();
 
                 return (
                   <button
-                    key={cat}
+                    key={`${catStr}-${catIdx}`}
                     type="button"
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => setSelectedCategory(catStr)}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
                         ? tabConfig.activeColor
@@ -299,7 +304,7 @@ export const TabContent: React.FC<TabContentProps> = ({
                           isSelected ? 'text-amber-300' : 'text-gray-400'
                         }`}
                       />
-                      <span className="truncate text-left">{cat}</span>
+                      <span className="truncate text-left">{catStr}</span>
                     </div>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
