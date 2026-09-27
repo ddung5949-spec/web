@@ -126,8 +126,6 @@ export const TabIntroManagerModal: React.FC<TabIntroManagerModalProps> = ({
               categories_config: updatedCategoriesConfig,
               navigation_tabs: updatedNavTabs.length > 0 ? updatedNavTabs : updatedCategoriesConfig,
               sections: updatedSections,
-              config_json: updatedConfig,
-              data: updatedConfig,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'id' }

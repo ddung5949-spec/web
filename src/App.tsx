@@ -2295,11 +2295,9 @@ export function App() {
             home_layout: newConfig.layoutSettings,
             layout_settings: newConfig.layoutSettings,
             categories_config: newConfig.categories_config,
+            navigation_tabs: newConfig.categories_config,
             home_category_columns: newConfig.homeCategoryColumns,
             daily_widgets: newConfig.dailyWidgets,
-            config_json: newConfig,
-            config: newConfig,
-            data: newConfig,
             updated_at: nowIso,
           },
           { onConflict: 'id' }
@@ -2386,9 +2384,6 @@ export function App() {
             id: 'default',
             military_utilities: cards,
             quick_links: cards,
-            config_json: updatedConfig,
-            config: updatedConfig,
-            data: updatedConfig,
             updated_at: nowIso,
           },
           { onConflict: 'id' }
@@ -2798,9 +2793,6 @@ export function App() {
         const { error: cErr } = await supabase.from('site_config').upsert(
           {
             id: 'default',
-            config_json: updatedConfig,
-            config: updatedConfig,
-            data: updatedConfig,
             updated_at: nowIso,
           },
           { onConflict: 'id' }

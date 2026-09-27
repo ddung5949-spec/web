@@ -1060,10 +1060,7 @@ export const supabaseDb = {
         daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
         daily_posters: dailyWidgetsDict,
         categories_config: configData.categories_config || configData.categoriesConfig || [],
-        categories: configData.categories_config || configData.categoriesConfig || [],
-        config_json: configData,
-        config: configData,
-        data: configData,
+        navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
         updated_at: now,
       };
 
@@ -1076,15 +1073,19 @@ export const supabaseDb = {
       const fallbackPayloads = [
         {
           id: 'default',
+          categories_config: configData.categories_config || configData.categoriesConfig || [],
+          navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
+          updated_at: now,
+        },
+        {
+          id: 'default',
           title: configData.title || '',
           subtitle: configData.subtitle || '',
           unit_name: configData.footerUnitName || configData.title || '',
           marquee_text: configData.ticker || '',
           theme_color: configData.colorRed || '#b91c1c',
           categories_config: configData.categories_config || configData.categoriesConfig || [],
-          config_json: configData,
-          config: configData,
-          data: configData,
+          navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
           updated_at: now,
         },
         {

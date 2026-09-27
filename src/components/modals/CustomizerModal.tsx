@@ -86,6 +86,61 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const prevIsOpenRef = useRef(false);
+
+  // Drag-to-scroll refs for Tab 3 category selection bar
+  const isDraggingCategoryRef = useRef(false);
+  const startXCategoryRef = useRef(0);
+  const scrollLeftCategoryRef = useRef(0);
+
+  const handleCategoryMouseDown = (e: React.MouseEvent) => {
+    if (!categoryScrollRef.current) return;
+    isDraggingCategoryRef.current = true;
+    startXCategoryRef.current = e.pageX - categoryScrollRef.current.offsetLeft;
+    scrollLeftCategoryRef.current = categoryScrollRef.current.scrollLeft;
+  };
+
+  const handleCategoryMouseLeaveOrUp = () => {
+    isDraggingCategoryRef.current = false;
+  };
+
+  const handleCategoryMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingCategoryRef.current || !categoryScrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - categoryScrollRef.current.offsetLeft;
+    const walk = (x - startXCategoryRef.current) * 1.5;
+    categoryScrollRef.current.scrollLeft = scrollLeftCategoryRef.current - walk;
+  };
+
+  // Safe Upsert Tabs to Supabase: saves categories_config, navigation_tabs and safely handles config_json
+  const safeUpsertTabs = async (updatedTabs: CategoryConfig[]) => {
+    try {
+      localStorage.setItem('cached_categories', JSON.stringify(updatedTabs));
+      const supabase = getSupabase();
+      if (!supabase) return;
+
+      const payload: any = {
+        id: 'default',
+        categories_config: updatedTabs,
+        navigation_tabs: updatedTabs,
+        config_json: { tabs: updatedTabs },
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('site_config')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error && (error.message?.includes('config_json') || (error as any)?.details?.includes('config_json'))) {
+        delete payload.config_json;
+        await supabase
+          .from('site_config')
+          .upsert(payload, { onConflict: 'id' });
+      }
+    } catch (err) {
+      console.warn('[CustomizerModal] safeUpsertTabs error:', err);
+    }
+  };
 
   // Backup & Restore states
   const [backupStatusMsg, setBackupStatusMsg] = useState<string | null>(null);
@@ -254,6 +309,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const justOpened = !prevIsOpenRef.current;
+      prevIsOpenRef.current = true;
+      if (!justOpened) return;
+
       setTitle(siteConfig?.title || defaultSiteConfig.title);
       setSubtitle(siteConfig?.subtitle || defaultSiteConfig.subtitle);
       setSlogan(siteConfig?.slogan || defaultSiteConfig.slogan);
@@ -313,7 +372,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           order: c.order || i + 1,
         }));
         setCategoriesList(normalized);
-        if (normalized[0]?.id) setSelectedCatId(normalized[0].id);
+        setSelectedCatId((prevId) =>
+          prevId && normalized.some((c) => c.id === prevId) ? prevId : normalized[0]?.id || 'ctd'
+        );
       } else {
         const normalizedDefault = defaultCategoriesConfig.map((c, i) => ({
           ...c,
@@ -325,7 +386,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           order: c.order || i + 1,
         }));
         setCategoriesList(normalizedDefault);
-        setSelectedCatId('ctd');
+        setSelectedCatId((prevId) =>
+          prevId && normalizedDefault.some((c) => c.id === prevId) ? prevId : 'ctd'
+        );
       }
       setFooterUnitName(
         siteConfig?.site_info?.unit_name ||
@@ -403,6 +466,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setPendingRenames([]);
       setEditingCategoryIndex(null);
       setNewCategoryInput('');
+    } else {
+      prevIsOpenRef.current = false;
     }
   }, [siteConfig, isOpen]);
 
@@ -442,35 +507,47 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   // Synchronized Tab Name updater (100% 2-way sync across Tab 3, Tab 4 and Header)
   const handleUpdateTabName = (id: string, newName: string) => {
-    setCategoriesList((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          return {
-            ...c,
-            name: newName,
-            navName: newName,
-            shortLabel: newName,
-            short_name: newName,
-            title: newName,
-            label: newName,
-          };
-        }
-        return c;
-      })
-    );
-
-    if (sections[id]) {
-      setSections((prev: any) => ({
-        ...prev,
-        [id]: {
-          ...(prev[id] || {}),
-          title: newName,
+    const updated = categoriesList.map((c) => {
+      if (c.id === id) {
+        return {
+          ...c,
+          name: newName,
+          navName: newName,
           shortLabel: newName,
           short_name: newName,
-          nav_title: newName,
-        },
-      }));
-    }
+          title: newName,
+          label: newName,
+        };
+      }
+      return c;
+    });
+
+    setCategoriesList(updated);
+
+    setSections((prev: any) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || {}),
+        title: newName,
+        shortLabel: newName,
+        short_name: newName,
+        nav_title: newName,
+      },
+    }));
+
+    // Cập nhật Header ngoài trang chủ và Cache tức thì 100%
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: updated,
+      categoriesConfig: updated,
+      categories: updated,
+      navTabs: updated as any,
+      navigation_tabs: updated as any,
+    };
+    onSave(updatedConfig, []);
+    try {
+      localStorage.setItem('cached_categories', JSON.stringify(updated));
+    } catch {}
   };
 
   // Handle category / section field change with instant dynamic sync
@@ -668,7 +745,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }));
   };
 
-  const handleCreateNewMainCategory = () => {
+  const handleCreateNewMainCategory = async () => {
     const name = newCategoryTitleInput.trim();
     const navName = newCategoryNavInput.trim() || name;
     if (!name) {
@@ -697,7 +774,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       type: 'internal',
     };
 
-    setCategoriesList((prev) => [...prev, newCatItem]);
+    const updatedCats = [...categoriesList, newCatItem];
+    setCategoriesList(updatedCats);
     setSections((prev: any) => ({
       ...prev,
       [newId]: {
@@ -715,10 +793,22 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setNewCategoryTitleInput('');
     setNewCategoryNavInput('');
     setIsAddingNewMainCat(false);
+
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: updatedCats,
+      categoriesConfig: updatedCats,
+      categories: updatedCats,
+      navTabs: updatedCats as any,
+      navigation_tabs: updatedCats as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(updatedCats);
+
     toast.success('Đã thêm chuyên mục', `Đã tạo chuyên mục mới "${name}"!`);
   };
 
-  const handleDeleteMainCategory = (catId: string) => {
+  const handleDeleteMainCategory = async (catId: string) => {
     if (categoriesList.length <= 1) {
       toast.warning('Không thể xóa', 'Hệ thống cần duy trì ít nhất 1 chuyên mục!');
       return;
@@ -732,11 +822,23 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setSelectedCatId(remaining[0].id);
       setSelectedSectionKey(remaining[0].id);
     }
+
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: remaining,
+      categoriesConfig: remaining,
+      categories: remaining,
+      navTabs: remaining as any,
+      navigation_tabs: remaining as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(remaining);
+
     toast.success('Đã xóa chuyên mục', `Đã xóa chuyên mục khỏi danh mục.`);
   };
 
   // Custom Menu & Navbar Addition Logic - Pushes directly to categoriesList
-  const handleAddMenuItem = () => {
+  const handleAddMenuItem = async () => {
     if (!newMenuTitle.trim()) {
       toast.warning('Thiếu thông tin', 'Vui lòng nhập tên mục điều hướng!');
       return;
@@ -760,7 +862,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       name,
       navName: name,
       shortLabel: name,
-      description: '',
+      description: newMenuType === 'external' ? (newMenuExternalUrl.trim() || '') : 'Trang nội bộ',
       subcategories: [],
       hidden: false,
       enabled: true,
@@ -771,17 +873,52 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       order: categoriesList.length + 1,
     };
 
-    setCategoriesList((prev) => [...prev, newCat]);
+    const updatedCats = [...categoriesList, newCat];
+    setCategoriesList(updatedCats);
+    setSections((prev: any) => ({
+      ...prev,
+      [newId]: {
+        title: name,
+        shortLabel: name,
+        short_name: name,
+        nav_title: name,
+        desc: newCat.description,
+        categories: [],
+      },
+    }));
+
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: updatedCats,
+      categoriesConfig: updatedCats,
+      categories: updatedCats,
+      navTabs: updatedCats as any,
+      navigation_tabs: updatedCats as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(updatedCats);
+
     setNewMenuTitle('');
     setNewMenuExternalUrl('');
     toast.success('Đã thêm mục điều hướng', `Đã thêm mục "${name}" vào hệ thống!`);
   };
 
-  const handleDeleteMenuItem = (id: string) => {
-    setCategoriesList((prev) => prev.filter((item) => item.id !== id));
+  const handleDeleteMenuItem = async (id: string) => {
+    const updated = categoriesList.filter((item) => item.id !== id);
+    setCategoriesList(updated);
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: updated,
+      categoriesConfig: updated,
+      categories: updated,
+      navTabs: updated as any,
+      navigation_tabs: updated as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(updated);
   };
 
-  const handleAddPresetLink = (titleText: string, url: string) => {
+  const handleAddPresetLink = async (titleText: string, url: string) => {
     const rawSlug = slugify(titleText);
     const newId = rawSlug
       ? categoriesList.some((c) => c.id === rawSlug)
@@ -804,12 +941,36 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       order: categoriesList.length + 1,
     };
 
-    setCategoriesList((prev) => [...prev, newCat]);
+    const updatedCats = [...categoriesList, newCat];
+    setCategoriesList(updatedCats);
+    setSections((prev: any) => ({
+      ...prev,
+      [newId]: {
+        title: titleText,
+        shortLabel: titleText,
+        short_name: titleText,
+        nav_title: titleText,
+        desc: '',
+        categories: [],
+      },
+    }));
+
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: updatedCats,
+      categoriesConfig: updatedCats,
+      categories: updatedCats,
+      navTabs: updatedCats as any,
+      navigation_tabs: updatedCats as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(updatedCats);
+
     toast.success('Đã thêm liên kết nhanh', `Đã thêm liên kết "${titleText}"!`);
   };
 
   // Nav Tabs Reorder & Toggle Actions (Operating directly on categoriesList)
-  const handleMoveCategoryTab = (index: number, direction: 'up' | 'down') => {
+  const handleMoveCategoryTab = async (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= categoriesList.length) return;
     const newCats = [...categoriesList];
@@ -820,25 +981,48 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       (tab as any).order = i + 1;
     });
     setCategoriesList(newCats);
+
+    // 2. ĐỒNG BỘ HIỂN THỊ: Cập nhật ngay thứ tự các nút trên thanh Header ngoài trang chủ và Tab 3 không cần F5
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: newCats,
+      categoriesConfig: newCats,
+      categories: newCats,
+      navTabs: newCats as any,
+      navigation_tabs: newCats as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(newCats);
   };
 
-  const handleToggleCategoryHidden = (id: string) => {
-    setCategoriesList((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const isCurrentlyHidden = Boolean(c.hidden);
-          return {
-            ...c,
-            hidden: !isCurrentlyHidden,
-            enabled: isCurrentlyHidden,
-          };
-        }
-        return c;
-      })
-    );
+  const handleToggleCategoryHidden = async (id: string) => {
+    const newCats = categoriesList.map((c) => {
+      if (c.id === id) {
+        const isCurrentlyHidden = Boolean(c.hidden);
+        return {
+          ...c,
+          hidden: !isCurrentlyHidden,
+          enabled: isCurrentlyHidden,
+        };
+      }
+      return c;
+    });
+    setCategoriesList(newCats);
+
+    // Cập nhật ngay lên Header và toàn hệ thống
+    const updatedConfig: SiteConfig = {
+      ...siteConfig,
+      categories_config: newCats,
+      categoriesConfig: newCats,
+      categories: newCats,
+      navTabs: newCats as any,
+      navigation_tabs: newCats as any,
+    };
+    onSave(updatedConfig, []);
+    await safeUpsertTabs(newCats);
   };
 
-  const handleResetNavTabs = () => {
+  const handleResetNavTabs = async () => {
     if (confirm('Khôi phục danh sách và thứ tự các tab menu chính về mặc định của Sư đoàn?')) {
       const normalizedDefault = defaultCategoriesConfig.map((c, i) => ({
         ...c,
@@ -851,6 +1035,17 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       }));
       setCategoriesList(normalizedDefault);
       setSelectedCatId(normalizedDefault[0]?.id || 'ctd');
+
+      const updatedConfig: SiteConfig = {
+        ...siteConfig,
+        categories_config: normalizedDefault,
+        categoriesConfig: normalizedDefault,
+        categories: normalizedDefault,
+        navTabs: normalizedDefault as any,
+        navigation_tabs: normalizedDefault as any,
+      };
+      onSave(updatedConfig, []);
+      await safeUpsertTabs(normalizedDefault);
     }
   };
 
@@ -962,41 +1157,63 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     try {
       const supabase = getSupabase();
       if (supabase) {
-        const { error } = await supabase
+        // Lưu ĐỒNG THỜI và AN TOÀN vào các cột chuẩn
+        const fullPayload: any = {
+          id: 'default',
+          categories_config: categoriesList,
+          navigation_tabs: categoriesList,
+          config_json: { tabs: categoriesList },
+          title: updatedConfig.title,
+          subtitle: updatedConfig.subtitle,
+          marquee_text: updatedConfig.ticker,
+          marquee_mode: updatedConfig.marquee_mode,
+          marquee_days: updatedConfig.marquee_days,
+          marquee_speed: updatedConfig.marquee_speed,
+          announcements: updatedConfig.announcements,
+          theme_color: updatedConfig.colorRed,
+          unit_name: updatedConfig.footerUnitName,
+          military_utilities: updatedConfig.quickActionCards || updatedConfig.military_utilities,
+          site_info: updatedConfig.site_info,
+          footer_config: updatedConfig.footer_config,
+          home_layout: updatedConfig.layoutSettings,
+          layout_settings: updatedConfig.layoutSettings,
+          home_category_columns: updatedConfig.homeCategoryColumns,
+          daily_widgets: updatedConfig.dailyWidgets,
+          updated_at: new Date().toISOString(),
+        };
+
+        let { error } = await supabase
           .from('site_config')
-          .upsert(
-            {
-              id: 'default',
-              categories_config: categoriesList,
-              navigation_tabs: categoriesList,
-              title: updatedConfig.title,
-              subtitle: updatedConfig.subtitle,
-              marquee_text: updatedConfig.ticker,
-              marquee_mode: updatedConfig.marquee_mode,
-              marquee_days: updatedConfig.marquee_days,
-              marquee_speed: updatedConfig.marquee_speed,
-              announcements: updatedConfig.announcements,
-              theme_color: updatedConfig.colorRed,
-              unit_name: updatedConfig.footerUnitName,
-              military_utilities: updatedConfig.quickActionCards || updatedConfig.military_utilities,
-              site_info: updatedConfig.site_info,
-              footer_config: updatedConfig.footer_config,
-              home_layout: updatedConfig.layoutSettings,
-              layout_settings: updatedConfig.layoutSettings,
-              home_category_columns: updatedConfig.homeCategoryColumns,
-              daily_widgets: updatedConfig.dailyWidgets,
-              config_json: updatedConfig,
-              config: updatedConfig,
-              data: updatedConfig,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
+          .upsert(fullPayload, { onConflict: 'id' });
+
+        if (error && (error.message?.includes('config_json') || (error as any)?.details?.includes('config_json'))) {
+          delete fullPayload.config_json;
+          const retryRes = await supabase
+            .from('site_config')
+            .upsert(fullPayload, { onConflict: 'id' });
+          error = retryRes.error;
+        }
 
         if (error) {
-          alert('❌ Lỗi lưu CSDL: ' + error.message);
-          setIsSaving(false);
-          return;
+          console.warn('[CustomizerModal] Full upsert warning, retrying with core navigation columns:', error);
+          // Fallback an toàn vào các cột chuẩn nếu cột phụ khác không tồn tại
+          const { error: coreError } = await supabase
+            .from('site_config')
+            .upsert(
+              {
+                id: 'default',
+                categories_config: categoriesList,
+                navigation_tabs: categoriesList,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+
+          if (coreError) {
+            alert('❌ Lỗi lưu CSDL: ' + coreError.message);
+            setIsSaving(false);
+            return;
+          }
         }
       }
 
@@ -1725,13 +1942,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {activeTab === 'sections' && (
             <div className="space-y-4">
               {/* Category sub-tab buttons bar */}
-              <div className="flex items-center gap-1.5 w-full">
+              <div className="flex items-center gap-1.5 w-full min-w-0">
                 {/* Nút mũi tên trái [ < ] */}
                 <button
                   type="button"
                   onClick={() => {
                     if (categoryScrollRef.current) {
-                      categoryScrollRef.current.scrollBy({ left: -220, behavior: 'smooth' });
+                      categoryScrollRef.current.scrollBy({ left: -240, behavior: 'smooth' });
                     }
                   }}
                   className="p-2 rounded-lg bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 shadow-xs shrink-0 cursor-pointer transition-colors"
@@ -1743,7 +1960,16 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                 {/* Container chứa các nút chuyên mục: Cuộn ngang mượt mà, hiển thị thanh cuộn mảnh */}
                 <div
                   ref={categoryScrollRef}
-                  className="flex items-center gap-2 overflow-x-auto p-2 scrollbar-thin scrollbar-thumb-red-500 bg-slate-100 rounded-lg w-full shrink-0 select-none"
+                  onMouseDown={handleCategoryMouseDown}
+                  onMouseLeave={handleCategoryMouseLeaveOrUp}
+                  onMouseUp={handleCategoryMouseLeaveOrUp}
+                  onMouseMove={handleCategoryMouseMove}
+                  onWheel={(e) => {
+                    if (categoryScrollRef.current && e.deltaY !== 0) {
+                      categoryScrollRef.current.scrollLeft += e.deltaY;
+                    }
+                  }}
+                  className="flex items-center gap-2 overflow-x-auto p-2 scrollbar-thin scrollbar-thumb-red-500 bg-slate-100 rounded-lg w-full shrink-0 select-none flex-1 min-w-0 scroll-smooth cursor-grab active:cursor-grabbing"
                 >
                   {categoriesList.map((cat, idx) => {
                     const isSelected = selectedCatId === cat.id;
@@ -1800,7 +2026,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                   type="button"
                   onClick={() => {
                     if (categoryScrollRef.current) {
-                      categoryScrollRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+                      categoryScrollRef.current.scrollBy({ left: 240, behavior: 'smooth' });
                     }
                   }}
                   className="p-2 rounded-lg bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 shadow-xs shrink-0 cursor-pointer transition-colors"
