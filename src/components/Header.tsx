@@ -154,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
       // Loại trừ 'home' vì nút Trang chủ luôn cố định ở vị trí đầu tiên
       // Loại trừ 'meeting' nếu có
       if (!catId || catId === 'home' || catId === 'trang-chu' || catId === 'meeting') return;
-      if (cat.enabled === false) return;
+      if (cat.hidden === true || cat.enabled === false) return;
       if (seenIds.has(catId)) return;
       seenIds.add(catId);
       list.push(cat);
@@ -187,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getTabLabel = (cat: any): string => {
     if (!cat) return '';
-    return cat.navName || cat.shortLabel || cat.short_name || cat.name || cat.label || cat.id || '';
+    return cat.name || cat.navName || cat.shortLabel || cat.short_name || cat.label || cat.id || '';
   };
 
   return (

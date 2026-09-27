@@ -3,6 +3,8 @@ import {
   AlertCircle,
   Award,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Crosshair,
   Database,
@@ -55,10 +57,12 @@ import { defaultCategoriesConfig, defaultDailyWidgets, defaultNavTabs, defaultSi
 import { UnitLogo } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
+import { getSupabase } from '../../utils/supabase';
 
 interface CustomizerModalProps {
   isOpen: boolean;
   siteConfig: SiteConfig;
+  categories?: any[];
   articles?: Article[];
   onClose: () => void;
   onSave: (
@@ -72,6 +76,7 @@ type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'typography' 
 export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   isOpen,
   siteConfig,
+  categories,
   articles = [],
   onClose,
   onSave,
@@ -79,6 +84,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('logo');
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Backup & Restore states
   const [backupStatusMsg, setBackupStatusMsg] = useState<string | null>(null);
@@ -173,13 +180,33 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     'ctd' | 'hl' | 'bac' | 'doc' | 'lecture' | 'meeting' | string
   >('ctd');
 
-  // Dynamic Categories Config State (Synchronized across the entire system)
+  // Dynamic Categories Config State (Synchronized across the entire system - Single Source of Truth)
   const [categoriesList, setCategoriesList] = useState<CategoryConfig[]>(() => {
-    const raw = siteConfig?.categories_config || siteConfig?.categoriesConfig || siteConfig?.categories;
+    const raw =
+      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      siteConfig?.categories_config ||
+      siteConfig?.categoriesConfig ||
+      siteConfig?.categories;
     if (raw && Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object') {
-      return raw as CategoryConfig[];
+      return (raw as CategoryConfig[]).map((c, i) => ({
+        ...c,
+        name: c.name || c.navName || c.shortLabel || `Chuyên mục ${i + 1}`,
+        navName: c.navName || c.name || c.shortLabel || `Chuyên mục ${i + 1}`,
+        shortLabel: c.shortLabel || c.navName || c.name || `Chuyên mục ${i + 1}`,
+        subcategories: c.subcategories || [],
+        hidden: Boolean(c.hidden),
+        order: c.order || i + 1,
+      }));
     }
-    return defaultCategoriesConfig;
+    return defaultCategoriesConfig.map((c, i) => ({
+      ...c,
+      name: c.name || c.navName || c.shortLabel || `Chuyên mục ${i + 1}`,
+      navName: c.navName || c.name || c.shortLabel || `Chuyên mục ${i + 1}`,
+      shortLabel: c.shortLabel || c.navName || c.name || `Chuyên mục ${i + 1}`,
+      subcategories: c.subcategories || [],
+      hidden: Boolean(c.hidden),
+      order: c.order || i + 1,
+    }));
   });
   const [selectedCatId, setSelectedCatId] = useState<string>('ctd');
 
@@ -270,12 +297,34 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         ...defaultSiteConfig.sections,
         ...(siteConfig?.sections || {}),
       });
-      const rawCats = siteConfig?.categories_config || siteConfig?.categoriesConfig || siteConfig?.categories;
+      const rawCats =
+        (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+        siteConfig?.categories_config ||
+        siteConfig?.categoriesConfig ||
+        siteConfig?.categories;
       if (rawCats && Array.isArray(rawCats) && rawCats.length > 0 && typeof rawCats[0] === 'object') {
-        setCategoriesList(rawCats as CategoryConfig[]);
-        if (rawCats[0]?.id) setSelectedCatId(rawCats[0].id);
+        const normalized = (rawCats as CategoryConfig[]).map((c, i) => ({
+          ...c,
+          name: c.name || c.navName || c.shortLabel || `Chuyên mục ${i + 1}`,
+          navName: c.navName || c.name || c.shortLabel || `Chuyên mục ${i + 1}`,
+          shortLabel: c.shortLabel || c.navName || c.name || `Chuyên mục ${i + 1}`,
+          subcategories: c.subcategories || [],
+          hidden: Boolean(c.hidden),
+          order: c.order || i + 1,
+        }));
+        setCategoriesList(normalized);
+        if (normalized[0]?.id) setSelectedCatId(normalized[0].id);
       } else {
-        setCategoriesList(defaultCategoriesConfig);
+        const normalizedDefault = defaultCategoriesConfig.map((c, i) => ({
+          ...c,
+          name: c.name || c.navName || c.shortLabel || `Chuyên mục ${i + 1}`,
+          navName: c.navName || c.name || c.shortLabel || `Chuyên mục ${i + 1}`,
+          shortLabel: c.shortLabel || c.navName || c.name || `Chuyên mục ${i + 1}`,
+          subcategories: c.subcategories || [],
+          hidden: Boolean(c.hidden),
+          order: c.order || i + 1,
+        }));
+        setCategoriesList(normalizedDefault);
         setSelectedCatId('ctd');
       }
       setFooterUnitName(
@@ -377,14 +426,68 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to slugify string for category IDs
+  const slugify = (text: string): string => {
+    return text
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  };
+
+  // Synchronized Tab Name updater (100% 2-way sync across Tab 3, Tab 4 and Header)
+  const handleUpdateTabName = (id: string, newName: string) => {
+    setCategoriesList((prev) =>
+      prev.map((c) => {
+        if (c.id === id) {
+          return {
+            ...c,
+            name: newName,
+            navName: newName,
+            shortLabel: newName,
+            short_name: newName,
+            title: newName,
+            label: newName,
+          };
+        }
+        return c;
+      })
+    );
+
+    if (sections[id]) {
+      setSections((prev: any) => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || {}),
+          title: newName,
+          shortLabel: newName,
+          short_name: newName,
+          nav_title: newName,
+        },
+      }));
+    }
+  };
+
   // Handle category / section field change with instant dynamic sync
   const handleCategoryFieldChange = (field: 'name' | 'navName' | 'description', val: string) => {
+    if (field === 'name') {
+      handleUpdateTabName(selectedCatId, val);
+      return;
+    }
+
     setCategoriesList((prev) =>
       prev.map((c) => {
         if (c.id === selectedCatId) {
           const updated = { ...c, [field]: val };
           if (field === 'navName') {
             updated.shortLabel = val;
+            updated.short_name = val;
+            updated.nav_title = val;
           }
           return updated;
         }
@@ -395,7 +498,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setSections((prev: any) => {
       const current = prev[selectedCatId] || {};
       const updatedSection: any = { ...current };
-      if (field === 'name') updatedSection.title = val;
       if (field === 'navName') {
         updatedSection.shortLabel = val;
         updatedSection.short_name = val;
@@ -407,22 +509,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         [selectedCatId]: updatedSection,
       };
     });
-
-    if (field === 'navName' || field === 'name') {
-      setNavTabs((prev) =>
-        prev.map((t) => {
-          if (t.id === selectedCatId || t.targetPage === selectedCatId) {
-            return {
-              ...t,
-              label: val,
-              short_name: val,
-              nav_title: val,
-            };
-          }
-          return t;
-        })
-      );
-    }
   };
 
   const handleSectionFieldChange = (field: string, val: string) => {
@@ -590,7 +676,13 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       return;
     }
 
-    const newId = `cat-${Date.now()}`;
+    const rawSlug = slugify(name);
+    const newId = rawSlug
+      ? categoriesList.some((c) => c.id === rawSlug)
+        ? `${rawSlug}-${Date.now()}`
+        : rawSlug
+      : `cat-${Date.now()}`;
+
     const newCatItem: CategoryConfig = {
       id: newId,
       name,
@@ -599,7 +691,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       description: 'Chuyên mục tuyên truyền, thông tin và hoạt động của đơn vị',
       subcategories: ['Tin tức chung', 'Hoạt động nổi bật'],
       order: categoriesList.length + 1,
+      hidden: false,
       enabled: true,
+      targetPage: newId as any,
+      type: 'internal',
     };
 
     setCategoriesList((prev) => [...prev, newCatItem]);
@@ -614,21 +709,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         categories: newCatItem.subcategories,
       },
     }));
-
-    // Add to navTabs
-    setNavTabs((prev) => [
-      ...prev,
-      {
-        id: newId,
-        label: navName,
-        short_name: navName,
-        nav_title: navName,
-        type: 'internal',
-        targetPage: newId as any,
-        enabled: true,
-        order: prev.length + 1,
-      },
-    ]);
 
     setSelectedCatId(newId);
     setSelectedSectionKey(newId);
@@ -648,7 +728,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
     const remaining = categoriesList.filter((c) => c.id !== catId);
     setCategoriesList(remaining);
-    setNavTabs((prev) => prev.filter((t) => t.id !== catId && t.targetPage !== (catId as any)));
     if (selectedCatId === catId) {
       setSelectedCatId(remaining[0].id);
       setSelectedSectionKey(remaining[0].id);
@@ -656,7 +735,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     toast.success('Đã xóa chuyên mục', `Đã xóa chuyên mục khỏi danh mục.`);
   };
 
-  // Custom Menu Management Logic
+  // Custom Menu & Navbar Addition Logic - Pushes directly to categoriesList
   const handleAddMenuItem = () => {
     if (!newMenuTitle.trim()) {
       toast.warning('Thiếu thông tin', 'Vui lòng nhập tên mục điều hướng!');
@@ -668,87 +747,110 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       return;
     }
 
-    const newItem: CustomMenuItem = {
-      id: `menu-item-${Date.now()}`,
-      title: newMenuTitle.trim(),
+    const name = newMenuTitle.trim();
+    const rawSlug = slugify(name);
+    const newId = rawSlug
+      ? categoriesList.some((c) => c.id === rawSlug)
+        ? `${rawSlug}-${Date.now()}`
+        : rawSlug
+      : `menu-${Date.now()}`;
+
+    const newCat: CategoryConfig = {
+      id: newId,
+      name,
+      navName: name,
+      shortLabel: name,
+      description: '',
+      subcategories: [],
+      hidden: false,
+      enabled: true,
       type: newMenuType,
-      targetPage: newMenuType === 'internal' ? newMenuTargetPage : undefined,
       externalUrl: newMenuType === 'external' ? newMenuExternalUrl.trim() : undefined,
+      targetPage: newMenuType === 'internal' ? newMenuTargetPage : (newId as any),
       openNewTab: newMenuType === 'external' ? newMenuOpenNewTab : false,
+      order: categoriesList.length + 1,
     };
 
-    setCustomMenuItems((prev) => [...prev, newItem]);
+    setCategoriesList((prev) => [...prev, newCat]);
     setNewMenuTitle('');
     setNewMenuExternalUrl('');
-    toast.success('Đã thêm mục điều hướng', `Đã thêm mục "${newItem.title}" vào thanh menu!`);
+    toast.success('Đã thêm mục điều hướng', `Đã thêm mục "${name}" vào hệ thống!`);
   };
 
   const handleDeleteMenuItem = (id: string) => {
-    setCustomMenuItems((prev) => prev.filter((item) => item.id !== id));
+    setCategoriesList((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleAddPresetLink = (titleText: string, url: string) => {
-    const newItem: CustomMenuItem = {
-      id: `menu-item-${Date.now()}`,
-      title: titleText,
+    const rawSlug = slugify(titleText);
+    const newId = rawSlug
+      ? categoriesList.some((c) => c.id === rawSlug)
+        ? `${rawSlug}-${Date.now()}`
+        : rawSlug
+      : `preset-${Date.now()}`;
+
+    const newCat: CategoryConfig = {
+      id: newId,
+      name: titleText,
+      navName: titleText,
+      shortLabel: titleText,
+      description: '',
+      subcategories: [],
+      hidden: false,
+      enabled: true,
       type: 'external',
       externalUrl: url,
       openNewTab: true,
+      order: categoriesList.length + 1,
     };
-    setCustomMenuItems((prev) => [...prev, newItem]);
+
+    setCategoriesList((prev) => [...prev, newCat]);
+    toast.success('Đã thêm liên kết nhanh', `Đã thêm liên kết "${titleText}"!`);
   };
 
-  // Nav Tabs Reorder & Toggle Actions
-  const handleMoveNavTab = (index: number, direction: 'up' | 'down') => {
-    const newTabs = [...navTabs];
+  // Nav Tabs Reorder & Toggle Actions (Operating directly on categoriesList)
+  const handleMoveCategoryTab = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newTabs.length) return;
-    const temp = newTabs[index];
-    newTabs[index] = newTabs[targetIndex];
-    newTabs[targetIndex] = temp;
-    newTabs.forEach((tab, i) => {
-      tab.order = i + 1;
+    if (targetIndex < 0 || targetIndex >= categoriesList.length) return;
+    const newCats = [...categoriesList];
+    const temp = newCats[index];
+    newCats[index] = newCats[targetIndex];
+    newCats[targetIndex] = temp;
+    newCats.forEach((tab, i) => {
+      (tab as any).order = i + 1;
     });
-    setNavTabs(newTabs);
+    setCategoriesList(newCats);
   };
 
-  const handleToggleNavTab = (id: string) => {
-    setNavTabs((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, enabled: !t.enabled } : t))
+  const handleToggleCategoryHidden = (id: string) => {
+    setCategoriesList((prev) =>
+      prev.map((c) => {
+        if (c.id === id) {
+          const isCurrentlyHidden = Boolean(c.hidden);
+          return {
+            ...c,
+            hidden: !isCurrentlyHidden,
+            enabled: isCurrentlyHidden,
+          };
+        }
+        return c;
+      })
     );
-  };
-
-  const handleUpdateNavTabLabel = (id: string, newLabel: string) => {
-    setNavTabs((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              label: newLabel,
-              short_name: newLabel,
-              nav_title: newLabel,
-            }
-          : t
-      )
-    );
-
-    // If this tab corresponds to a section, update the section's shortLabel as well
-    if (sections[id]) {
-      setSections((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          shortLabel: newLabel,
-          short_name: newLabel,
-          nav_title: newLabel,
-        },
-      }));
-    }
   };
 
   const handleResetNavTabs = () => {
     if (confirm('Khôi phục danh sách và thứ tự các tab menu chính về mặc định của Sư đoàn?')) {
-      setNavTabs(defaultNavTabs);
+      const normalizedDefault = defaultCategoriesConfig.map((c, i) => ({
+        ...c,
+        name: c.name || c.navName || c.shortLabel || `Chuyên mục ${i + 1}`,
+        navName: c.navName || c.name || c.shortLabel || `Chuyên mục ${i + 1}`,
+        shortLabel: c.shortLabel || c.navName || c.name || `Chuyên mục ${i + 1}`,
+        subcategories: c.subcategories || [],
+        hidden: false,
+        order: i + 1,
+      }));
+      setCategoriesList(normalizedDefault);
+      setSelectedCatId(normalizedDefault[0]?.id || 'ctd');
     }
   };
 
@@ -758,9 +860,12 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setColorGreen(preset.green);
   };
 
-  // Submit all changes
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit all changes - LƯU & ĐỒNG BỘ GIAO DIỆN HỆ THỐNG
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (isSaving) return;
+    setIsSaving(true);
 
     const normalizedMarqueeMode =
       tickerMode === 'auto_today'
@@ -788,7 +893,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       categories_config: categoriesList,
       categoriesConfig: categoriesList,
       categories: categoriesList,
-      navTabs,
+      navTabs: categoriesList as any,
+      navigation_tabs: categoriesList as any,
       customMenuItems,
       // Marquee & Ticker settings (Synchronized)
       tickerMode,
@@ -853,8 +959,59 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       },
     };
 
-    onSave(updatedConfig, pendingRenames);
-    onClose();
+    try {
+      const supabase = getSupabase();
+      if (supabase) {
+        const { error } = await supabase
+          .from('site_config')
+          .upsert(
+            {
+              id: 'default',
+              categories_config: categoriesList,
+              navigation_tabs: categoriesList,
+              title: updatedConfig.title,
+              subtitle: updatedConfig.subtitle,
+              marquee_text: updatedConfig.ticker,
+              marquee_mode: updatedConfig.marquee_mode,
+              marquee_days: updatedConfig.marquee_days,
+              marquee_speed: updatedConfig.marquee_speed,
+              announcements: updatedConfig.announcements,
+              theme_color: updatedConfig.colorRed,
+              unit_name: updatedConfig.footerUnitName,
+              military_utilities: updatedConfig.quickActionCards || updatedConfig.military_utilities,
+              site_info: updatedConfig.site_info,
+              footer_config: updatedConfig.footer_config,
+              home_layout: updatedConfig.layoutSettings,
+              layout_settings: updatedConfig.layoutSettings,
+              home_category_columns: updatedConfig.homeCategoryColumns,
+              daily_widgets: updatedConfig.dailyWidgets,
+              config_json: updatedConfig,
+              config: updatedConfig,
+              data: updatedConfig,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+
+        if (error) {
+          alert('❌ Lỗi lưu CSDL: ' + error.message);
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Cập nhật State toàn cục và Cache
+      localStorage.setItem('cached_categories', JSON.stringify(categoriesList));
+      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      onSave(updatedConfig, pendingRenames);
+      alert('✅ ĐÃ LƯU & ĐỒNG BỘ GIAO DIỆN HỆ THỐNG THÀNH CÔNG!');
+      onClose();
+    } catch (err: any) {
+      alert('❌ Lỗi lưu CSDL: ' + (err?.message || 'Không thể kết nối CSDL'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleResetToDefault = () => {
@@ -1568,49 +1725,88 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           {activeTab === 'sections' && (
             <div className="space-y-4">
               {/* Category sub-tab buttons bar */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 text-xs font-bold">
-                {categoriesList.map((cat, idx) => {
-                  const isSelected = selectedCatId === cat.id;
-                  const displayTitle =
-                    cat.navName ||
-                    cat.shortLabel ||
-                    cat.name ||
-                    sections[cat.id]?.shortLabel ||
-                    sections[cat.id]?.title ||
-                    `Chuyên mục ${idx + 1}`;
-
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCatId(cat.id);
-                        setSelectedSectionKey(cat.id as any);
-                        setEditingCategoryIndex(null);
-                        setNewCategoryInput('');
-                        setIsAddingNewMainCat(false);
-                      }}
-                      className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-red-800 text-white font-black shadow-md border-b-2 border-amber-400'
-                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300 font-bold'
-                      }`}
-                    >
-                      <span className={isSelected ? 'text-amber-300 font-black' : 'text-gray-500 font-bold'}>
-                        {idx + 1}.
-                      </span>
-                      <span>{displayTitle}</span>
-                    </button>
-                  );
-                })}
-
+              <div className="flex items-center gap-1.5 w-full">
+                {/* Nút mũi tên trái [ < ] */}
                 <button
                   type="button"
-                  onClick={() => setIsAddingNewMainCat(true)}
-                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-dashed border-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+                  onClick={() => {
+                    if (categoryScrollRef.current) {
+                      categoryScrollRef.current.scrollBy({ left: -220, behavior: 'smooth' });
+                    }
+                  }}
+                  className="p-2 rounded-lg bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 shadow-xs shrink-0 cursor-pointer transition-colors"
+                  title="Cuộn sang trái"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Thêm chuyên mục</span>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {/* Container chứa các nút chuyên mục: Cuộn ngang mượt mà, hiển thị thanh cuộn mảnh */}
+                <div
+                  ref={categoryScrollRef}
+                  className="flex items-center gap-2 overflow-x-auto p-2 scrollbar-thin scrollbar-thumb-red-500 bg-slate-100 rounded-lg w-full shrink-0 select-none"
+                >
+                  {categoriesList.map((cat, idx) => {
+                    const isSelected = selectedCatId === cat.id;
+                    const displayTitle =
+                      cat.name ||
+                      cat.navName ||
+                      cat.shortLabel ||
+                      sections[cat.id]?.shortLabel ||
+                      sections[cat.id]?.title ||
+                      `Chuyên mục ${idx + 1}`;
+
+                    return (
+                      <button
+                        key={cat.id || idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCatId(cat.id);
+                          setSelectedSectionKey(cat.id as any);
+                          setEditingCategoryIndex(null);
+                          setNewCategoryInput('');
+                          setIsAddingNewMainCat(false);
+                        }}
+                        className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer shrink-0 whitespace-nowrap flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-red-800 text-white font-black shadow-md border-b-2 border-amber-400'
+                            : 'bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 font-bold'
+                        }`}
+                      >
+                        <span className={isSelected ? 'text-amber-300 font-black' : 'text-gray-500 font-bold'}>
+                          {idx + 1}.
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap">{displayTitle}</span>
+                        {cat.hidden && (
+                          <span className="text-[10px] bg-gray-400 text-white px-1.5 py-0.2 rounded font-normal">
+                            Ẩn
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingNewMainCat(true)}
+                    className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-dashed border-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span>Thêm chuyên mục</span>
+                  </button>
+                </div>
+
+                {/* Nút mũi tên phải [ > ] */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (categoryScrollRef.current) {
+                      categoryScrollRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+                    }
+                  }}
+                  className="p-2 rounded-lg bg-white hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 shadow-xs shrink-0 cursor-pointer transition-colors"
+                  title="Cuộn sang phải"
+                >
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
 
@@ -1904,11 +2100,11 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                 </p>
 
                 <div className="space-y-2 bg-white p-3 rounded-lg border border-amber-200">
-                  {navTabs.map((tab, idx) => (
+                  {categoriesList.map((tab, idx) => (
                     <div
-                      key={tab.id}
+                      key={tab.id || idx}
                       className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors ${
-                        tab.enabled
+                        !tab.hidden
                           ? 'bg-amber-50/40 border-amber-200 text-gray-900'
                           : 'bg-gray-100 border-gray-200 text-gray-400 opacity-60'
                       }`}
@@ -1919,7 +2115,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                           <button
                             type="button"
                             disabled={idx === 0}
-                            onClick={() => handleMoveNavTab(idx, 'up')}
+                            onClick={() => handleMoveCategoryTab(idx, 'up')}
                             className="p-1 rounded bg-white hover:bg-amber-100 border border-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             title="Di chuyển lên trước"
                           >
@@ -1927,8 +2123,8 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                           </button>
                           <button
                             type="button"
-                            disabled={idx === navTabs.length - 1}
-                            onClick={() => handleMoveNavTab(idx, 'down')}
+                            disabled={idx === categoriesList.length - 1}
+                            onClick={() => handleMoveCategoryTab(idx, 'down')}
                             className="p-1 rounded bg-white hover:bg-amber-100 border border-gray-200 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             title="Di chuyển xuống sau"
                           >
@@ -1937,35 +2133,57 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                         </div>
 
                         <span className="font-mono text-[11px] font-bold text-amber-800 shrink-0 w-6 text-center">
-                          #{tab.order}
+                          #{idx + 1}
                         </span>
 
-                        {/* Label input */}
+                        {/* Label input - BẮT BUỘC RÀNG BUỘC: value={tab.name || ''} và onChange */}
                         <input
                           type="text"
-                          value={tab.label}
-                          onChange={(e) => handleUpdateNavTabLabel(tab.id, e.target.value)}
+                          value={tab.name || ''}
+                          onChange={(e) => handleUpdateTabName(tab.id, e.target.value)}
                           className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold bg-white border border-gray-300 rounded focus:border-amber-700 focus:outline-hidden text-gray-900"
                           placeholder="Tên hiển thị trên menu..."
                         />
 
                         <span className="text-[10px] text-gray-400 font-mono shrink-0 hidden sm:inline">
-                          [{tab.targetPage || tab.id}]
+                          [{tab.type === 'external' ? 'Liên kết ngoài' : (tab.targetPage || tab.id)}]
                         </span>
                       </div>
 
-                      {/* Enable / Disable Toggle */}
-                      <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={tab.enabled}
-                          onChange={() => handleToggleNavTab(tab.id)}
-                          className="w-4 h-4 text-amber-700 rounded cursor-pointer accent-amber-700"
-                        />
-                        <span className="text-xs font-bold text-gray-700 select-none">
-                          {tab.enabled ? 'Hiển thị' : 'Ẩn'}
-                        </span>
-                      </label>
+                      {/* Enable / Disable Toggle (Ẩn / Hiện) */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!tab.hidden}
+                            onChange={() => handleToggleCategoryHidden(tab.id)}
+                            className="w-4 h-4 text-amber-700 rounded cursor-pointer accent-amber-700"
+                          />
+                          <span className="text-xs font-bold text-gray-700 select-none">
+                            {!tab.hidden ? 'Hiển thị' : 'Ẩn'}
+                          </span>
+                        </label>
+
+                        {/* Nút xóa nếu có nhiều hơn 1 chuyên mục */}
+                        {categoriesList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Đồng chí có chắc muốn xóa mục "${tab.name}" khỏi thanh điều hướng?`)) {
+                                setCategoriesList((prev) => prev.filter((c) => c.id !== tab.id));
+                                if (selectedCatId === tab.id) {
+                                  const remaining = categoriesList.filter((c) => c.id !== tab.id);
+                                  if (remaining.length > 0) setSelectedCatId(remaining[0].id);
+                                }
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Xóa mục này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -3066,10 +3284,11 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
               <button
                 type="submit"
                 id="btn-save-customizer-config"
-                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-xs cursor-pointer transition-all"
+                disabled={isSaving}
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-xs cursor-pointer transition-all"
               >
                 <Save className="w-4 h-4" />
-                <span>LƯU & ĐỒNG BỘ GIAO DIỆN HỆ THỐNG</span>
+                <span>{isSaving ? 'ĐANG LƯU & ĐỒNG BỘ...' : 'LƯU & ĐỒNG BỘ GIAO DIỆN HỆ THỐNG'}</span>
               </button>
             </div>
           </div>

@@ -51,7 +51,7 @@ export interface CategoryViewProps {
   onSelectSection?: (section: PageView, sub?: string) => void;
   onGoHome?: () => void;
   onOpenTabIntroModal?: (tabKey: string) => void;
-  onSaveCategories?: (categories: any[]) => void | Promise<void>;
+  onSaveCategories?: (categories: any[], silent?: boolean) => void | Promise<void>;
   onRenameCategory?: (oldCat: string, newCat: string) => void;
   onDeleteCategory?: (catToDelete: string, fallbackCat: string) => void;
 }
@@ -254,41 +254,16 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       });
   }, [rawSectionArticles, activeSub, searchQuery, sortBy]);
 
-  // Direct Supabase save handler when editing category subcategories
+  // Direct save handler when CategoryManagerModal completes save (Modal already saved to Supabase and alerted)
   const handleDirectSaveCategories = async (updatedCategories: any[]) => {
     try {
-      const client = supabase || getSupabase();
-      if (!client) {
-        alert('Lỗi lưu Supabase: Không tìm thấy kết nối');
-        return;
-      }
-
-      const { error } = await client
-        .from('site_config')
-        .upsert(
-          {
-            id: 'default',
-            categories_config: updatedCategories,
-            navigation_tabs: updatedCategories,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-
-      if (error) {
-        alert('Lỗi lưu Supabase: ' + error.message);
-        return;
-      }
-
-      alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
-
-      // Update global state and localStorage immediately
+      // Update global state and localStorage immediately without duplicate alerts
       localStorage.setItem('cached_categories', JSON.stringify(updatedCategories));
       if (onSaveCategories) {
-        await onSaveCategories(updatedCategories);
+        await onSaveCategories(updatedCategories, true);
       }
     } catch (err: any) {
-      alert('Lỗi lưu Supabase: ' + (err?.message || 'Lỗi mạng'));
+      console.error('Error syncing categories in CategoryView:', err);
     }
   };
 
@@ -639,7 +614,6 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
           categories={categoriesList}
           initialCategories={currentCategory?.subcategories || []}
           onSave={handleDirectSaveCategories}
-          onSaveCategories={handleDirectSaveCategories}
         />
       )}
     </div>

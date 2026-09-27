@@ -75,8 +75,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Exact handleSave implementing user direct specifications
-  const handleSave = async (updatedList = catList) => {
+  // Exact handleSave implementing user direct specifications (Đảm bảo duy nhất 1 lần thông báo)
+  const handleSave = async (e?: React.SyntheticEvent | any, updatedList = catList) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isSaving) return;
     setIsSaving(true);
     setSaveSuccessMessage(null);
 
@@ -180,11 +185,15 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         }
       } catch {}
 
-      // 3. Callback props to immediately update global state
-      if (onSave) await onSave(updatedCategories);
-      if (onSaveCategories) await onSaveCategories(updatedCategories);
+      // 3. Callback props to immediately update global state silently (chỉ gọi 1 callback tránh trigger alert kép)
+      if (onSave) {
+        await onSave(updatedCategories);
+      } else if (onSaveCategories) {
+        await onSaveCategories(updatedCategories);
+      }
 
       setIsSaving(false);
+      // DUY NHẤT 1 LẦN THÔNG BÁO TẠI ĐÂY
       alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
       onClose();
     } catch (e: any) {
@@ -504,7 +513,11 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           <button
             type="button"
             disabled={isSaving}
-            onClick={() => handleSave()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSave(e);
+            }}
             style={{ backgroundColor: themeColor }}
             className="px-5 py-2 text-white font-extrabold rounded-xl hover:opacity-90 shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-all"
           >

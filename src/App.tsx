@@ -2256,6 +2256,12 @@ export function App() {
   ) => {
     // 1. Cập nhật tức thì lên State và LocalStorage (Optimistic UI)
     setSiteConfig(newConfig);
+    if (newConfig.categories_config && Array.isArray(newConfig.categories_config)) {
+      setCategories(newConfig.categories_config);
+      try {
+        localStorage.setItem('cached_categories', JSON.stringify(newConfig.categories_config));
+      } catch {}
+    }
     safeStore.set('mangyang_site_config', newConfig);
     try {
       localStorage.setItem('site_config_cache', JSON.stringify(newConfig));
@@ -2495,7 +2501,7 @@ export function App() {
   };
 
   // Master Categories & Tabbar Save Handler (BẮT BUỘC ĐẨY LÊN SUPABASE)
-  const handleSaveCategories = async (updatedCategories: any[]) => {
+  const handleSaveCategories = async (updatedCategories: any[], silent = false) => {
     // 1. Cập nhật giao diện tức thì
     setCategories(updatedCategories);
     try {
@@ -2522,7 +2528,7 @@ export function App() {
     try {
       const client = supabase || getSupabase();
       if (!client) {
-        alert('Lỗi lưu Supabase: Không tìm thấy kết nối CSDL');
+        if (!silent) alert('Lỗi lưu Supabase: Không tìm thấy kết nối CSDL');
         return;
       }
 
@@ -2540,13 +2546,15 @@ export function App() {
 
       if (error) {
         console.error('Lỗi Supabase:', error);
-        alert('Lỗi lưu Supabase: ' + error.message);
+        if (!silent) alert('Lỗi lưu Supabase: ' + error.message);
         return;
       }
 
-      alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
+      if (!silent) {
+        alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
+      }
     } catch (err: any) {
-      alert('Lỗi lưu Supabase: ' + err.message);
+      if (!silent) alert('Lỗi lưu Supabase: ' + err.message);
     }
   };
 
@@ -3146,6 +3154,7 @@ export function App() {
           <CustomizerModal
             isOpen={customizerModalOpen}
             siteConfig={siteConfig}
+            categories={categories}
             articles={articles}
             onClose={() => setCustomizerModalOpen(false)}
             onSave={handleSaveCustomizer}
@@ -3159,6 +3168,7 @@ export function App() {
             articleToEdit={postModal.articleToEdit}
             currentUser={currentUser}
             siteConfig={siteConfig}
+            categories={categories}
             onClose={() => setPostModal({ isOpen: false, section: 'ctd', articleToEdit: null })}
             onSubmitArticle={handlePostArticle}
             onUpdateArticle={handleUpdateArticle}
@@ -3220,8 +3230,7 @@ export function App() {
           <CategoryManagerModal
             isOpen={isCategoryModalOpen}
             onClose={() => setIsCategoryModalOpen(false)}
-            onSave={handleSaveCategories}
-            onSaveCategories={handleSaveCategories}
+            onSave={(updated) => handleSaveCategories(updated, true)}
             categories={categories}
             initialCategories={categories}
           />

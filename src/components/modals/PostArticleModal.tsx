@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   AlignLeft,
   AlignRight,
@@ -25,20 +25,22 @@ import {
   SiteConfig,
   User,
 } from '../../types';
-import { defaultSiteConfig, MILITARY_FALLBACK_BANNER } from '../../data/initialData';
+import { defaultCategoriesConfig, defaultSiteConfig, MILITARY_FALLBACK_BANNER } from '../../data/initialData';
 import { compressImageFile, optimizeArticleImagesPayload, validateImageFile } from '../../utils/imageUtils';
 import { toast } from '../Toast';
 
-interface PostArticleModalProps {
+export interface PostArticleModalProps {
   isOpen: boolean;
   sectionKey: SectionType;
   currentUser: User | null;
   siteConfig?: SiteConfig;
+  categories?: any[];
   articleToEdit?: Article | null;
   onClose: () => void;
   onSubmitArticle: (data: {
     title: string;
     category: string;
+    subCategory?: string;
     author: string;
     image: string;
     images?: ArticleImage[];
@@ -60,6 +62,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   sectionKey,
   currentUser,
   siteConfig,
+  categories: categoriesProp,
   articleToEdit = null,
   onClose,
   onSubmitArticle,
@@ -69,9 +72,31 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const activeSessionTargetRef = useRef<string | null>(null);
 
-  const [selectedSection, setSelectedSection] = useState<SectionType>(sectionKey);
+  // Dynamic Categories source list (BẮT BUỘC ĐỒNG BỘ ĐỘNG THEO YÊU CẦU)
+  const categories: any[] = useMemo(() => {
+    const raw =
+      (categoriesProp && Array.isArray(categoriesProp) && categoriesProp.length > 0
+        ? categoriesProp
+        : null) ||
+      siteConfig?.categories_config ||
+      (siteConfig as any)?.categoriesConfig ||
+      (siteConfig as any)?.categories ||
+      defaultCategoriesConfig ||
+      [];
+    const list = Array.isArray(raw) ? raw : [];
+    return list.filter((c: any) => c && c.id !== 'meeting' && c.targetPage !== 'meeting');
+  }, [categoriesProp, siteConfig]);
+
+  // Form State: Chuyên mục xuất bản (*) & Thể loại / tiểu mục (*)
+  const [formData, setFormData] = useState<{
+    category: string;
+    subCategory: string;
+  }>({
+    category: '',
+    subCategory: '',
+  });
+
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
   const [author, setAuthor] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [articleImages, setArticleImages] = useState<ArticleImage[]>([]);
@@ -87,19 +112,22 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
 
   const isEditing = Boolean(articleToEdit);
 
-  const categoriesList = siteConfig?.categories_config || (siteConfig as any)?.categoriesConfig || (siteConfig as any)?.categories;
-  const configuredCategory = Array.isArray(categoriesList)
-    ? categoriesList.find((c: any) => c.id === selectedSection)
-    : undefined;
+  // Resolved Category Object & SectionKey
+  const currentCatObj = useMemo(() => {
+    return categories.find(
+      (c: any) => c.name === formData.category || c.id === formData.category
+    );
+  }, [categories, formData.category]);
 
-  const currentSectionConfig =
-    siteConfig?.sections?.[selectedSection] || defaultSiteConfig.sections[selectedSection];
-  const rawCats = configuredCategory?.subcategories && configuredCategory.subcategories.length > 0
-    ? configuredCategory.subcategories
-    : currentSectionConfig?.categories || [];
-  const categories: string[] = (Array.isArray(rawCats) ? rawCats : [])
-    .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.label || c?.shortLabel || String(c || ''))))
-    .filter(Boolean);
+  const selectedSection = (currentCatObj?.id ||
+    currentCatObj?.targetPage ||
+    (formData.category === 'Học tập và làm theo Bác'
+      ? 'bac'
+      : formData.category === 'Huấn luyện - Sẵn sàng chiến đấu'
+      ? 'hl'
+      : 'ctd')) as SectionType;
+
+  const category = formData.subCategory || formData.category;
 
   // Initialize form state ONLY when modal transitions from closed to open or a different article is selected
   useEffect(() => {
@@ -135,12 +163,44 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       console.warn('Could not parse localStorage draft', e);
     }
 
+    // Resolve initial category & subcategory dynamically from categories list
+    let initialParent = '';
+    let initialSub = '';
+
     if (articleToEdit) {
+      const matchCat = categories.find(
+        (c: any) =>
+          c.id === articleToEdit.sectionKey ||
+          c.targetPage === articleToEdit.sectionKey ||
+          c.name === articleToEdit.sectionKey ||
+          (Array.isArray(c.subcategories) &&
+            c.subcategories.some(
+              (sub: any) =>
+                (typeof sub === 'string' ? sub : sub?.name || '').toLowerCase() ===
+                (articleToEdit.category || '').toLowerCase()
+            ))
+      );
+
+      if (matchCat) {
+        initialParent = matchCat.name;
+        initialSub =
+          articleToEdit.subCategory ||
+          articleToEdit.category ||
+          (matchCat.subcategories?.[0] &&
+            (typeof matchCat.subcategories[0] === 'string'
+              ? matchCat.subcategories[0]
+              : matchCat.subcategories[0]?.name)) ||
+          '';
+      } else {
+        initialParent = categories[0]?.name || '';
+        initialSub = articleToEdit.subCategory || articleToEdit.category || '';
+      }
+
       // If there's a draft that is newer or has unsaved edits, we can restore it
       if (savedDraft && (savedDraft.title || savedDraft.content)) {
-        setSelectedSection(savedDraft.sectionKey || articleToEdit.sectionKey);
+        if (savedDraft.category) initialParent = savedDraft.category;
+        if (savedDraft.subCategory) initialSub = savedDraft.subCategory;
         setTitle(savedDraft.title || articleToEdit.title || '');
-        setCategory(savedDraft.category || articleToEdit.category || '');
         setAuthor(savedDraft.author || articleToEdit.author || '');
         setImageUrl(savedDraft.imageUrl || articleToEdit.image || '');
         setEmbedCode(savedDraft.embedCode || articleToEdit.embedCode || '');
@@ -158,9 +218,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setStatus(savedDraft.status || articleToEdit.status || 'approved');
         setDraftRestored(true);
       } else {
-        setSelectedSection(articleToEdit.sectionKey);
         setTitle(articleToEdit.title || '');
-        setCategory(articleToEdit.category || '');
         setAuthor(articleToEdit.author || '');
         setImageUrl(articleToEdit.image || '');
         setEmbedCode(articleToEdit.embedCode || '');
@@ -176,11 +234,28 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setStatus(articleToEdit.status || 'approved');
       }
     } else {
+      // New article: match with sectionKey prop
+      const matchCat =
+        categories.find(
+          (c: any) =>
+            c.id === sectionKey ||
+            c.targetPage === sectionKey ||
+            c.name === sectionKey
+        ) || categories[0];
+
+      initialParent = matchCat?.name || categories[0]?.name || '';
+      initialSub =
+        (matchCat?.subcategories?.[0] &&
+          (typeof matchCat.subcategories[0] === 'string'
+            ? matchCat.subcategories[0]
+            : matchCat.subcategories[0]?.name)) ||
+        '';
+
       // New article draft check
       if (savedDraft && (savedDraft.title || savedDraft.content || savedDraft.excerpt)) {
-        setSelectedSection(savedDraft.sectionKey || sectionKey);
+        if (savedDraft.category) initialParent = savedDraft.category;
+        if (savedDraft.subCategory) initialSub = savedDraft.subCategory;
         setTitle(savedDraft.title || '');
-        setCategory(savedDraft.category || categories[0] || 'Tin tức hoạt động');
         setAuthor(
           savedDraft.author ||
             (currentUser ? `${currentUser.fullName} (${currentUser.rankUnit})` : '')
@@ -193,12 +268,6 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setStatus(savedDraft.status || 'approved');
         setDraftRestored(true);
       } else {
-        setSelectedSection(sectionKey);
-        const defaultCats =
-          siteConfig?.sections?.[sectionKey]?.categories ||
-          defaultSiteConfig.sections[sectionKey]?.categories ||
-          [];
-        setCategory(defaultCats[0] || 'Tin tức hoạt động');
         if (currentUser) {
           setAuthor(`${currentUser.fullName} (${currentUser.rankUnit})`);
         } else {
@@ -213,6 +282,11 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         setStatus('approved');
       }
     }
+
+    setFormData({
+      category: initialParent,
+      subCategory: initialSub,
+    });
   }, [isOpen, articleToEdit]);
 
   // Real-time Auto-save Draft to localStorage while typing
@@ -221,14 +295,15 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     const draftKey = getDraftKey(articleToEdit ? articleToEdit.id : null);
 
     // If there is any content, save to localStorage
-    if (title || content || excerpt || author || imageUrl || articleImages.length > 0 || embedCode) {
+    if (title || content || excerpt || author || imageUrl || articleImages.length > 0 || embedCode || formData.category) {
       try {
         localStorage.setItem(
           draftKey,
           JSON.stringify({
             sectionKey: selectedSection,
             title,
-            category,
+            category: formData.category,
+            subCategory: formData.subCategory,
             author,
             imageUrl,
             articleImages,
@@ -248,7 +323,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     articleToEdit,
     selectedSection,
     title,
-    category,
+    formData,
     author,
     imageUrl,
     articleImages,
@@ -257,18 +332,6 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     embedCode,
     status,
   ]);
-
-  // When section changes, ensure valid category
-  const handleSectionChange = (newSec: SectionType) => {
-    setSelectedSection(newSec);
-    const newCats =
-      siteConfig?.sections?.[newSec]?.categories ||
-      defaultSiteConfig.sections[newSec]?.categories ||
-      [];
-    if (!newCats.includes(category)) {
-      setCategory(newCats[0] || '');
-    }
-  };
 
   // Handle single / main image upload with auto compression
   const handleMainImageFileUpload = async (file: File) => {
@@ -393,6 +456,10 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
     e.preventDefault();
     setFormError(null);
 
+    if (!formData.category.trim()) {
+      setFormError('Vui lòng chọn Chuyên mục xuất bản (*)!');
+      return;
+    }
     if (!title.trim()) {
       setFormError('Vui lòng nhập tiêu đề bài viết (*)!');
       return;
@@ -439,16 +506,23 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
       });
 
       const finalCategoryStr = (
-        typeof category === 'string'
-          ? category
-          : (category as any)?.name || (category as any)?.label || categories[0] || 'Thông tin chung'
+        formData.subCategory.trim() ||
+        formData.category.trim() ||
+        (currentCatObj?.subcategories?.[0] &&
+          (typeof currentCatObj.subcategories[0] === 'string'
+            ? currentCatObj.subcategories[0]
+            : currentCatObj.subcategories[0]?.name)) ||
+        'Tin tức hoạt động'
       ).trim();
+
+      const finalSubCategoryStr = (formData.subCategory || finalCategoryStr).trim();
 
       if (isEditing && articleToEdit && onUpdateArticle) {
         const updated: Article = {
           ...articleToEdit,
           title: title.trim(),
           category: finalCategoryStr,
+          subCategory: finalSubCategoryStr,
           author: author.trim(),
           image: finalImage,
           images: finalImagesList,
@@ -466,6 +540,7 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
         const res = await onSubmitArticle({
           title: title.trim(),
           category: finalCategoryStr,
+          subCategory: finalSubCategoryStr,
           author: author.trim(),
           image: finalImage,
           images: finalImagesList,
@@ -620,20 +695,34 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
-          {/* Section & Category Selection */}
+          {/* Section & Category Selection (ĐỒNG BỘ ĐỘNG THEO YÊU CẦU NGƯỜI DÙNG) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block font-bold text-gray-700 mb-1">
                 Chuyên mục xuất bản (*):
               </label>
               <select
-                value={selectedSection}
-                onChange={(e) => handleSectionChange(e.target.value as SectionType)}
+                value={formData.category}
+                onChange={(e) => {
+                  const newCat = e.target.value;
+                  // Tự động tìm danh mục mới và gán tiểu mục đầu tiên tương ứng
+                  const catObj = categories.find((c: any) => c.name === newCat || c.id === newCat);
+                  const firstSub =
+                    (catObj?.subcategories?.[0] &&
+                      (typeof catObj.subcategories[0] === 'string'
+                        ? catObj.subcategories[0]
+                        : catObj.subcategories[0]?.name)) ||
+                    '';
+                  setFormData({ ...formData, category: newCat, subCategory: firstSub });
+                }}
                 className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold"
               >
-                <option value="ctd">Công tác Đảng - CTCT</option>
-                <option value="hl">Huấn luyện - Sẵn sàng chiến đấu</option>
-                <option value="bac">Học tập và làm theo Bác</option>
+                <option value="">-- Chọn chuyên mục --</option>
+                {categories.map((c: any) => (
+                  <option key={c.id || c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -641,17 +730,28 @@ export const PostArticleModal: React.FC<PostArticleModalProps> = ({
               <label className="block font-bold text-gray-700 mb-1">
                 Thể loại bài viết (*):
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold"
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              {(() => {
+                const currentCat = categories.find(
+                  (c: any) => c.name === formData.category || c.id === formData.category
+                );
+                const subList: string[] = (currentCat?.subcategories || []).map((sub: any) =>
+                  typeof sub === 'string' ? sub : sub?.name || String(sub)
+                );
+                return (
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold"
+                  >
+                    <option value="">-- Chọn thể loại / tiểu mục --</option>
+                    {subList.map((sub: string) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
             </div>
           </div>
 

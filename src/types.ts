@@ -72,7 +72,7 @@ export interface User {
   canViewCollaborativeEdits?: boolean;
 }
 
-export type SectionType = 'ctd' | 'hl' | 'bac';
+export type SectionType = 'ctd' | 'hl' | 'bac' | string;
 
 export type ArticleImagePosition =
   | 'top'
@@ -94,6 +94,7 @@ export interface Article {
   id: number;
   title: string;
   category: string;
+  subCategory?: string;
   author: string;
   date: string;
   image: string;
@@ -143,6 +144,10 @@ export interface CategoryConfig {
   name: string; // Tên đầy đủ của chuyên mục (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'Công tác Đảng - CTCT')
   navName: string; // Tên hiển thị viết tắt trên Menu Navbar (vd: 'TUYÊN TRUYỀN GIÁO DỤC', 'CTĐ - CTCT')
   shortLabel?: string;
+  short_name?: string;
+  nav_title?: string;
+  title?: string;
+  label?: string;
   description?: string; // Mô tả định hướng nội dung
   subcategories: string[]; // Danh sách các tiểu mục con (vd: ['CTĐ - CTCT', 'Công tác Quân sự', 'Công tác Hậu cần - Kỹ thuật', '500 ngày đêm'])
   sectionKey?: SectionType | string;
@@ -150,6 +155,7 @@ export interface CategoryConfig {
   type?: 'internal' | 'external';
   externalUrl?: string;
   openNewTab?: boolean;
+  hidden?: boolean;
   enabled?: boolean;
   order?: number;
 }
@@ -499,4 +505,5 @@ export type PageView =
   | 'approvals'
   | 'users'
   | 'article_detail'
-  | 'article-detail';
+  | 'article-detail'
+  | string;
