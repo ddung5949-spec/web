@@ -2863,6 +2863,8 @@ export function App() {
         categories={categories}
         currentUser={currentUser}
         roles={roles}
+        currentPage={currentPage}
+        pendingDraftsCount={pendingDraftsCount}
         onOpenAuth={(tab) => setAuthModal({ isOpen: true, tab })}
         onOpenProfile={() => setProfileModalOpen(true)}
         onLogout={handleLogout}
