@@ -53,8 +53,9 @@ import {
   UncleHoQuote,
   UncleHoSettings,
   User,
+  CategoryConfig,
 } from '../types';
-import { defaultHomeCategoryColumns, defaultSidebarWidgets } from '../data/initialData';
+import { defaultCategoriesConfig, defaultSidebarWidgets } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
 import { DailyWidgetsSection } from './DailyWidgetsSection';
 import { DailyPosterWidget } from './DailyPosterWidget';
@@ -63,7 +64,6 @@ import { HomeLatestNewsWidget } from './HomeLatestNewsWidget';
 import { HomeMiddleFeaturedSlider } from './HomeMiddleFeaturedSlider';
 import { HomeQuickActionsWidget } from './HomeQuickActionsWidget';
 import { HomeSpotlightSection } from './HomeSpotlightSection';
-import { HomeGallerySection } from './HomeGallerySection';
 import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
 import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
@@ -79,6 +79,7 @@ interface HomeViewProps {
   dailyPosters?: Record<string, any>;
   currentUser?: User | null;
   siteConfig?: SiteConfig;
+  categories?: CategoryConfig[];
   isLoading?: boolean;
   onOpenArticle: (article: Article) => void;
   onSelectSection: (section: PageView) => void;
@@ -111,6 +112,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   },
   currentUser = null,
   siteConfig,
+  categories,
   dailyPosters: propsDailyPosters,
   isLoading = false,
   onOpenArticle,
@@ -367,11 +369,73 @@ export const HomeView: React.FC<HomeViewProps> = ({
     },
   ];
 
-  // Dynamic Category Columns from siteConfig or default
-  const configuredColumns: HomeCategoryColumn[] =
-    siteConfig?.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
-      ? siteConfig.homeCategoryColumns
-      : defaultHomeCategoryColumns;
+  // Lấy danh sách chuyên mục động thực tế từ hệ thống (từ Tab 3, Tab 4)
+  const availableCategories: CategoryConfig[] = React.useMemo(() => {
+    const raw =
+      (Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      (Array.isArray(siteConfig?.categories_config) && siteConfig.categories_config.length > 0
+        ? siteConfig.categories_config
+        : null) ||
+      (Array.isArray(siteConfig?.categories) && siteConfig.categories.length > 0
+        ? (siteConfig.categories as any[])
+        : null) ||
+      defaultCategoriesConfig;
+    return raw.filter((c: any) => c && typeof c === 'object');
+  }, [categories, siteConfig?.categories_config, siteConfig?.categories]);
+
+  // Tạo danh sách cột chuyên mục mặc định đồng bộ 100% theo categories thực tế (loại bỏ 3 danh mục tĩnh cũ)
+  const defaultDynamicColumns: HomeCategoryColumn[] = React.useMemo(() => {
+    const validCats = availableCategories.filter(
+      (c) => c.enabled !== false && c.type !== 'external'
+    );
+    const colorPresets = ['bg-red-800', 'bg-emerald-800', 'bg-amber-800', 'bg-blue-800', 'bg-indigo-900', 'bg-slate-900'];
+    return validCats.map((cat, idx) => ({
+      id: `col-${cat.id}`,
+      title: cat.name,
+      subtitle:
+        Array.isArray(cat.subcategories) && cat.subcategories.length > 0
+          ? cat.subcategories.join(' • ')
+          : cat.description || '',
+      type: 'category_articles',
+      sectionKey: cat.id,
+      categoryFilter: 'all',
+      articleLimit: 5,
+      headerBgColor: colorPresets[idx % colorPresets.length],
+      headerTextColor: 'text-amber-200',
+      iconName: idx % 3 === 0 ? 'flag' : idx % 3 === 1 ? 'crosshair' : 'heart',
+      enabled: true,
+      colSpan: '1',
+      heightMode: 'auto',
+    }));
+  }, [availableCategories]);
+
+  // Dynamic Category Columns from siteConfig (home_layout hoặc homeCategoryColumns) or dynamic default
+  const configuredColumns: HomeCategoryColumn[] = React.useMemo(() => {
+    const rawCols =
+      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
+        ? (siteConfig as any).home_layout
+        : siteConfig?.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
+        ? siteConfig.homeCategoryColumns
+        : defaultDynamicColumns;
+
+    return rawCols.map((col: HomeCategoryColumn) => {
+      if (col.type === 'embed_code') return col;
+      const matched = availableCategories.find(
+        (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+      );
+      if (matched) {
+        return {
+          ...col,
+          title: matched.name || col.title,
+          subtitle:
+            Array.isArray(matched.subcategories) && matched.subcategories.length > 0
+              ? matched.subcategories.join(' • ')
+              : col.subtitle || '',
+        };
+      }
+      return col;
+    });
+  }, [(siteConfig as any)?.home_layout, siteConfig?.homeCategoryColumns, defaultDynamicColumns, availableCategories]);
 
   const activeColumns = configuredColumns
     .filter((col) => col.enabled !== false)
@@ -845,19 +909,36 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             {activeColumns.map((col) => {
               const isEmbed = col.type === 'embed_code';
+              const matchedCat = availableCategories.find(
+                (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+              );
+              const displayTitle = matchedCat?.name || col.title;
+              const displaySubtitle =
+                matchedCat && Array.isArray(matchedCat.subcategories) && matchedCat.subcategories.length > 0
+                  ? matchedCat.subcategories.join(' • ')
+                  : col.subtitle;
+
               const colArticles = isEmbed
                 ? []
                 : approvedArticles
                     .filter((a) => {
-                      const matchSection = !col.sectionKey || a.sectionKey === col.sectionKey || (!a.sectionKey && col.sectionKey === 'ctd');
+                      const matchSection =
+                        !col.sectionKey ||
+                        a.sectionKey === col.sectionKey ||
+                        (!a.sectionKey && col.sectionKey === 'ctd') ||
+                        (matchedCat && (a.sectionKey === matchedCat.id || a.category === matchedCat.name || a.category === matchedCat.navName));
+
+                      const filterVal = (col.categoryFilter || '').trim().toLowerCase();
                       const matchCategory =
-                        !col.categoryFilter ||
-                        col.categoryFilter === 'all' ||
+                        !filterVal ||
+                        filterVal === 'all' ||
                         !a.category ||
-                        a.category.trim().toLowerCase() === col.categoryFilter.trim().toLowerCase();
+                        a.category.trim().toLowerCase() === filterVal ||
+                        a.category.toLowerCase().includes(filterVal);
+
                       return matchSection && matchCategory;
                     })
-                    .slice(0, col.articleLimit || 4);
+                    .slice(0, col.articleLimit || 5);
 
               const colSpanClass =
                 col.colSpan === 'full' || col.colSpan === '3'
@@ -885,7 +966,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             col.headerTextColor || 'text-gray-900'
                           } truncate font-extrabold`}
                         >
-                          {col.title}
+                          {displayTitle}
                         </span>
                       </div>
                       {col.sectionKey && (
@@ -900,9 +981,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </div>
 
                     {/* Subtitle if any */}
-                    {col.subtitle && (
+                    {displaySubtitle && (
                       <div className="px-3.5 py-1 bg-gray-50/70 border-b border-gray-100 text-[10px] text-gray-500 truncate">
-                        {col.subtitle}
+                        {displaySubtitle}
                       </div>
                     )}
 
@@ -960,7 +1041,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         onClick={() => onSelectSection(col.sectionKey as PageView)}
                         className="text-[11px] font-bold text-teal-800 hover:text-teal-950 inline-flex items-center gap-1 cursor-pointer transition-colors"
                       >
-                        <span>Vào chuyên mục {col.title}</span>
+                        <span>Vào chuyên mục {displayTitle}</span>
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     ) : isEmbed && col.embedUrl ? (
@@ -985,11 +1066,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* ========================================================
-          ALBUM ẢNH TRUYỀN THỐNG (LẤY TỪ BẢNG 'gallery' SUPABASE)
-         ======================================================== */}
-      <HomeGallerySection currentUser={currentUser || null} />
 
       {/* ========================================================
           3. QUICK LIBRARY & LEARNING ASSETS PREVIEW
@@ -1110,6 +1186,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <HomeSectionManagerModal
           isOpen={isSectionManagerModalOpen}
           siteConfig={siteConfig}
+          categories={availableCategories}
           onClose={() => setIsSectionManagerModalOpen(false)}
           onSaveColumns={(columns) => {
             if (onSaveHomeCategoryColumns) {

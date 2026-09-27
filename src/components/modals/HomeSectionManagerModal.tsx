@@ -26,13 +26,15 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { defaultHomeCategoryColumns } from '../../data/initialData';
-import { HomeCategoryColumn, SectionType, SiteConfig } from '../../types';
+import { defaultCategoriesConfig } from '../../data/initialData';
+import { CategoryConfig, HomeCategoryColumn, SectionType, SiteConfig } from '../../types';
 import { toast } from '../Toast';
+import { getSupabase, supabase } from '../../utils/supabase';
 
-interface HomeSectionManagerModalProps {
+export interface HomeSectionManagerModalProps {
   isOpen: boolean;
   siteConfig: SiteConfig;
+  categories?: CategoryConfig[];
   onClose: () => void;
   onSaveColumns: (columns: HomeCategoryColumn[]) => void;
 }
@@ -62,15 +64,85 @@ const ICON_OPTIONS = [
 export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = ({
   isOpen,
   siteConfig,
+  categories,
   onClose,
   onSaveColumns,
 }) => {
-  const currentColumns =
-    siteConfig.homeCategoryColumns !== undefined
-      ? siteConfig.homeCategoryColumns
-      : defaultHomeCategoryColumns;
+  // Lấy danh sách chuyên mục động thực tế từ hệ thống (ưu tiên categories prop, rồi siteConfig.categories_config)
+  const availableCategories: CategoryConfig[] = React.useMemo(() => {
+    const raw =
+      (Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      (Array.isArray(siteConfig.categories_config) && siteConfig.categories_config.length > 0
+        ? siteConfig.categories_config
+        : null) ||
+      (Array.isArray(siteConfig.categories) && siteConfig.categories.length > 0
+        ? (siteConfig.categories as any[])
+        : null) ||
+      defaultCategoriesConfig;
+    return raw.filter((c: any) => c && typeof c === 'object');
+  }, [categories, siteConfig.categories_config, siteConfig.categories]);
 
-  const [columns, setColumns] = useState<HomeCategoryColumn[]>(currentColumns);
+  // Tạo danh sách cột chuyên mục mặc định đồng bộ 100% theo categories thực tế (Không dùng 3 danh mục tĩnh cũ)
+  const getDefaultDynamicColumns = React.useCallback((): HomeCategoryColumn[] => {
+    const validCats = availableCategories.filter(
+      (c) => c.enabled !== false && c.type !== 'external'
+    );
+    const colorPresets = ['bg-red-800', 'bg-emerald-800', 'bg-amber-800', 'bg-blue-800', 'bg-indigo-900', 'bg-slate-900'];
+    return validCats.map((cat, idx) => ({
+      id: `col-${cat.id}`,
+      title: cat.name,
+      subtitle:
+        Array.isArray(cat.subcategories) && cat.subcategories.length > 0
+          ? cat.subcategories.join(' • ')
+          : cat.description || '',
+      type: 'category_articles',
+      sectionKey: cat.id,
+      categoryFilter: 'all',
+      articleLimit: 5,
+      headerBgColor: colorPresets[idx % colorPresets.length],
+      headerTextColor: 'text-amber-200',
+      iconName: idx % 3 === 0 ? 'flag' : idx % 3 === 1 ? 'crosshair' : 'heart',
+      enabled: true,
+      colSpan: '1',
+      heightMode: 'auto',
+    }));
+  }, [availableCategories]);
+
+  // Hàm tự động đồng bộ tên và tiểu mục mới nhất từ Tab 3, Tab 4 vào các cột
+  const syncColumnsWithCategories = React.useCallback(
+    (cols: HomeCategoryColumn[]): HomeCategoryColumn[] => {
+      return cols.map((col) => {
+        if (col.type === 'embed_code') return col;
+        const matched = availableCategories.find(
+          (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+        );
+        if (matched) {
+          return {
+            ...col,
+            title: matched.name || col.title,
+            subtitle:
+              Array.isArray(matched.subcategories) && matched.subcategories.length > 0
+                ? matched.subcategories.join(' • ')
+                : col.subtitle || '',
+          };
+        }
+        return col;
+      });
+    },
+    [availableCategories]
+  );
+
+  const getInitialColumns = (): HomeCategoryColumn[] => {
+    const rawCols =
+      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
+        ? (siteConfig as any).home_layout
+        : siteConfig.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
+        ? siteConfig.homeCategoryColumns
+        : getDefaultDynamicColumns();
+    return syncColumnsWithCategories(rawCols);
+  };
+
+  const [columns, setColumns] = useState<HomeCategoryColumn[]>(getInitialColumns);
   const [editingCol, setEditingCol] = useState<HomeCategoryColumn | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -80,7 +152,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const [formTitle, setFormTitle] = useState('');
   const [formSubtitle, setFormSubtitle] = useState('');
   const [formSectionKey, setFormSectionKey] = useState<SectionType | string>('ctd');
-  const [formCategoryFilter, setFormCategoryFilter] = useState('');
+  const [formCategoryFilter, setFormCategoryFilter] = useState('all');
   const [formEmbedCode, setFormEmbedCode] = useState('');
   const [formHeaderBgColor, setFormHeaderBgColor] = useState('bg-red-800');
   const [formIconName, setFormIconName] = useState('flag');
@@ -89,24 +161,80 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const [formHeightMode, setFormHeightMode] = useState<'auto' | 'compact' | 'expanded'>('auto');
 
   React.useEffect(() => {
-    if (siteConfig.homeCategoryColumns !== undefined) {
-      setColumns(siteConfig.homeCategoryColumns);
-    } else {
-      setColumns(defaultHomeCategoryColumns);
-    }
-  }, [siteConfig.homeCategoryColumns, isOpen]);
+    const rawCols =
+      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
+        ? (siteConfig as any).home_layout
+        : siteConfig.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
+        ? siteConfig.homeCategoryColumns
+        : getDefaultDynamicColumns();
+    setColumns(syncColumnsWithCategories(rawCols));
+  }, [siteConfig.homeCategoryColumns, (siteConfig as any)?.home_layout, availableCategories, isOpen]);
 
   if (!isOpen) return null;
+
+  // Lưu trực tiếp lên Supabase và cập nhật State Trang chủ
+  const persistColumns = async (updated: HomeCategoryColumn[]) => {
+    setColumns(updated);
+    onSaveColumns(updated);
+    try {
+      localStorage.setItem('cached_home_layout', JSON.stringify(updated));
+      localStorage.setItem('cached_home_category_columns', JSON.stringify(updated));
+    } catch {}
+
+    try {
+      const client = supabase || getSupabase();
+      if (client) {
+        let { error } = await client
+          .from('site_config')
+          .upsert(
+            {
+              id: 'default',
+              home_layout: updated,
+              home_category_columns: updated,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+
+        if (error) {
+          await client
+            .from('site_config')
+            .upsert(
+              {
+                id: 'default',
+                home_layout: updated,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+        }
+      }
+    } catch (err) {
+      console.warn('[HomeSectionManagerModal] Supabase save warning:', err);
+    }
+  };
 
   const handleStartCreate = (type: 'category_articles' | 'embed_code' = 'category_articles') => {
     setIsCreating(true);
     setEditingCol(null);
     setConfirmDeleteId(null);
     setFormType(type);
-    setFormTitle(type === 'embed_code' ? 'BẢN TIN NHÚNG TRUYỀN HÌNH / BÁO CHÍ' : 'CHUYÊN MỤC TIN MỚI');
-    setFormSubtitle(type === 'embed_code' ? 'Khung phát sóng hoặc tin tức nhúng từ nguồn ngoài' : 'Tổng hợp các bài viết mới');
-    setFormSectionKey('ctd');
-    setFormCategoryFilter('');
+    const firstCat = availableCategories[0];
+    const initialKey = firstCat ? firstCat.id : 'ctd';
+    setFormSectionKey(initialKey);
+    setFormTitle(
+      type === 'embed_code'
+        ? 'BẢN TIN NHÚNG TRUYỀN HÌNH / BÁO CHÍ'
+        : firstCat?.name || 'CHUYÊN MỤC TIN MỚI'
+    );
+    setFormSubtitle(
+      type === 'embed_code'
+        ? 'Khung phát sóng hoặc tin tức nhúng từ nguồn ngoài'
+        : Array.isArray(firstCat?.subcategories) && firstCat.subcategories.length > 0
+        ? firstCat.subcategories.join(' • ')
+        : ''
+    );
+    setFormCategoryFilter('all');
     setFormEmbedCode(
       type === 'embed_code'
         ? '<div class="p-4 bg-slate-900 text-white rounded-xl text-center"><p class="text-sm font-bold text-amber-300">Khung truyền thông / Video nhúng</p><p class="text-xs text-gray-300 mt-1">Dán thẻ iframe, YouTube embed hoặc mã nhúng HTML vào đây</p></div>'
@@ -124,10 +252,17 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
     setIsCreating(false);
     setConfirmDeleteId(null);
     setFormType(col.type || 'category_articles');
-    setFormTitle(col.title);
-    setFormSubtitle(col.subtitle || '');
-    setFormSectionKey(col.sectionKey || 'ctd');
-    setFormCategoryFilter(col.categoryFilter || '');
+    const matched = availableCategories.find(
+      (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+    );
+    setFormTitle(matched?.name || col.title);
+    setFormSubtitle(
+      Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
+        ? matched.subcategories.join(' • ')
+        : col.subtitle || ''
+    );
+    setFormSectionKey(col.sectionKey || availableCategories[0]?.id || 'ctd');
+    setFormCategoryFilter(col.categoryFilter || 'all');
     setFormEmbedCode(col.embedCode || col.embedHtml || '');
     setFormHeaderBgColor(col.headerBgColor || 'bg-red-800');
     setFormIconName(col.iconName || 'flag');
@@ -136,7 +271,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
     setFormHeightMode(col.heightMode || 'auto');
   };
 
-  const handleSaveForm = (e: React.FormEvent) => {
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim()) {
       toast.warning('Thiếu thông tin', 'Vui lòng nhập tiêu đề chuyên mục!');
@@ -168,46 +303,43 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
       updated = [...columns, payload];
     }
 
-    setColumns(updated);
-    onSaveColumns(updated);
+    await persistColumns(updated);
+    toast.success('Thành công', editingCol ? 'Đã cập nhật chuyên mục' : 'Đã thêm chuyên mục mới');
     setEditingCol(null);
     setIsCreating(false);
   };
 
-  const handleDeleteColumn = (id: string) => {
+  const handleDeleteColumn = async (id: string) => {
     const updated = columns.filter((c) => c.id !== id);
-    setColumns(updated);
-    onSaveColumns(updated);
+    await persistColumns(updated);
     if (editingCol?.id === id) {
       setEditingCol(null);
     }
     setConfirmDeleteId(null);
+    toast.info('Đã xóa', 'Đã xóa khối chuyên mục khỏi trang chủ');
   };
 
-  const handleToggleColumn = (id: string) => {
-    const updated = columns.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c));
-    setColumns(updated);
-    onSaveColumns(updated);
+  const handleToggleColumn = async (id: string) => {
+    const updated = columns.map((c) => (c.id === id ? { ...c, enabled: c.enabled === false } : c));
+    await persistColumns(updated);
   };
 
-  const handleMoveUp = (index: number) => {
+  const handleMoveUp = async (index: number) => {
     if (index <= 0) return;
     const updated = [...columns];
     const temp = updated[index - 1];
     updated[index - 1] = updated[index];
     updated[index] = temp;
-    setColumns(updated);
-    onSaveColumns(updated);
+    await persistColumns(updated);
   };
 
-  const handleMoveDown = (index: number) => {
+  const handleMoveDown = async (index: number) => {
     if (index >= columns.length - 1) return;
     const updated = [...columns];
     const temp = updated[index + 1];
     updated[index + 1] = updated[index];
     updated[index] = temp;
-    setColumns(updated);
-    onSaveColumns(updated);
+    await persistColumns(updated);
   };
 
   return (
@@ -224,7 +356,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                 Quản lý Chuyên mục & Nội dung nhúng Trang chủ
               </h3>
               <p className="text-[11px] text-white/80">
-                Tùy biến kích thước, số bài viết, chiều cao tự động và nhúng nguồn tin linh hoạt
+                Tự động đồng bộ theo danh mục và tiểu mục hệ thống, cập nhật trực tiếp lên CSDL
               </p>
             </div>
           </div>
@@ -282,30 +414,95 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                 </span>
               </div>
 
+              {/* Dynamic Category & Subcategory Selection */}
+              {formType === 'category_articles' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-red-50/50 rounded-xl border border-red-200">
+                  <div>
+                    <label className="block text-xs font-black text-red-950 mb-1 flex items-center justify-between">
+                      <span>CHỌN CHUYÊN MỤC HỆ THỐNG <span className="text-red-600">*</span></span>
+                      <span className="text-[10px] text-red-700 font-normal">Đồng bộ từ Tab 3 & 4</span>
+                    </label>
+                    <select
+                      value={formSectionKey}
+                      onChange={(e) => {
+                        const newKey = e.target.value;
+                        setFormSectionKey(newKey);
+                        const selCat = availableCategories.find((c) => c.id === newKey);
+                        if (selCat) {
+                          setFormTitle(selCat.name);
+                          setFormSubtitle(
+                            Array.isArray(selCat.subcategories) && selCat.subcategories.length > 0
+                              ? selCat.subcategories.join(' • ')
+                              : selCat.description || ''
+                          );
+                          setFormCategoryFilter('all');
+                        }
+                      }}
+                      className="w-full text-xs font-bold px-3 py-2 border border-red-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer shadow-2xs"
+                    >
+                      {availableCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name} ({cat.navName || cat.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-red-950 mb-1 flex items-center justify-between">
+                      <span>LỌC TIỂU MỤC CON</span>
+                      <span className="text-[10px] text-red-700 font-normal">Tự động theo chuyên mục</span>
+                    </label>
+                    {(() => {
+                      const currentSelectedCat = availableCategories.find(
+                        (c) => c.id === formSectionKey
+                      );
+                      const subList = currentSelectedCat?.subcategories || [];
+                      return (
+                        <select
+                          value={formCategoryFilter}
+                          onChange={(e) => setFormCategoryFilter(e.target.value)}
+                          className="w-full text-xs font-medium px-3 py-2 border border-red-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer shadow-2xs"
+                        >
+                          <option value="all">
+                            Tất cả bài viết trong chuyên mục ({currentSelectedCat?.name || formSectionKey})
+                          </option>
+                          {subList.map((sub, idx) => (
+                            <option key={idx} value={sub}>
+                              Tiểu mục: {sub}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
               {/* Title & Subtitle */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Tiêu đề chuyên mục <span className="text-red-600">*</span>
+                    Tiêu đề khối chuyên mục <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="VD: CÔNG TÁC ĐẢNG - CTCT, HUẤN LUYỆN & SSCĐ..."
+                    placeholder="VD: TUYÊN TRUYỀN GIÁO DỤC, THỰC HÀNH THEO BÁC..."
                     className="w-full text-xs font-bold px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Dòng mô tả phụ (Subtitle)
+                    Dòng mô tả tiểu mục phụ bên dưới
                   </label>
                   <input
                     type="text"
                     value={formSubtitle}
                     onChange={(e) => setFormSubtitle(e.target.value)}
-                    placeholder="VD: Tin tức tư tưởng & xây dựng Đảng..."
+                    placeholder="VD: Tiểu mục 1 • Tiểu mục 2 • Tiểu mục 3..."
                     className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
@@ -362,40 +559,6 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                   </select>
                 </div>
               </div>
-
-              {/* If Type is category_articles */}
-              {formType === 'category_articles' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Thuộc mục chính (Section)
-                    </label>
-                    <select
-                      value={formSectionKey}
-                      onChange={(e) => setFormSectionKey(e.target.value as SectionType)}
-                      className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-red-500 focus:outline-none cursor-pointer"
-                    >
-                      <option value="ctd">Công tác Đảng - CTCT (ctd)</option>
-                      <option value="hl">Huấn luyện & SSCĐ (hl)</option>
-                      <option value="bac">Học tập theo Bác (bac)</option>
-                      <option value="doc">Kho Văn bản - Chỉ thị (doc)</option>
-                      <option value="lecture">Bài giảng số hóa (lecture)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Lọc chuyên mục con (Tùy chọn)
-                    </label>
-                    <input
-                      type="text"
-                      value={formCategoryFilter}
-                      onChange={(e) => setFormCategoryFilter(e.target.value)}
-                      placeholder="Để trống để hiển thị tất cả các bài trong mục"
-                      className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* If Type is embed_code */}
               {formType === 'embed_code' && (
@@ -491,6 +654,15 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
           <div className="space-y-2">
             {columns.map((col, index) => {
               const isEmbed = col.type === 'embed_code';
+              const matched = availableCategories.find(
+                (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+              );
+              const displayTitle = matched?.name || col.title;
+              const displaySubtitle =
+                Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
+                  ? matched.subcategories.join(' • ')
+                  : col.subtitle;
+
               return (
                 <div
                   key={col.id}
@@ -512,7 +684,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-extrabold text-xs text-gray-900 uppercase truncate">
-                          {col.title}
+                          {displayTitle}
                         </span>
                         {col.colSpan && col.colSpan !== '1' && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
@@ -531,7 +703,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                         )}
                       </div>
                       <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                        {col.subtitle || (isEmbed ? 'Mã nhúng iframe / video' : `Section: ${col.sectionKey}`)}
+                        {displaySubtitle || (isEmbed ? 'Mã nhúng iframe / video' : `Mục: ${col.sectionKey}`)}
                       </p>
                     </div>
                   </div>
@@ -616,7 +788,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
 
         {/* Modal Footer */}
         <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
-          <span>* Chiều cao các chuyên mục tự động co giãn theo tin bài hiển thị thực tế.</span>
+          <span>* Các thay đổi được lưu tự động lên CSDL Supabase và cập nhật tức thì ngoài trang chủ.</span>
           <button
             type="button"
             onClick={onClose}

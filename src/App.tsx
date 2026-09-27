@@ -583,7 +583,10 @@ export function App() {
       if (config.footer_config) {
         mergedConfig.footer_config = config.footer_config;
       }
-      if (config.home_layout || config.layout_settings) {
+      if (Array.isArray(config.home_layout)) {
+        mergedConfig.homeCategoryColumns = config.home_layout;
+        (mergedConfig as any).home_layout = config.home_layout;
+      } else if (config.home_layout || config.layout_settings) {
         const rawLayout = config.home_layout || config.layout_settings;
         const normalizedLayout = {
           showUncleHoSection: true,
@@ -2484,15 +2487,58 @@ export function App() {
     await cloudStorage.saveSiteConfig(updatedConfig);
   };
 
-  // Home Category Columns Save Handler
+  // Home Category Columns Save Handler (LƯU VÀ CẬP NHẬT TRỰC TIẾP LÊN SUPABASE)
   const handleSaveHomeCategoryColumns = async (columns: HomeCategoryColumn[]) => {
+    // 1. Cập nhật tức thì vào State của Trang chủ để hiển thị ngay mà không cần F5
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       homeCategoryColumns: columns,
+      home_layout: columns as any,
     };
     setSiteConfig(updatedConfig);
+    try {
+      localStorage.setItem('cached_home_layout', JSON.stringify(columns));
+      localStorage.setItem('cached_home_category_columns', JSON.stringify(columns));
+      localStorage.setItem('cached_site_config', JSON.stringify(updatedConfig));
+      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+    } catch {}
+
+    // 2. Lưu trực tiếp lên Supabase
+    try {
+      const client = supabase || getSupabase();
+      if (client) {
+        let { error } = await client
+          .from('site_config')
+          .upsert(
+            {
+              id: 'default',
+              home_layout: columns,
+              home_category_columns: columns,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+
+        if (error) {
+          // Retry chỉ với home_layout nếu cột home_category_columns chưa tồn tại
+          await client
+            .from('site_config')
+            .upsert(
+              {
+                id: 'default',
+                home_layout: columns,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            );
+        }
+      }
+    } catch (err) {
+      console.error('[App] Error saving home_layout to Supabase:', err);
+    }
+
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu.');
+    showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu và đồng bộ thành công.');
   };
 
   // Master Categories & Tabbar Save Handler (BẮT BUỘC ĐẨY LÊN SUPABASE)
@@ -2917,6 +2963,7 @@ export function App() {
                 dailyPosters={dailyPosters}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
+                categories={categories}
                 isLoading={isLoadingData}
                 onOpenArticle={handleOpenArticle}
                 onSelectSection={handleSelectPage}
