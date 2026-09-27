@@ -32,6 +32,7 @@ interface HeaderProps {
   onLogout: () => void;
   onGoHome: () => void;
   onSelectPage?: (page: PageView) => void;
+  onSelectCategory?: (categoryId: string, subcategory?: string) => void;
   onOpenCustomizer?: () => void;
   onOpenUncleHoManager?: () => void;
   onOpenAnnouncementManager?: () => void;
@@ -48,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onGoHome,
   onSelectPage,
+  onSelectCategory,
   onOpenCustomizer,
   onOpenUncleHoManager,
   onOpenAnnouncementManager,
@@ -313,6 +315,20 @@ export const Header: React.FC<HeaderProps> = ({
                             <CheckSquare className="w-4 h-4 text-emerald-700 shrink-0" />
                             <span>Duyệt dự thảo tin bài</span>
                           </button>
+
+                          {onOpenCategoryManager && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsUserMenuOpen(false);
+                                onOpenCategoryManager();
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-gray-700 hover:bg-amber-50 hover:text-amber-900 rounded-lg transition-colors cursor-pointer text-left"
+                            >
+                              <Layers className="w-4 h-4 text-amber-700 shrink-0" />
+                              <span className="font-bold text-amber-900">QUẢN LÝ CHUYÊN MỤC</span>
+                            </button>
+                          )}
 
                           {onOpenCustomizer && (
                             <button

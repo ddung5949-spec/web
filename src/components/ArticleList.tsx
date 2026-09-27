@@ -45,20 +45,20 @@ export const ArticleList: React.FC<ArticleListProps> = ({
             onDelete={() => onDeleteArticle && onDeleteArticle(article.id)}
           />
         ))
+      ) : !searchQuery ? (
+        <div className="w-full py-16 text-center text-slate-500 font-medium bg-white rounded-lg border border-dashed border-slate-300 my-4">
+          Chưa có dữ liệu nào được đăng tải trong mục này.
+        </div>
       ) : (
         <div className="bg-white p-8 sm:p-10 text-center text-gray-500 rounded-xl border border-gray-200 space-y-3 shadow-2xs">
           <div className="w-12 h-12 rounded-full bg-red-50 text-red-700 flex items-center justify-center mx-auto">
             <BookOpen className="w-6 h-6" />
           </div>
           <h4 className="text-sm font-bold text-gray-800">
-            {selectedCategory !== 'all'
-              ? `Chưa có bài viết nào trong danh mục "${selectedCategory}"`
-              : 'Chưa có bài viết nào phù hợp'}
+            Không tìm thấy bài viết nào phù hợp
           </h4>
           <p className="text-xs text-gray-500 max-w-md mx-auto">
-            {searchQuery
-              ? `Không tìm thấy kết quả phù hợp với từ khóa "${searchQuery}". Vui lòng thử từ khóa khác hoặc quay lại danh sách đầy đủ.`
-              : 'Hãy chọn xem toàn bộ tài liệu của chuyên mục hoặc gửi bài viết mới lên hệ thống.'}
+            Không tìm thấy kết quả phù hợp với từ khóa "{searchQuery}". Vui lòng thử từ khóa khác hoặc quay lại danh sách đầy đủ.
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
             {onResetFilter && (

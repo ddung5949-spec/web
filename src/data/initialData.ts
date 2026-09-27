@@ -5,9 +5,6 @@ import {
   DocumentItem,
   HomeCategoryColumn,
   LectureItem,
-  MeetingDocumentItem,
-  MeetingRoomItem,
-  MeetingRoomSettings,
   MilitaryProfile,
   NavTabItem,
   RoleDefinition,
@@ -221,28 +218,20 @@ export const defaultRoles: RoleDefinition[] = [
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: true,
-      canJoinPartyMeeting: true,
-      canUploadMeetingDoc: true,
-      canDeleteMeetingDoc: true,
       canViewCollaborativeEdits: true,
-      canCreateMeeting: true,
     },
   },
   {
     id: 'commander',
     name: 'Chỉ huy / Đảng ủy viên',
-    description: 'Cán bộ chỉ huy đơn vị, tham gia phòng họp Đảng ủy và biểu quyết văn kiện',
+    description: 'Cán bộ chỉ huy đơn vị, nắm tình hình tư tưởng và lãnh đạo đơn vị',
     color: '#065f46',
     textColor: '#ffffff',
     isSystem: true,
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: true,
-      canJoinPartyMeeting: true,
-      canUploadMeetingDoc: true,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: true,
-      canCreateMeeting: true,
     },
   },
   {
@@ -255,11 +244,7 @@ export const defaultRoles: RoleDefinition[] = [
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: true,
-      canJoinPartyMeeting: false,
-      canUploadMeetingDoc: false,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: true,
-      canCreateMeeting: false,
     },
   },
   {
@@ -272,11 +257,7 @@ export const defaultRoles: RoleDefinition[] = [
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: true,
-      canJoinPartyMeeting: true,
-      canUploadMeetingDoc: true,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: true,
-      canCreateMeeting: true,
     },
   },
   {
@@ -289,11 +270,7 @@ export const defaultRoles: RoleDefinition[] = [
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: true,
-      canJoinPartyMeeting: false,
-      canUploadMeetingDoc: false,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: false,
-      canCreateMeeting: false,
     },
   },
   {
@@ -306,11 +283,7 @@ export const defaultRoles: RoleDefinition[] = [
     defaultPermissions: {
       canViewDoc: true,
       canUploadDoc: false,
-      canJoinPartyMeeting: false,
-      canUploadMeetingDoc: false,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: false,
-      canCreateMeeting: false,
     },
   },
 ];
@@ -550,21 +523,6 @@ export const defaultArticles: Article[] = [];
 export const defaultDocuments: DocumentItem[] = [];
 
 export const defaultLectures: LectureItem[] = [];
-
-export const defaultMeetingDocumentHtml = '';
-
-export const defaultMeetingDocuments: MeetingDocumentItem[] = [];
-
-export const defaultMeetingSettings: MeetingRoomSettings = {
-  passwordRequired: false,
-  roomPassword: '',
-  meetingTitle: 'Hội nghị Đảng ủy',
-  meetingSessionNumber: 'Kỳ họp thường kỳ',
-  chairPerson: 'Đồng chí Bí thư Đảng ủy',
-  secretary: 'Đồng chí Thư ký',
-};
-
-export const defaultMeetingRooms: MeetingRoomItem[] = [];
 
 export const categoryOptions: Record<string, string[]> = {
   ctd: ['Công tác Tuyên huấn', 'Công tác Tổ chức', 'Công tác Cán bộ', 'Thi đua Quyết thắng', 'Bảo vệ an ninh'],

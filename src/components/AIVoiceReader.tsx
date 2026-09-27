@@ -17,7 +17,7 @@ import { aiSpeech, VIETNAMESE_VOICE_PROFILES, VoiceProfile } from '../utils/aiSp
 interface AIVoiceReaderProps {
   title?: string;
   textToRead: string;
-  sourceType?: 'article' | 'meeting' | 'document';
+  sourceType?: 'article' | 'document';
   compact?: boolean;
   className?: string;
 }

@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from '../Toast';
-import { getSupabase } from '../../utils/supabase';
+import { getSupabase, supabase } from '../../utils/supabase';
 
 export interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -81,114 +81,116 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     setSaveSuccessMessage(null);
 
     // Resolve what to save
-    let categoriesToSave: any = updatedList;
+    let updatedCategories: any[] = [];
+    let fullList: any[] = [];
 
-    // If sectionKey is specified, we are managing subcategories of a section inside full categories_config
-    if (sectionKey) {
+    if (Array.isArray(categories) && categories.length > 0) {
+      fullList = JSON.parse(JSON.stringify(categories));
+    } else {
       try {
         const cachedRaw =
           localStorage.getItem('cached_categories') ||
           localStorage.getItem('cached_site_config') ||
           localStorage.getItem('site_config_cache');
-        let fullList: any[] = [];
         if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            fullList = Array.isArray(parsed)
-              ? parsed
-              : parsed?.categories_config || parsed?.categories || [];
-          } catch {}
+          const parsed = JSON.parse(cachedRaw);
+          fullList = Array.isArray(parsed)
+            ? parsed
+            : parsed?.categories_config || parsed?.categories || [];
         }
-        if (Array.isArray(fullList) && fullList.length > 0) {
-          const matchIndex = fullList.findIndex(
-            (c: any) =>
-              (sectionKey && c.id === sectionKey) ||
-              c.name === sectionTitle ||
-              c.navName === sectionTitle ||
-              c.shortLabel === sectionTitle
-          );
-          if (matchIndex >= 0) {
-            fullList[matchIndex] = {
-              ...fullList[matchIndex],
-              subcategories: updatedList,
-              categories: updatedList,
-            };
-          } else {
-            fullList.push({
-              id: sectionKey,
-              name: sectionTitle,
-              navName: sectionTitle,
-              targetPage: sectionKey,
-              subcategories: updatedList,
-              categories: updatedList,
-            });
-          }
-          categoriesToSave = fullList;
-        }
-      } catch (err) {
-        console.warn('[CategoryManagerModal] Section categories merge notice:', err);
+      } catch {}
+    }
+
+    if (sectionKey) {
+      const copy = Array.isArray(fullList) && fullList.length > 0 ? [...fullList] : [];
+      const subNames = updatedList
+        .map((c: any) => (typeof c === 'string' ? c.trim() : (c.name || c.navName || c.shortLabel || c.id || '').trim()))
+        .filter(Boolean);
+
+      const matchIndex = copy.findIndex(
+        (c: any) =>
+          (sectionKey && c.id === sectionKey) ||
+          c.targetPage === sectionKey ||
+          c.name === sectionTitle ||
+          c.navName === sectionTitle ||
+          c.shortLabel === sectionTitle
+      );
+      if (matchIndex >= 0) {
+        copy[matchIndex] = {
+          ...copy[matchIndex],
+          subcategories: subNames,
+          categories: subNames,
+        };
+      } else {
+        copy.push({
+          id: sectionKey,
+          name: sectionTitle,
+          navName: sectionTitle,
+          targetPage: sectionKey,
+          subcategories: subNames,
+          categories: subNames,
+          order: copy.length + 1,
+          enabled: true,
+        });
       }
+      updatedCategories = copy;
+    } else {
+      updatedCategories = updatedList;
     }
 
     // Filter out any legacy meeting items
-    const filterMeeting = (items: any[]): any[] => {
-      if (!Array.isArray(items)) return [];
-      return items.filter(
-        (it) => it && it.id !== 'meeting' && it.targetPage !== 'meeting' && it.sectionKey !== 'meeting'
-      );
-    };
-
-    const cleanCategoriesToSave = filterMeeting(categoriesToSave);
+    updatedCategories = (Array.isArray(updatedCategories) ? updatedCategories : []).filter(
+      (it: any) => it && it.id !== 'meeting' && it.targetPage !== 'meeting' && it.sectionKey !== 'meeting'
+    );
 
     try {
-      // 1. Gọi TRỰC TIẾP supabase.from('site_config').upsert
-      const supabase = getSupabase();
-      if (supabase) {
-        const { error: upErr } = await supabase
-          .from('site_config')
-          .upsert(
-            {
-              id: 'default',
-              categories_config: cleanCategoriesToSave,
-              navigation_tabs: cleanCategoriesToSave,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
-
-        if (upErr) {
-          setIsSaving(false);
-          window.alert('Lỗi lưu Database: ' + upErr.message);
-          return;
-        }
+      // 1. BẮT BUỘC gọi trực tiếp API Supabase đẩy dữ liệu lên cơ sở dữ liệu
+      const client = supabase || getSupabase();
+      if (!client) {
+        setIsSaving(false);
+        alert('Lỗi lưu Supabase: Không tìm thấy client kết nối');
+        return;
       }
 
-      // 2. Cập nhật đồng thời vào State toàn cục và ghi đè localStorage.setItem('cached_categories', ...)
-      localStorage.setItem('cached_categories', JSON.stringify(cleanCategoriesToSave));
+      const { error } = await client
+        .from('site_config')
+        .upsert({
+          id: 'default',
+          categories_config: updatedCategories,
+          navigation_tabs: updatedCategories,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+
+      if (error) {
+        setIsSaving(false);
+        alert('Lỗi lưu Supabase: ' + error.message);
+        return;
+      }
+
+      // 2. Cập nhật đồng thời vào State toàn cục và localStorage
+      localStorage.setItem('cached_categories', JSON.stringify(updatedCategories));
       try {
         const cachedSiteCfg = localStorage.getItem('cached_site_config') || localStorage.getItem('site_config_cache');
         if (cachedSiteCfg) {
           const cfg = JSON.parse(cachedSiteCfg);
-          cfg.categories_config = cleanCategoriesToSave;
-          cfg.navigation_tabs = cleanCategoriesToSave;
+          cfg.categories_config = updatedCategories;
+          cfg.navigation_tabs = updatedCategories;
           localStorage.setItem('cached_site_config', JSON.stringify(cfg));
           localStorage.setItem('site_config_cache', JSON.stringify(cfg));
         }
       } catch {}
 
-      // 3. Callback props
-      if (onSave) await onSave(cleanCategoriesToSave);
-      if (onSaveCategories) await onSaveCategories(cleanCategoriesToSave);
+      // 3. Callback props to immediately update global state
+      if (onSave) await onSave(updatedCategories);
+      if (onSaveCategories) await onSaveCategories(updatedCategories);
 
       setIsSaving(false);
-
-      // 4. Hiển thị thông báo thành công và đóng modal
-      window.alert('✅ Đã lưu và đồng bộ thanh chuyên mục lên hệ thống thành công!');
+      alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
       onClose();
     } catch (e: any) {
       setIsSaving(false);
       console.error('Error saving categories:', e);
-      window.alert('Lỗi lưu Database: ' + (e?.message || 'Lỗi kết nối'));
+      alert('Lỗi lưu Supabase: ' + (e?.message || 'Lỗi kết nối'));
     }
   };
 

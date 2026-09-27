@@ -99,26 +99,6 @@ body {
   animation-play-state: paused !important;
 }
 
-/* User Highlight Mark inside Party Meeting Rich Editor */
-.user-highlight-mark {
-  background-color: #fef08a;
-  border-bottom: 2px solid #eab308;
-  padding: 1px 4px;
-  border-radius: 2px;
-}
-
-.user-highlight-mark::after {
-  content: attr(data-author);
-  font-size: 10px;
-  background-color: var(--army-red);
-  color: #ffffff;
-  padding: 1px 5px;
-  border-radius: 3px;
-  margin-left: 4px;
-  vertical-align: super;
-  font-weight: bold;
-}
-
 /* Animated Light Beam Border for Circular Logo */
 @keyframes spin-beam {
   0% {

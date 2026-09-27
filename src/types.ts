@@ -185,12 +185,6 @@ export interface SiteSectionsConfig {
     desc: string;
     categories?: string[];
   };
-  meeting?: {
-    title: string;
-    shortLabel: string;
-    subTitle?: string;
-    desc: string;
-  };
 }
 
 export interface CustomMenuItem {
@@ -215,7 +209,7 @@ export interface QuickActionCard {
   id: string;
   title: string;
   subtitle?: string;
-  iconName: 'exam' | 'doc' | 'video' | 'meeting' | 'link' | 'award' | 'book' | 'lecture' | 'users' | 'shield' | 'star' | 'flag' | string;
+  iconName: 'exam' | 'doc' | 'video' | 'link' | 'award' | 'book' | 'lecture' | 'users' | 'shield' | 'star' | 'flag' | string;
   type: 'internal' | 'external';
   targetPage?: PageView;
   externalUrl?: string;

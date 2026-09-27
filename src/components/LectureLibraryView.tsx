@@ -165,13 +165,17 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
     }
   };
 
+  // Safe lectures array
+  const safeLectures = Array.isArray(lectures) ? lectures : [];
+
   // Filter lectures
-  const filteredLectures = lectures.filter((lec) => {
+  const filteredLectures = safeLectures.filter((lec) => {
+    if (!lec) return false;
     const matchesSearch =
-      lec.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lec.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lec.target.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lec.desc.toLowerCase().includes(searchTerm.toLowerCase());
+      (lec.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lec.author || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lec.target || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lec.desc || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType =
       selectedFileType === 'all' ||
@@ -415,7 +419,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="bg-white/10 p-2 rounded-lg border border-white/10">
                 <div className="text-base font-black text-amber-300">
-                  {lectures.reduce((acc, l) => acc + (l.downloads || 0), 0)}
+                  {safeLectures.reduce((acc, l) => acc + (l?.downloads || 0), 0)}
                 </div>
                 <div className="text-[10px] text-gray-300 font-medium uppercase mt-0.5">
                   Lượt tải về
@@ -549,6 +553,10 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
                   </div>
                 );
               })
+            ) : safeLectures.length === 0 ? (
+              <div className="col-span-full w-full py-16 text-center text-slate-500 font-medium bg-white rounded-lg border border-dashed border-slate-300 my-4">
+                Chưa có dữ liệu nào được đăng tải trong mục này.
+              </div>
             ) : (
               <div className="col-span-full bg-white p-8 text-center text-gray-500 rounded-lg border border-gray-200 space-y-2">
                 <p className="text-xs">Không tìm thấy bài giảng nào phù hợp với bộ lọc.</p>
@@ -578,7 +586,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
           itemCountByCategory={(() => {
             const map: Record<string, number> = {};
             availableCategories.forEach((cat: string) => {
-              map[cat] = lectures.filter((l) => l.category === cat).length;
+              map[cat] = safeLectures.filter((l) => (l?.category === cat || l?.target === cat)).length;
             });
             return map;
           })()}

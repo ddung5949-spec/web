@@ -3,17 +3,10 @@ import {
   Article,
   DocumentItem,
   LectureItem,
-  MeetingDocumentItem,
-  MeetingRoomItem,
-  MeetingRoomSettings,
-  MeetingVote,
   SiteConfig,
   UncleHoQuote,
   UncleHoSettings,
   User,
-  RoomPresenceItem,
-  CollabDocData,
-  RoomBroadcastAction,
 } from '../types';
 
 // Synchronous safe memory / localStorage store with try-catch
@@ -294,176 +287,7 @@ export const cloudStorage = {
   },
 
   // =========================================================================
-  // 6. MEETING ROOMS & THIẾT LẬP PHÒNG HỌP CHI BỘ
-  // =========================================================================
-  async loadMeetingRooms(fallback: MeetingRoomItem[] = []): Promise<MeetingRoomItem[]> {
-    if (isSupabaseConfigured()) {
-      try {
-        const remote = await supabaseDb.fetchMeetingRooms();
-        if (remote !== null) {
-          safeStore.set('mangyang_meeting_rooms', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Supabase loadMeetingRooms error:', e);
-      }
-    }
-    return safeStore.get('mangyang_meeting_rooms', fallback);
-  },
-
-  async saveMeetingRoom(room: MeetingRoomItem, _updatedList?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertMeetingRoom(room);
-      if (!res.success) {
-        return { success: false, error: res.error || 'Lỗi lưu phòng họp' };
-      }
-    }
-
-    const current = safeStore.get<MeetingRoomItem[]>('mangyang_meeting_rooms', []);
-    const exists = current.some((r) => r.id === room.id);
-    const updated = exists ? current.map((r) => (r.id === room.id ? room : r)) : [room, ...current];
-    safeStore.set('mangyang_meeting_rooms', updated);
-
-    return { success: true };
-  },
-
-  async saveMeetingRooms(rooms: MeetingRoomItem[]): Promise<void> {
-    safeStore.set('mangyang_meeting_rooms', rooms);
-    if (isSupabaseConfigured()) {
-      for (const r of rooms) {
-        await supabaseDb.upsertMeetingRoom(r);
-      }
-    }
-  },
-
-  async deleteMeetingRoom(roomId: string, _updatedList?: MeetingRoomItem[]): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.deleteMeetingRoom(roomId);
-      if (!res.success) {
-        return { success: false, error: res.error || 'Lỗi xóa phòng họp' };
-      }
-    }
-
-    const current = safeStore.get<MeetingRoomItem[]>('mangyang_meeting_rooms', []);
-    const updated = current.filter((r) => r.id !== roomId);
-    safeStore.set('mangyang_meeting_rooms', updated);
-
-    return { success: true };
-  },
-
-  // =========================================================================
-  // 7. MEETING DOCUMENTS / TÀI LIỆU CUỘC HỌP
-  // =========================================================================
-  async loadMeetingDocuments(fallback: MeetingDocumentItem[] = []): Promise<MeetingDocumentItem[]> {
-    if (isSupabaseConfigured()) {
-      try {
-        const remote = await supabaseDb.fetchMeetingDocuments();
-        if (remote !== null) {
-          safeStore.set('mangyang_meeting_documents', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Supabase loadMeetingDocuments error:', e);
-      }
-    }
-    return safeStore.get('mangyang_meeting_documents', fallback);
-  },
-
-  async saveMeetingDocument(doc: MeetingDocumentItem): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertMeetingDocument(doc);
-      if (!res.success) {
-        return { success: false, error: res.error || 'Lỗi lưu tài liệu họp' };
-      }
-    }
-
-    const current = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_documents', []);
-    const exists = current.some((d) => d.id === doc.id);
-    const updated = exists ? current.map((d) => (d.id === doc.id ? doc : d)) : [doc, ...current];
-    safeStore.set('mangyang_meeting_documents', updated);
-
-    return { success: true };
-  },
-
-  async deleteMeetingDocument(docId: number | string): Promise<{ success: boolean; error?: string }> {
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.deleteMeetingDocument(Number(docId));
-      if (!res.success) {
-        return { success: false, error: res.error || 'Lỗi xóa tài liệu họp' };
-      }
-    }
-
-    const current = safeStore.get<MeetingDocumentItem[]>('mangyang_meeting_documents', []);
-    const updated = current.filter((d) => String(d.id) !== String(docId));
-    safeStore.set('mangyang_meeting_documents', updated);
-
-    return { success: true };
-  },
-
-  // =========================================================================
-  // 8. MEETING SETTINGS / CẤU HÌNH PHÒNG HỌP
-  // =========================================================================
-  async loadMeetingSettings(fallback: MeetingRoomSettings): Promise<MeetingRoomSettings> {
-    if (isSupabaseConfigured()) {
-      try {
-        const remote = await supabaseDb.fetchMeetingSettings();
-        if (remote !== null) {
-          safeStore.set('mangyang_meeting_settings', remote);
-          return remote;
-        }
-      } catch (e) {
-        console.warn('Supabase loadMeetingSettings error:', e);
-      }
-    }
-    return safeStore.get('mangyang_meeting_settings', fallback);
-  },
-
-  async saveMeetingSettings(settings: MeetingRoomSettings): Promise<{ success: boolean; error?: string }> {
-    safeStore.set('mangyang_meeting_settings', settings);
-    if (isSupabaseConfigured()) {
-      const res = await supabaseDb.upsertMeetingSettings(settings);
-      return res;
-    }
-    return { success: true };
-  },
-
-  // =========================================================================
-  // 9. MEETING VOTES / BIỂU QUYẾT
-  // =========================================================================
-  async loadMeetingVotes(fallback: Record<string, MeetingVote>): Promise<Record<string, MeetingVote>> {
-    if (isSupabaseConfigured()) {
-      try {
-        const remote = await supabaseDb.fetchMeetingVotes();
-        if (remote && Object.keys(remote).length > 0) {
-          safeStore.set('mangyang_meeting_votes', remote as any);
-          return remote as any;
-        }
-      } catch (e) {
-        console.warn('Supabase loadMeetingVotes error:', e);
-      }
-    }
-    return safeStore.get('mangyang_meeting_votes', fallback);
-  },
-
-  async saveMeetingVote(vote: MeetingVote): Promise<void> {
-    const current = safeStore.get<Record<string, MeetingVote>>('mangyang_meeting_votes', {});
-    current[vote.userId] = vote;
-    safeStore.set('mangyang_meeting_votes', current);
-
-    if (isSupabaseConfigured()) {
-      await supabaseDb.upsertMeetingVote(vote);
-    }
-  },
-
-  async resetMeetingVotes(): Promise<void> {
-    safeStore.set('mangyang_meeting_votes', {});
-    if (isSupabaseConfigured()) {
-      await supabaseDb.clearMeetingVotes();
-    }
-  },
-
-  // =========================================================================
-  // 10. BÁC HỒ & LỜI DẠY
+  // 6. BÁC HỒ & LỜI DẠY
   // =========================================================================
   async loadUncleHoQuotes(fallback: UncleHoQuote[]): Promise<UncleHoQuote[]> {
     return safeStore.get('mangyang_uncle_ho_quotes', fallback);
@@ -482,18 +306,7 @@ export const cloudStorage = {
   },
 
   // =========================================================================
-  // 11. COLLABORATION WORKSPACE METHODS (SAFE NO-OP / IN-MEMORY)
-  // =========================================================================
-  subscribeRoomPresence: (_roomId: string, _callback: (list: RoomPresenceItem[]) => void) => () => {},
-  subscribeCollabDoc: (_roomId: string, _docId: number, _callback: (doc: CollabDocData | null) => void) => () => {},
-  subscribeRoomActions: (_roomId: string, _callback: (actions: RoomBroadcastAction[]) => void) => () => {},
-  updateRoomPresence: async (_userOrRoom: RoomPresenceItem | string, _user?: RoomPresenceItem) => {},
-  removeRoomPresence: async (_roomId: string, _userId: number) => {},
-  saveCollabDoc: async (_roomId: string, _docId: number, _docData: CollabDocData) => {},
-  broadcastRoomAction: async (_actionOrRoom: RoomBroadcastAction | string, _action?: RoomBroadcastAction) => {},
-
-  // =========================================================================
-  // 12. GLOBAL REALTIME SUBSCRIPTION (EXCLUSIVELY SUPABASE)
+  // 7. GLOBAL REALTIME SUBSCRIPTION (EXCLUSIVELY SUPABASE)
   // =========================================================================
   subscribeAll(callbacks: {
     onArticlesChange?: (articles: Article[]) => void;
@@ -502,9 +315,6 @@ export const cloudStorage = {
     onArticleDelete?: (articleId: number) => void;
     onDocumentsChange?: (docs: DocumentItem[]) => void;
     onLecturesChange?: (lectures: LectureItem[]) => void;
-    onMeetingSettingsChange?: (settings: MeetingRoomSettings) => void;
-    onMeetingDocumentsChange?: (docs: MeetingDocumentItem[]) => void;
-    onMeetingRoomsChange?: (rooms: MeetingRoomItem[]) => void;
     onSiteConfigChange?: (config: SiteConfig) => void;
     onUsersChange?: (users: User[]) => void;
   }): (() => void) | null {

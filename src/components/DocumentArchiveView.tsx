@@ -105,12 +105,13 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // Extract unique issuers for filtering
+  const safeDocs = Array.isArray(documents) ? documents : [];
   const uniqueIssuers = Array.from(
-    new Set(documents.map((d) => d.issuer).filter(Boolean))
+    new Set(safeDocs.map((d) => d?.issuer).filter(Boolean))
   );
 
   // Calculate total downloads
-  const totalDownloads = documents.reduce((sum, d) => sum + (d.downloads || 0), 0);
+  const totalDownloads = safeDocs.reduce((sum, d) => sum + (d?.downloads || 0), 0);
 
   // Download handler
   const handleDownload = (doc: DocumentItem) => {
@@ -220,7 +221,8 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   };
 
   // Filter documents
-  const filteredDocuments = documents.filter((doc) => {
+  const filteredDocuments = safeDocs.filter((doc) => {
+    if (!doc) return false;
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
       !term ||
@@ -617,7 +619,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
           </div>
 
           {/* Content Views: Grid or Table */}
-          {filteredDocuments.length === 0 ? (
+          {safeDocs.length === 0 ? (
+            <div className="w-full py-16 text-center text-slate-500 font-medium bg-white rounded-lg border border-dashed border-slate-300 my-4">
+              Chưa có dữ liệu nào được đăng tải trong mục này.
+            </div>
+          ) : filteredDocuments.length === 0 ? (
             <div className="p-10 bg-white rounded-xl border border-gray-200 text-center space-y-3">
               <FolderArchive className="w-12 h-12 text-gray-300 mx-auto" />
               <div className="text-sm font-bold text-gray-700">Không tìm thấy văn bản phù hợp</div>

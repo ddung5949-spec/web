@@ -63,6 +63,7 @@ import { HomeLatestNewsWidget } from './HomeLatestNewsWidget';
 import { HomeMiddleFeaturedSlider } from './HomeMiddleFeaturedSlider';
 import { HomeQuickActionsWidget } from './HomeQuickActionsWidget';
 import { HomeSpotlightSection } from './HomeSpotlightSection';
+import { HomeGallerySection } from './HomeGallerySection';
 import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
 import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
@@ -984,6 +985,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* ========================================================
+          ALBUM ẢNH TRUYỀN THỐNG (LẤY TỪ BẢNG 'gallery' SUPABASE)
+         ======================================================== */}
+      <HomeGallerySection currentUser={currentUser || null} />
 
       {/* ========================================================
           3. QUICK LIBRARY & LEARNING ASSETS PREVIEW

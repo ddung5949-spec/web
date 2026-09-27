@@ -2928,8 +2928,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                           lectures: safeStore.get('mangyang_lectures', []),
                           quotes: safeStore.get('mangyang_quotes', []),
                           users: safeStore.get('mangyang_users', []),
-                          meetingRooms: safeStore.get('mangyang_meeting_rooms', []),
-                          meetingDocs: safeStore.get('mangyang_meeting_documents', []),
                         };
                         const blob = new Blob([JSON.stringify(backupData, null, 2)], {
                           type: 'application/json',

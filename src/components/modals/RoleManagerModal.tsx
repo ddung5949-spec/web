@@ -57,11 +57,7 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
   const [permissions, setPermissions] = useState({
     canViewDoc: true,
     canUploadDoc: false,
-    canJoinPartyMeeting: false,
-    canUploadMeetingDoc: false,
-    canDeleteMeetingDoc: false,
     canViewCollaborativeEdits: false,
-    canCreateMeeting: false,
   });
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -77,11 +73,7 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
     setPermissions({
       canViewDoc: true,
       canUploadDoc: false,
-      canJoinPartyMeeting: false,
-      canUploadMeetingDoc: false,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: false,
-      canCreateMeeting: false,
     });
     setErrorMessage('');
   };
@@ -96,11 +88,7 @@ export const RoleManagerModal: React.FC<RoleManagerModalProps> = ({
     setPermissions({
       canViewDoc: role.defaultPermissions?.canViewDoc ?? true,
       canUploadDoc: role.defaultPermissions?.canUploadDoc ?? false,
-      canJoinPartyMeeting: role.defaultPermissions?.canJoinPartyMeeting ?? false,
-      canUploadMeetingDoc: role.defaultPermissions?.canUploadMeetingDoc ?? false,
-      canDeleteMeetingDoc: role.defaultPermissions?.canDeleteMeetingDoc ?? false,
       canViewCollaborativeEdits: role.defaultPermissions?.canViewCollaborativeEdits ?? false,
-      canCreateMeeting: role.defaultPermissions?.canCreateMeeting ?? false,
     });
     setErrorMessage('');
   };

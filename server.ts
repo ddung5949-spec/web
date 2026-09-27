@@ -190,59 +190,6 @@ Yêu cầu định dạng phản hồi:
   }
 });
 
-// 4. Meeting Resolution & Conclusion Assistant for Party Cells
-app.post('/api/ai/meeting-assistant', async (req, res) => {
-  try {
-    const { meetingTitle, meetingCode, discussions, existingResolution } = req.body;
-
-    if (!meetingTitle || typeof meetingTitle !== 'string') {
-      return res.status(400).json({
-        error: 'Tiêu đề phiên họp là bắt buộc.',
-      });
-    }
-
-    const ai = getGeminiClient();
-
-    const prompt = `Bạn đang hỗ trợ Thư ký / Chủ trì phiên họp Đảng ủy / Chi bộ Quân sự - Trung đoàn 95, Sư đoàn 2.
-Phiên họp: ${meetingTitle.slice(0, 300)} (Mã phòng: ${meetingCode ? String(meetingCode).slice(0, 50) : 'N/A'})
-
-Ý kiến thảo luận và các nội dung đã ghi nhận:
-${Array.isArray(discussions) ? discussions.slice(0, 50).join('\n- ') : typeof discussions === 'string' ? discussions.slice(0, 20000) : 'Chưa có ý kiến phát biểu bổ sung'}
-
-Dự thảo nghị quyết hiện tại (nếu có):
-${typeof existingResolution === 'string' ? existingResolution.slice(0, 20000) : 'Chưa có dự thảo'}
-
-Hãy dự thảo hoặc hoàn thiện:
-1. **Đánh giá tình hình & Kết luận của Chủ trì**: Tóm lược sự đồng thuận và các vấn đề cần lưu ý.
-2. **Dự thảo Nghị quyết / Kết luận phiên họp**: Gồm phương hướng, mục tiêu và các chỉ tiêu, biện pháp thực hiện cụ thể.
-3. **Phân công tổ chức thực hiện**: Trách nhiệm của các bộ phận, chi ủy và đảng viên.
-
-Định dạng văn bản chuẩn quy cách văn kiện Đảng trong Quân đội nhân dân Việt Nam.`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
-      contents: prompt,
-      config: {
-        systemInstruction: MILITARY_SYSTEM_INSTRUCTION,
-        temperature: 0.3,
-      },
-    });
-
-    res.json({
-      success: true,
-      draftResolution: response.text || 'Không thể tạo dự thảo nghị quyết.',
-    });
-  } catch (error: any) {
-    console.error('Server Gemini Meeting Assistant Error:', error);
-    const isKeyMissing = error?.message?.includes('GEMINI_API_KEY');
-    res.status(500).json({
-      success: false,
-      error: isKeyMissing
-        ? 'Chưa cấu hình GEMINI_API_KEY trong biến môi trường server.'
-        : 'Lỗi trợ lý soạn thảo nghị quyết: ' + (error?.message || 'Lỗi không xác định'),
-    });
-  }
-});
 
 // Vite middleware & Static serving
 async function startServer() {

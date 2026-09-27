@@ -4,10 +4,6 @@ import {
   DailyWidgetItem,
   DocumentItem,
   LectureItem,
-  MeetingDocumentItem,
-  MeetingRoomItem,
-  MeetingRoomSettings,
-  MeetingVote,
   SectionType,
   SiteConfig,
   User,
@@ -158,11 +154,7 @@ export const supabaseAuth = {
       canUploadDoc: true,
       canViewSecretDocs: true,
       canUploadDocs: true,
-      canJoinPartyMeeting: true,
-      canUploadMeetingDoc: true,
-      canDeleteMeetingDoc: true,
       canViewCollaborativeEdits: true,
-      canCreateMeeting: true,
       createdAt: sbUser.created_at || new Date().toISOString(),
       lastActiveAt: new Date().toLocaleString('vi-VN'),
     };
@@ -170,7 +162,7 @@ export const supabaseAuth = {
 };
 
 /* =========================================================================
-   DATABASE-FIRST SUPABASE SERVICES (Tin bài, Văn bản, Bài giảng, Phòng họp...)
+   DATABASE-FIRST SUPABASE SERVICES (Tin bài, Văn bản, Bài giảng, Cấu hình...)
    ========================================================================= */
 
 // Module-level singleton reference for global realtime channel
@@ -210,9 +202,6 @@ export const supabaseDb = {
         role: item.role || 'user',
         canViewDoc: item.can_view_doc ?? item.canViewDoc ?? true,
         canUploadDoc: item.can_upload_doc ?? item.canUploadDoc ?? false,
-        canJoinPartyMeeting: item.can_join_party_meeting ?? item.canJoinPartyMeeting ?? false,
-        canUploadMeetingDoc: item.can_upload_meeting_doc ?? item.canUploadMeetingDoc ?? (item.role === 'admin'),
-        canDeleteMeetingDoc: item.can_delete_meeting_doc ?? item.canDeleteMeetingDoc ?? (item.role === 'admin'),
         canViewCollaborativeEdits: item.can_view_collab ?? item.canViewCollaborativeEdits ?? true,
       }));
     } catch (err) {
@@ -240,9 +229,6 @@ export const supabaseDb = {
         role: user.role,
         can_view_doc: user.canViewDoc,
         can_upload_doc: user.canUploadDoc,
-        can_join_party_meeting: user.canJoinPartyMeeting,
-        can_upload_meeting_doc: user.canUploadMeetingDoc,
-        can_delete_meeting_doc: user.canDeleteMeetingDoc,
       };
 
       const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
@@ -811,331 +797,7 @@ export const supabaseDb = {
   },
 
   // -------------------------------------------------------------
-  // 5. CẤU HÌNH PHÒNG HỌP & MẬT KHẨU (Bảng: meeting_settings)
-  // -------------------------------------------------------------
-  async fetchMeetingSettings(): Promise<MeetingRoomSettings | null> {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from('meeting_settings')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('Supabase fetchMeetingSettings error:', error.message);
-        return null;
-      }
-      if (!data) return null;
-
-      return {
-        passwordRequired: data.password_required ?? data.passwordRequired ?? true,
-        roomPassword: data.room_password || data.roomPassword || '1945',
-        meetingTitle: data.meeting_title || data.meetingTitle,
-        meetingSessionNumber: data.meeting_session_number || data.meetingSessionNumber,
-        chairPerson: data.chair_person || data.chairPerson,
-        secretary: data.secretary,
-      };
-    } catch (err) {
-      console.warn('Supabase fetchMeetingSettings failed:', err);
-      return null;
-    }
-  },
-
-  async upsertMeetingSettings(settings: MeetingRoomSettings): Promise<{ success: boolean; error?: string }> {
-    const supabase = getSupabase();
-    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
-
-    try {
-      const payload: any = {
-        id: 1,
-        password_required: settings.passwordRequired,
-        room_password: settings.roomPassword,
-        meeting_title: settings.meetingTitle,
-        meeting_session_number: settings.meetingSessionNumber,
-        chair_person: settings.chairPerson,
-        secretary: settings.secretary,
-      };
-
-      const { error } = await supabase.from('meeting_settings').upsert(payload, { onConflict: 'id' });
-      if (error) {
-        console.error('Supabase upsertMeetingSettings error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      console.error('Supabase upsertMeetingSettings failed:', err);
-      return { success: false, error: err?.message };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 6. TÀI LIỆU PHÒNG HỌP (Bảng: meeting_documents)
-  // -------------------------------------------------------------
-  async fetchMeetingDocuments(): Promise<MeetingDocumentItem[] | null> {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from('meeting_documents')
-        .select('*')
-        .order('id', { ascending: true });
-
-      if (error) {
-        console.warn('Supabase fetchMeetingDocuments error:', error.message);
-        return null;
-      }
-      if (!data) return null;
-
-      return data.map((item: any) => ({
-        id: Number(item.id),
-        code: item.code || '',
-        title: item.title || '',
-        category: item.category || 'Nghị quyết',
-        contentHtml: item.content_html || item.contentHtml || '',
-        fileType: item.file_type || item.fileType || 'word',
-        fileName: item.file_name || item.fileName || '',
-        fileSize: item.file_size || item.fileSize || '',
-        fileUrl: item.file_url || item.fileUrl || '',
-        uploadedBy: item.uploaded_by || item.uploadedBy || 'Đảng ủy',
-        date: item.date || '26/08/2026',
-        isSecret: item.is_secret ?? item.isSecret ?? false,
-      }));
-    } catch (err) {
-      console.warn('Supabase fetchMeetingDocuments failed:', err);
-      return null;
-    }
-  },
-
-  async upsertMeetingDocument(doc: MeetingDocumentItem): Promise<{ success: boolean; error?: string }> {
-    const supabase = getSupabase();
-    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
-
-    try {
-      const payload: any = {
-        id: doc.id,
-        code: doc.code || '',
-        title: doc.title,
-        category: doc.category || 'Nghị quyết',
-        content_html: doc.contentHtml || '',
-        file_type: doc.fileType || 'word',
-        file_name: doc.fileName || '',
-        file_size: doc.fileSize || '',
-        file_url: doc.fileUrl || '',
-        uploaded_by: doc.uploadedBy || '',
-        date: doc.date,
-        is_secret: doc.isSecret ?? false,
-      };
-
-      const { error } = await supabase.from('meeting_documents').upsert(payload, { onConflict: 'id' });
-      if (error) {
-        console.error('Supabase upsertMeetingDocument error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      console.error('Supabase upsertMeetingDocument failed:', err);
-      return { success: false, error: err?.message };
-    }
-  },
-
-  async deleteMeetingDocument(docId: number): Promise<{ success: boolean; error?: string }> {
-    const supabase = getSupabase();
-    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
-
-    try {
-      const { error } = await supabase.from('meeting_documents').delete().eq('id', docId);
-      if (error) {
-        console.error('Supabase deleteMeetingDocument error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      console.error('Supabase deleteMeetingDocument failed:', err);
-      return { success: false, error: err?.message };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 7. PHÒNG HỌP TRỰC TUYẾN ĐA KỲ HỌP (Bảng: meeting_rooms)
-  // -------------------------------------------------------------
-  async fetchMeetingRooms(): Promise<MeetingRoomItem[] | null> {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-
-    try {
-      const { data, error } = await supabase
-        .from('meeting_rooms')
-        .select('*')
-        .order('id', { ascending: false });
-
-      if (error) {
-        console.warn('Supabase fetchMeetingRooms error:', error.message);
-        return null;
-      }
-      if (!data) return null;
-
-      return data.map((item: any) => ({
-        id: String(item.id),
-        roomCode: item.room_code || item.roomCode || `PH-${String(item.id).slice(-4)}`,
-        title: item.title || 'Kỳ họp Đảng ủy',
-        sessionNumber: item.session_number || item.sessionNumber || 'Kỳ họp định kỳ',
-        chairPerson: item.chair_person || item.chairPerson || '',
-        secretary: item.secretary || '',
-        description: item.description || '',
-        unitTarget: item.unit_target || item.unitTarget || 'Đảng ủy Trung đoàn 95',
-        passwordRequired: item.password_required ?? item.passwordRequired ?? true,
-        roomPassword: item.room_password || item.roomPassword || '1945',
-        createdByUserId: item.created_by_user_id || item.createdByUserId || 1,
-        createdByUserName: item.created_by_user_name || item.createdByUserName || 'Đảng ủy',
-        createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-        status: (item.status === 'in_progress' || item.status === 'ended') ? item.status : 'scheduled',
-        startTime: item.start_time || item.startTime || '08:00 26/08/2026',
-        endTime: item.end_time || item.endTime || '11:30 26/08/2026',
-        totalDurationMinutes: Number(item.total_duration_minutes || item.totalDurationMinutes || 0),
-        documents: item.documents ? (typeof item.documents === 'string' ? JSON.parse(item.documents) : item.documents) : [],
-        votes: item.votes ? (typeof item.votes === 'string' ? JSON.parse(item.votes) : item.votes) : {},
-      }));
-    } catch (err) {
-      console.warn('Supabase fetchMeetingRooms failed:', err);
-      return null;
-    }
-  },
-
-  async upsertMeetingRoom(room: MeetingRoomItem): Promise<{ success: boolean; error?: string }> {
-    const supabase = getSupabase();
-    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
-
-    try {
-      const payload: any = {
-        id: room.id,
-        room_code: room.roomCode,
-        title: room.title,
-        session_number: room.sessionNumber,
-        chair_person: room.chairPerson,
-        secretary: room.secretary,
-        description: room.description || '',
-        unit_target: room.unitTarget || '',
-        password_required: room.passwordRequired,
-        room_password: room.roomPassword || '1945',
-        created_by_user_id: room.createdByUserId,
-        created_by_user_name: room.createdByUserName,
-        created_at: room.createdAt,
-        status: room.status,
-        start_time: room.startTime,
-        end_time: room.endTime,
-        total_duration_minutes: room.totalDurationMinutes,
-        documents: JSON.stringify(room.documents || []),
-        votes: JSON.stringify(room.votes || {}),
-      };
-
-      const { error } = await supabase.from('meeting_rooms').upsert(payload, { onConflict: 'id' });
-      if (error) {
-        console.error('Supabase upsertMeetingRoom error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      console.error('Supabase upsertMeetingRoom failed:', err);
-      return { success: false, error: err?.message };
-    }
-  },
-
-  async deleteMeetingRoom(roomId: string): Promise<{ success: boolean; error?: string }> {
-    const supabase = getSupabase();
-    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase' };
-
-    try {
-      const { error } = await supabase.from('meeting_rooms').delete().eq('id', roomId);
-      if (error) {
-        console.error('Supabase deleteMeetingRoom error:', error);
-        return { success: false, error: error.message };
-      }
-      return { success: true };
-    } catch (err: any) {
-      console.error('Supabase deleteMeetingRoom failed:', err);
-      return { success: false, error: err?.message };
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 8. BIỂU QUYẾT (Bảng: meeting_votes)
-  // -------------------------------------------------------------
-  async fetchMeetingVotes(): Promise<Record<number, MeetingVote> | null> {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-
-    try {
-      const { data, error } = await supabase.from('meeting_votes').select('*');
-      if (error) {
-        console.warn('Supabase fetchMeetingVotes error:', error.message);
-        return null;
-      }
-      if (!data) return null;
-
-      const votesMap: Record<number, MeetingVote> = {};
-      data.forEach((v: any) => {
-        const uid = Number(v.user_id || v.userId);
-        if (uid) {
-          votesMap[uid] = {
-            userId: uid,
-            voterName: v.voter_name || v.voterName || 'Đại biểu',
-            rankUnit: v.rank_unit || v.rankUnit || '',
-            choice: v.choice,
-            time: v.time,
-            docId: v.doc_id || v.docId,
-          };
-        }
-      });
-      return votesMap;
-    } catch (err) {
-      console.warn('Supabase fetchMeetingVotes failed:', err);
-      return null;
-    }
-  },
-
-  async upsertMeetingVote(vote: MeetingVote): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    try {
-      const payload: any = {
-        user_id: vote.userId,
-        voter_name: vote.voterName,
-        rank_unit: vote.rankUnit,
-        choice: vote.choice,
-        time: vote.time,
-        doc_id: vote.docId || null,
-      };
-
-      const { error } = await supabase.from('meeting_votes').upsert(payload, { onConflict: 'user_id' });
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.warn('Supabase upsertMeetingVote failed:', err);
-      return false;
-    }
-  },
-
-  async clearMeetingVotes(): Promise<boolean> {
-    const supabase = getSupabase();
-    if (!supabase) return false;
-
-    try {
-      const { error } = await supabase.from('meeting_votes').delete().neq('user_id', 0);
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.warn('Supabase clearMeetingVotes failed:', err);
-      return false;
-    }
-  },
-
-  // -------------------------------------------------------------
-  // 9. CẤU HÌNH GIAO DIỆN & TOÀN HỆ THỐNG (Bảng: site_config)
+  // 5. CẤU HÌNH GIAO DIỆN & TOÀN HỆ THỐNG (Bảng: site_config)
   // -------------------------------------------------------------
   async fetchSiteConfig(): Promise<SiteConfig | null> {
     const supabase = getSupabase();
@@ -1583,9 +1245,6 @@ export const supabaseDb = {
     onArticleDelete?: (articleId: number) => void;
     onDocumentsChange?: (docs: DocumentItem[]) => void;
     onLecturesChange?: (lectures: LectureItem[]) => void;
-    onMeetingSettingsChange?: (settings: MeetingRoomSettings) => void;
-    onMeetingDocumentsChange?: (docs: MeetingDocumentItem[]) => void;
-    onMeetingRoomsChange?: (rooms: MeetingRoomItem[]) => void;
     onSiteConfigChange?: (config: SiteConfig) => void;
     onUsersChange?: (users: User[]) => void;
   }): (() => void) | null {
@@ -1661,40 +1320,7 @@ export const supabaseDb = {
             console.warn('[Realtime Lectures Handler] Error caught safely:', e);
           }
         })
-        // 4. Meeting Settings
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_settings' }, async () => {
-          try {
-            if (callbacks.onMeetingSettingsChange) {
-              const fresh = await supabaseDb.fetchMeetingSettings();
-              if (fresh !== null) callbacks.onMeetingSettingsChange(fresh);
-            }
-          } catch (e) {
-            console.warn('[Realtime MeetingSettings Handler] Error caught safely:', e);
-          }
-        })
-        // 5. Meeting Documents
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_documents' }, async () => {
-          try {
-            if (callbacks.onMeetingDocumentsChange) {
-              const fresh = await supabaseDb.fetchMeetingDocuments();
-              if (fresh !== null) callbacks.onMeetingDocumentsChange(fresh);
-            }
-          } catch (e) {
-            console.warn('[Realtime MeetingDocuments Handler] Error caught safely:', e);
-          }
-        })
-        // 6. Meeting Rooms
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_rooms' }, async () => {
-          try {
-            if (callbacks.onMeetingRoomsChange) {
-              const fresh = await supabaseDb.fetchMeetingRooms();
-              if (fresh !== null) callbacks.onMeetingRoomsChange(fresh);
-            }
-          } catch (e) {
-            console.warn('[Realtime MeetingRooms Handler] Error caught safely:', e);
-          }
-        })
-        // 7. Site Config & Categories
+        // 4. Site Config & Categories
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_config' }, async () => {
           try {
             if (callbacks.onSiteConfigChange) {

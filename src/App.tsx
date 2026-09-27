@@ -6,10 +6,6 @@ import {
   HomeAnnouncement,
   HomeCategoryColumn,
   LectureItem,
-  MeetingDocumentItem,
-  MeetingRoomItem,
-  MeetingRoomSettings,
-  MeetingVote,
   MilitaryProfile,
   PageView,
   QuickActionCard,
@@ -27,9 +23,6 @@ import {
   defaultDailyWidgets,
   defaultDocuments,
   defaultLectures,
-  defaultMeetingDocuments,
-  defaultMeetingRooms,
-  defaultMeetingSettings,
   defaultMilitaryProfiles,
   defaultRoles,
   defaultSidebarWidgets,
@@ -47,7 +40,7 @@ import { Header } from './components/Header';
 import { Navbar } from './components/Navbar';
 import { NewsTicker } from './components/NewsTicker';
 import { HomeView } from './components/HomeView';
-import { SectionView } from './components/SectionView';
+import { CategoryView, SectionView } from './components/CategoryView';
 import { ArticleDetailView } from './components/ArticleDetailView';
 import { DocumentArchiveView } from './components/DocumentArchiveView';
 import { LectureLibraryView } from './components/LectureLibraryView';
@@ -375,39 +368,6 @@ export function App() {
     }
   });
 
-  const [meetingDocuments, setMeetingDocuments] = useState<MeetingDocumentItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('meeting_documents_cache') || localStorage.getItem('mangyang_meeting_documents');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return defaultMeetingDocuments;
-  });
-
-  const [meetingSettings, setMeetingSettings] = useState<MeetingRoomSettings>(() =>
-    safeStore.get('mangyang_meeting_settings', defaultMeetingSettings)
-  );
-
-  const [meetingVotes, setMeetingVotes] = useState<Record<number, MeetingVote>>(() =>
-    safeStore.get('mangyang_meeting_votes', {})
-  );
-
-  const [meetingRooms, setMeetingRooms] = useState<MeetingRoomItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('meeting_rooms_cache') || localStorage.getItem('mangyang_meeting_rooms');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return defaultMeetingRooms;
-  });
 
   const [roles, setRoles] = useState<RoleDefinition[]>(() =>
     safeStore.get('mangyang_custom_roles', defaultRoles)
@@ -421,6 +381,7 @@ export function App() {
   const [currentPage, setCurrentPage] = useState<PageView>('home');
   const [previousPage, setPreviousPage] = useState<PageView>('home');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
 
   // Modals state
   const [authModal, setAuthModal] = useState<{ isOpen: boolean; tab: 'login' | 'register' }>({
@@ -1008,63 +969,6 @@ export function App() {
           () => {}
         );
 
-      supabase
-        .from('meeting_rooms')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20)
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              setMeetingRooms(data as any);
-              try { localStorage.setItem('meeting_rooms_cache', JSON.stringify(data)); } catch {}
-            }
-          },
-          () => {}
-        );
-
-      supabase
-        .from('meeting_documents')
-        .select('*')
-        .limit(30)
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              setMeetingDocuments(data as any);
-              try { localStorage.setItem('meeting_documents_cache', JSON.stringify(data)); } catch {}
-            }
-          },
-          () => {}
-        );
-
-      supabase
-        .from('meeting_settings')
-        .select('*')
-        .maybeSingle()
-        .then(
-          ({ data }) => {
-            if (isMounted && data) {
-              setMeetingSettings((prev) => ({ ...prev, ...(data as any) }));
-            }
-          },
-          () => {}
-        );
-
-      supabase
-        .from('meeting_votes')
-        .select('*')
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              const voteMap: Record<number, any> = {};
-              data.forEach((v: any) => {
-                if (v.id) voteMap[v.id] = v;
-              });
-              setMeetingVotes(voteMap);
-            }
-          },
-          () => {}
-        );
 
       supabase
         .from('users')
@@ -1132,21 +1036,6 @@ export function App() {
       onLecturesChange: (freshLectures) => {
         if (isMounted && freshLectures) {
           setLectures(freshLectures);
-        }
-      },
-      onMeetingRoomsChange: (freshRooms) => {
-        if (isMounted && freshRooms) {
-          setMeetingRooms(freshRooms);
-        }
-      },
-      onMeetingDocumentsChange: (freshMeetingDocs) => {
-        if (isMounted && freshMeetingDocs) {
-          setMeetingDocuments(freshMeetingDocs);
-        }
-      },
-      onMeetingSettingsChange: (freshSettings) => {
-        if (isMounted && freshSettings) {
-          setMeetingSettings(freshSettings);
         }
       },
       onSiteConfigChange: (freshConfig) => {
@@ -1234,17 +1123,6 @@ export function App() {
     safeStore.set('mangyang_lectures', lectures);
   }, [lectures]);
 
-  useEffect(() => {
-    safeStore.set('mangyang_meeting_docs', meetingDocuments);
-  }, [meetingDocuments]);
-
-  useEffect(() => {
-    safeStore.set('mangyang_meeting_settings', meetingSettings);
-  }, [meetingSettings]);
-
-  useEffect(() => {
-    safeStore.set('mangyang_meeting_votes', meetingVotes);
-  }, [meetingVotes]);
 
   useEffect(() => {
     safeStore.set('mangyang_custom_roles', roles);
@@ -1339,6 +1217,11 @@ export function App() {
     }
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectCategory = (categoryId: string, sub?: string) => {
+    setSelectedSubcategory(sub || 'all');
+    handleSelectPage(categoryId as PageView);
   };
 
   const handleOpenArticle = (article: Article) => {
@@ -1494,9 +1377,6 @@ export function App() {
       isOnline: false,
       canViewDoc: false,
       canUploadDoc: false,
-      canJoinPartyMeeting: false,
-      canUploadMeetingDoc: false,
-      canDeleteMeetingDoc: false,
       canViewCollaborativeEdits: false,
       role: 'user',
     };
@@ -1622,9 +1502,6 @@ export function App() {
         isOnline: false,
         canViewDoc: true,
         canUploadDoc: false,
-        canJoinPartyMeeting: false,
-        canUploadMeetingDoc: false,
-        canDeleteMeetingDoc: false,
         canViewCollaborativeEdits: false,
       };
 
@@ -1729,9 +1606,6 @@ export function App() {
           isOnline: false,
           canViewDoc: true,
           canUploadDoc: false,
-          canJoinPartyMeeting: false,
-          canUploadMeetingDoc: false,
-          canDeleteMeetingDoc: false,
           canViewCollaborativeEdits: false,
         };
         newUsersToAdd.push(newUser);
@@ -1787,9 +1661,6 @@ export function App() {
       const defaultPerms = roleDef?.defaultPermissions || {
         canViewDoc: true,
         canUploadDoc: false,
-        canJoinPartyMeeting: false,
-        canUploadMeetingDoc: false,
-        canDeleteMeetingDoc: false,
         canViewCollaborativeEdits: false,
       };
 
@@ -1836,10 +1707,8 @@ export function App() {
     field:
       | 'canViewDoc'
       | 'canUploadDoc'
-      | 'canJoinPartyMeeting'
-      | 'canCreateMeeting'
-      | 'canUploadMeetingDoc'
-      | 'canDeleteMeetingDoc'
+      | 'canUploadDocs'
+      | 'canViewSecretDocs'
       | 'canViewCollaborativeEdits',
     checked: boolean
   ) => {
@@ -1893,9 +1762,8 @@ export function App() {
               ? {
                   canViewDoc: true,
                   canUploadDoc: true,
-                  canJoinPartyMeeting: true,
-                  canUploadMeetingDoc: true,
-                  canDeleteMeetingDoc: true,
+                  canUploadDocs: true,
+                  canViewSecretDocs: true,
                   canViewCollaborativeEdits: true,
                 }
               : {}),
@@ -1957,12 +1825,6 @@ export function App() {
   const handleDeleteUser = async (userId: number) => {
     if (confirm('Đồng chí có chắc chắn muốn xóa tài khoản quân nhân này khỏi hệ thống?')) {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-      // Remove votes if any
-      setMeetingVotes((prev) => {
-        const copy = { ...prev };
-        delete copy[userId];
-        return copy;
-      });
       const res = await cloudStorage.deleteUser(userId);
       if (res.success) {
         showToast('info', 'Đã xóa tài khoản', 'Tài khoản quân nhân đã được xóa khỏi Cơ sở dữ liệu.');
@@ -2319,124 +2181,7 @@ export function App() {
     );
   };
 
-  // Party Meeting Document Actions
-  const handleSaveMeetingDocument = async (doc: MeetingDocumentItem) => {
-    const exists = meetingDocuments.some((d) => d.id === doc.id);
-    if (exists) {
-      setMeetingDocuments((prev) => prev.map((d) => (d.id === doc.id ? doc : d)));
-    } else {
-      setMeetingDocuments((prev) => [doc, ...prev]);
-    }
-    const res = await cloudStorage.saveMeetingDocument(doc);
-    if (res.success) {
-      showToast('success', 'Đã lưu tài liệu phòng họp', `Tài liệu "${doc.title}" đã được lưu trữ vào Cơ sở dữ liệu phòng họp.`);
-    } else {
-      showToast('error', 'Lỗi lưu tài liệu họp', res.error);
-    }
-  };
-
-  const handleDeleteMeetingDocument = async (docId: number) => {
-    setMeetingDocuments((prev) => prev.filter((d) => d.id !== docId));
-    const res = await cloudStorage.deleteMeetingDocument(docId);
-    if (res.success) {
-      showToast('info', 'Đã xóa tài liệu phòng họp', 'Tài liệu đã được gỡ bỏ khỏi Cơ sở dữ liệu.');
-    } else {
-      showToast('error', 'Lỗi xóa tài liệu họp', res.error);
-    }
-  };
-
-  const handleSaveMeetingSettings = async (settings: MeetingRoomSettings) => {
-    setMeetingSettings(settings);
-    const res = await cloudStorage.saveMeetingSettings(settings);
-    if (res.success) {
-      showToast('success', 'Đã cập nhật cấu hình phòng họp', 'Thiết lập mật khẩu và thông tin kỳ họp đã được đồng bộ lên Cơ sở dữ liệu.');
-    } else {
-      showToast('error', 'Lỗi lưu cấu hình phòng họp', res.error);
-    }
-  };
-
-  const handleCastVote = (vote: MeetingVote) => {
-    const voteKey = vote.docId ? `${vote.docId}_${vote.userId}` : `${vote.userId}`;
-    setMeetingVotes((prev: any) => ({
-      ...prev,
-      [voteKey]: vote,
-      [vote.userId]: vote,
-    }));
-    cloudStorage.saveMeetingVote(vote);
-    showToast('success', 'Biểu quyết thành công', `Đồng chí ${vote.voterName} đã biểu quyết: [${vote.choice.toUpperCase()}].`);
-  };
-
-  const handleResetVotes = (docId?: number) => {
-    if (docId !== undefined) {
-      setMeetingVotes((prev) => {
-        const copy: any = { ...prev };
-        Object.keys(copy).forEach((k) => {
-          if (copy[k]?.docId === docId) {
-            delete copy[k];
-          }
-        });
-        return copy;
-      });
-      showToast('info', 'Khởi tạo lại biểu quyết', 'Đã làm mới phiên biểu quyết cho văn bản này.');
-    } else {
-      setMeetingVotes({});
-      cloudStorage.resetMeetingVotes();
-      showToast('info', 'Khởi tạo lại toàn bộ', 'Đã làm mới toàn bộ kết quả biểu quyết trong kỳ họp Đảng ủy.');
-    }
-  };
-
-  // Party Meeting Multi-Room Handlers
-  const handleSaveMeetingRoom = async (room: MeetingRoomItem) => {
-    let updatedRooms: MeetingRoomItem[] = [];
-    setMeetingRooms((prev) => {
-      const idx = prev.findIndex((r) => r.id === room.id);
-      let updated: MeetingRoomItem[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = room;
-      } else {
-        if (prev.length >= 30) {
-          showToast('warning', 'Đạt giới hạn phòng họp', 'Đã đạt giới hạn tối đa 30 phòng họp đồng thời! Vui lòng kết thúc hoặc xóa bớt phòng họp cũ.');
-          return prev;
-        }
-        updated = [room, ...prev];
-      }
-      updatedRooms = updated.slice(0, 30);
-      safeStore.set('mangyang_meeting_rooms', updatedRooms);
-      return updatedRooms;
-    });
-
-    const res = await cloudStorage.saveMeetingRoom(room, updatedRooms);
-    if (res.success) {
-      showToast('success', 'Đã lưu phòng họp trực tuyến', `Phòng họp "${room.title}" đã được lưu lên Cơ sở dữ liệu.`);
-    } else {
-      showToast('error', 'Lỗi lưu phòng họp', res.error);
-    }
-  };
-
-  const handleDeleteMeetingRoom = async (roomId: string) => {
-    let updatedRooms: MeetingRoomItem[] = [];
-    setMeetingRooms((prev) => {
-      const updated = prev.filter((r) => r.id !== roomId);
-      updatedRooms = updated;
-      safeStore.set('mangyang_meeting_rooms', updated);
-      return updated;
-    });
-
-    const res = await cloudStorage.deleteMeetingRoom(roomId, updatedRooms);
-    if (res.success) {
-      showToast('info', 'Đã xóa phòng họp', 'Phòng họp đã được gỡ bỏ khỏi Cơ sở dữ liệu.');
-    } else {
-      showToast('error', 'Lỗi xóa phòng họp', res.error);
-    }
-  };
-
-  const handleSaveMeetingRooms = (rooms: MeetingRoomItem[]) => {
-    const limited = rooms.slice(0, 30);
-    setMeetingRooms(limited);
-    safeStore.set('mangyang_meeting_rooms', limited);
-    cloudStorage.saveMeetingRooms(limited);
-  };
+  // Document Categories Actions
 
   const handleSaveDocCategories = async (newCats: string[]) => {
     const currentCategoriesList =
@@ -2569,11 +2314,7 @@ export function App() {
       console.warn('cloudStorage.saveSiteConfig error:', e);
     }
 
-    if (saveSuccess) {
-      showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Cấu hình giao diện và dòng chữ chạy đã được cập nhật.');
-    } else {
-      showToast('info', 'Đã lưu cục bộ', 'Dữ liệu đã được lưu trên thiết bị của bạn.');
-    }
+    showToast('success', '✅ Đã lưu cấu hình thành công!', 'Cấu hình giao diện đã được đồng bộ lên Cơ sở dữ liệu.');
 
     if (categoryRenames && categoryRenames.length > 0) {
       setArticles((prevArticles) => {
@@ -2767,6 +2508,8 @@ export function App() {
         categories_config: updatedCategories,
         categoriesConfig: updatedCategories,
         categories: updatedCategories,
+        navigation_tabs: updatedCategories,
+        navTabs: updatedCategories,
       };
       try {
         localStorage.setItem('cached_site_config', JSON.stringify(updated));
@@ -2777,19 +2520,19 @@ export function App() {
 
     // 2. BẮT BUỘC GHI TRỰC TIẾP LÊN SUPABASE DATABASE
     try {
-      const supabase = getSupabase();
-      if (!supabase) {
-        alert('❌ Không tìm thấy kết nối Supabase!');
+      const client = supabase || getSupabase();
+      if (!client) {
+        alert('Lỗi lưu Supabase: Không tìm thấy kết nối CSDL');
         return;
       }
 
-      const { error } = await supabase
+      const { error } = await client
         .from('site_config')
         .upsert(
           {
             id: 'default',
             categories_config: updatedCategories,
-            navigation_tabs: updatedCategories, // Đồng bộ luôn cả thanh Tabbar
+            navigation_tabs: updatedCategories,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'id' }
@@ -2797,13 +2540,13 @@ export function App() {
 
       if (error) {
         console.error('Lỗi Supabase:', error);
-        alert('❌ LỖI KHÔNG LƯU ĐƯỢC LÊN DATABASE: ' + error.message);
+        alert('Lỗi lưu Supabase: ' + error.message);
         return;
       }
 
-      alert('✅ ĐÃ LƯU VÀ ĐỒNG BỘ LÊN DATABASE SUPABASE THÀNH CÔNG! Mọi thiết bị sẽ nhận được thay đổi.');
+      alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
     } catch (err: any) {
-      alert('❌ Lỗi kết nối mạng: ' + err.message);
+      alert('Lỗi lưu Supabase: ' + err.message);
     }
   };
 
@@ -3123,8 +2866,9 @@ export function App() {
         onOpenAuth={(tab) => setAuthModal({ isOpen: true, tab })}
         onOpenProfile={() => setProfileModalOpen(true)}
         onLogout={handleLogout}
-        onGoHome={() => setCurrentPage('home')}
+        onGoHome={() => handleSelectCategory('home', 'all')}
         onSelectPage={handleSelectPage}
+        onSelectCategory={handleSelectCategory}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
         onOpenUncleHoManager={() => setUncleHoManagerOpen(true)}
         onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
@@ -3135,6 +2879,7 @@ export function App() {
       <Navbar
         currentPage={currentPage}
         onSelectPage={handleSelectPage}
+        onSelectCategory={handleSelectCategory}
         currentUser={currentUser}
         pendingDraftsCount={pendingDraftsCount}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
@@ -3152,7 +2897,7 @@ export function App() {
         articles={articles}
         primaryRedColor={siteConfig.colorRed}
         onOpenArticle={handleOpenArticle}
-        onTickerClick={() => handleSelectPage('home')}
+        onTickerClick={() => handleSelectCategory('home', 'all')}
       />
 
       {/* 4. Main Body Container */}
@@ -3198,9 +2943,13 @@ export function App() {
                 siteConfig.categories_config.some(
                   (c: any) => c.id === currentPage || c.targetPage === currentPage
                 ))) && (
-              <SectionView
+              <CategoryView
                 sectionKey={currentPage as any}
+                categoryId={currentPage}
+                categories={categories}
                 articles={articles}
+                selectedSub={selectedSubcategory}
+                onSelectSub={setSelectedSubcategory}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
                 isLoading={isLoadingData}
@@ -3208,10 +2957,10 @@ export function App() {
                 onOpenPostModal={handleOpenPostModal}
                 onEditArticle={handleOpenEditArticleModal}
                 onDeleteArticle={handleDeleteArticle}
-                onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
+                onSelectSection={handleSelectCategory}
+                onGoHome={() => handleSelectCategory('home', 'all')}
                 onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
-                onSaveCategories={(newCats) => handleSaveSectionCategories(currentPage as any, newCats)}
+                onSaveCategories={handleSaveCategories}
                 onRenameCategory={(oldCat, newCat) =>
                   handleRenameSectionCategory(currentPage as any, oldCat, newCat)
                 }
@@ -3469,16 +3218,9 @@ export function App() {
           <CategoryManagerModal
             isOpen={isCategoryModalOpen}
             onClose={() => setIsCategoryModalOpen(false)}
-            onSave={(newCats) => {
-              setCategories(newCats);
-              setSiteConfig((prev) => ({
-                ...prev,
-                categories_config: newCats,
-                navigation_tabs: newCats,
-                categoriesConfig: newCats,
-                categories: newCats,
-              }));
-            }}
+            onSave={handleSaveCategories}
+            onSaveCategories={handleSaveCategories}
+            categories={categories}
             initialCategories={categories}
           />
         )}

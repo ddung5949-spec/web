@@ -13,12 +13,6 @@ export interface AISummarizeResponse {
   error?: string;
 }
 
-export interface AIMeetingDraftResponse {
-  success: boolean;
-  draftResolution?: string;
-  error?: string;
-}
-
 export interface AIHealthResponse {
   status: string;
   service?: string;
@@ -92,43 +86,6 @@ export async function summarizeWithAI(
     return {
       success: false,
       error: 'Không thể kết nối đến máy chủ Backend để tóm tắt văn bản.',
-    };
-  }
-}
-
-export async function assistMeetingResolutionWithAI(
-  meetingTitle: string,
-  meetingCode?: string,
-  discussions?: string[],
-  existingResolution?: string
-): Promise<AIMeetingDraftResponse> {
-  try {
-    const res = await fetch('/api/ai/meeting-assistant', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        meetingTitle,
-        meetingCode,
-        discussions: discussions || [],
-        existingResolution: existingResolution || '',
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      return {
-        success: false,
-        error: data?.error || `Lỗi máy chủ (${res.status})`,
-      };
-    }
-    return data;
-  } catch (err: any) {
-    console.error('Error assisting meeting resolution with AI:', err);
-    return {
-      success: false,
-      error: 'Không thể kết nối đến máy chủ Backend để dự thảo nghị quyết.',
     };
   }
 }

@@ -24,6 +24,7 @@ import { defaultNavTabs } from '../data/initialData';
 interface NavbarProps {
   currentPage: PageView;
   onSelectPage: (page: PageView) => void;
+  onSelectCategory?: (categoryId: string, subcategory?: string) => void;
   currentUser: User | null;
   pendingDraftsCount: number;
   onOpenCustomizer: () => void;
@@ -37,6 +38,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentPage,
   onSelectPage,
+  onSelectCategory,
   currentUser,
   pendingDraftsCount,
   onOpenCustomizer,
@@ -111,9 +113,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       });
     }
 
-    // Filter enabled tabs, exclude meeting, and sort by order
+    // Filter enabled tabs, exclude meeting & home (home is permanently fixed at position 0), and sort by order
     return tabs
-      .filter((t) => t.enabled !== false && t.id !== 'meeting' && t.targetPage !== 'meeting')
+      .filter(
+        (t) =>
+          t.enabled !== false &&
+          t.id !== 'meeting' &&
+          t.targetPage !== 'meeting' &&
+          t.id !== 'home' &&
+          t.targetPage !== 'home'
+      )
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [siteConfig?.navTabs, siteConfig?.sections, siteConfig?.categories_config, categories]);
 
@@ -278,6 +287,30 @@ export const Navbar: React.FC<NavbarProps> = ({
           onWheel={handleWheel}
           className="w-full flex items-center justify-start md:justify-center flex-nowrap md:flex-wrap gap-1 sm:gap-2 px-2 py-1.5 list-none m-0 overflow-x-auto md:overflow-visible no-scrollbar scroll-smooth"
         >
+          {/* 1. NÚT TRANG CHỦ CỐ ĐỊNH Ở VỊ TRÍ ĐẦU TIÊN BÊN TRÁI */}
+          <li className="shrink-0">
+            <button
+              type="button"
+              id="nav-home"
+              onClick={() => {
+                if (onSelectCategory) {
+                  onSelectCategory('home', 'all');
+                } else {
+                  onSelectPage('home');
+                }
+              }}
+              className={`bg-red-700 hover:bg-red-800 text-white font-bold text-xs sm:text-sm px-3.5 py-1.5 rounded shadow flex items-center gap-1.5 cursor-pointer transition-all ${
+                currentPage === 'home'
+                  ? 'ring-2 ring-amber-300 shadow-md brightness-110'
+                  : ''
+              }`}
+              title="Về Trang chủ"
+            >
+              <span>🏠</span>
+              <span>TRANG CHỦ</span>
+            </button>
+          </li>
+
           {configuredNavTabs.map((tab) => {
             const Icon = getTabIcon(tab.id, tab.type);
             const displayLabel = getTabLabel(tab);
@@ -304,7 +337,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             const target = (tab.targetPage || tab.id) as PageView;
             const isActive = currentPage === target;
 
-            // Resolve dynamic subcategories from categories_config
+            // Resolve dynamic subcategories from categories_config (ONLY subcategories, NEVER parent categories)
             const categoriesList =
               (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
               siteConfig?.categories_config ||
@@ -313,8 +346,31 @@ export const Navbar: React.FC<NavbarProps> = ({
             const catItem = Array.isArray(categoriesList)
               ? categoriesList.find((c: any) => c.id === tab.id || c.id === tab.targetPage || c.name === tab.label)
               : undefined;
-            const rawSubcategories = catItem?.subcategories || catItem?.categories || [];
-            const subcategories: string[] = Array.isArray(rawSubcategories) ? rawSubcategories : [];
+
+            // Get subcategories specifically
+            const rawSubcategories = catItem?.subcategories || (siteConfig?.sections as any)?.[tab.id]?.categories || [];
+            
+            // Build a set of parent names/labels to strictly exclude from dropdown
+            const parentLabels = new Set(
+              ['home', 'ctd', 'hl', 'bac', 'doc', 'lecture', 'qdnd', 'qk5', 'trang chủ']
+            );
+            (configuredNavTabs || []).forEach((t) => {
+              if (t.id) parentLabels.add(String(t.id).toLowerCase());
+              if (t.label) parentLabels.add(String(t.label).toLowerCase());
+              if (t.short_name) parentLabels.add(String(t.short_name).toLowerCase());
+            });
+
+            const subcategories: string[] = (Array.isArray(rawSubcategories) ? rawSubcategories : [])
+              .map((sub: any) => typeof sub === 'string' ? sub.trim() : (sub?.name || sub?.title || sub?.label || '').trim())
+              .filter((name: string) => {
+                if (!name) return false;
+                const lower = name.toLowerCase();
+                // Never repeat parent category names or tab labels
+                if (parentLabels.has(lower)) return false;
+                if (lower === displayLabel.toLowerCase()) return false;
+                return true;
+              });
+
             const hasSubcategories = subcategories && subcategories.length > 0;
             const isDropdownOpen = activeDropdownTabId === tab.id;
 
@@ -333,7 +389,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   id={`nav-${tab.id}`}
                   onClick={() => {
-                    onSelectPage(target);
+                    if (onSelectCategory) {
+                      onSelectCategory(catItem?.id || tab.id || tab.targetPage, 'all');
+                    } else {
+                      onSelectPage(target);
+                    }
                     setActiveDropdownTabId(null);
                   }}
                   style={{
@@ -364,17 +424,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <div className="px-3 py-1.5 border-b border-white/10 text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center justify-between">
                       <span>{displayLabel}</span>
-                      <span className="text-[9px] text-white/50 font-normal">Chuyên mục</span>
+                      <span className="text-[9px] text-white/50 font-normal">Tiểu mục</span>
                     </div>
                     <div className="py-1 max-h-64 overflow-y-auto">
-                      {subcategories.map((sub: any, sIdx: number) => {
-                        const subName = typeof sub === 'string' ? sub : (sub?.name || sub?.title || sub?.label || String(sub || ''));
+                      {(catItem?.subcategories || subcategories || []).map((sub: any, sIdx: number) => {
+                        const subName = typeof sub === 'string' ? sub : (sub?.name || sub?.title || sub?.label || '');
+                        if (!subName) return null;
                         return (
                           <button
                             key={sIdx}
                             type="button"
                             onClick={() => {
-                              onSelectPage(target);
+                              if (onSelectCategory) {
+                                onSelectCategory(catItem?.id || tab.id || tab.targetPage, subName);
+                              } else {
+                                onSelectPage(target);
+                              }
                               setActiveDropdownTabId(null);
                             }}
                             className="w-full text-left px-3.5 py-1.5 text-xs text-white/90 hover:text-amber-200 hover:bg-black/40 transition-colors flex items-center gap-2 cursor-pointer"
@@ -414,22 +479,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {pendingDraftsCount}
                   </span>
                 )}
-              </button>
-            </li>
-          )}
-
-          {/* Quản lý Chuyên mục (Chỉ dành cho Admin) */}
-          {isAdmin && onOpenCategoryManager && (
-            <li className="shrink-0">
-              <button
-                type="button"
-                id="nav-category-manager"
-                onClick={onOpenCategoryManager}
-                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold uppercase bg-amber-400 hover:bg-amber-300 text-red-950 transition-all cursor-pointer whitespace-nowrap rounded-md border border-amber-300 shadow-xs"
-                title="Quản lý cấu trúc chuyên mục và tabbar website"
-              >
-                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-950" />
-                <span>Chuyên mục</span>
               </button>
             </li>
           )}

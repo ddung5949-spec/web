@@ -27,11 +27,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   const [avatar, setAvatar] = useState('');
   const [canViewDoc, setCanViewDoc] = useState(false);
   const [canUploadDoc, setCanUploadDoc] = useState(false);
-  const [canJoinPartyMeeting, setCanJoinPartyMeeting] = useState(false);
-  const [canUploadMeetingDoc, setCanUploadMeetingDoc] = useState(false);
-  const [canDeleteMeetingDoc, setCanDeleteMeetingDoc] = useState(false);
   const [canViewCollaborativeEdits, setCanViewCollaborativeEdits] = useState(false);
-  const [canCreateMeeting, setCanCreateMeeting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -45,11 +41,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       setAvatar(userToEdit.avatar || '');
       setCanViewDoc(!!userToEdit.canViewDoc);
       setCanUploadDoc(!!userToEdit.canUploadDoc);
-      setCanJoinPartyMeeting(!!userToEdit.canJoinPartyMeeting);
-      setCanUploadMeetingDoc(!!userToEdit.canUploadMeetingDoc);
-      setCanDeleteMeetingDoc(!!userToEdit.canDeleteMeetingDoc);
       setCanViewCollaborativeEdits(!!userToEdit.canViewCollaborativeEdits);
-      setCanCreateMeeting(!!userToEdit.canCreateMeeting);
     } else {
       setUsername('');
       setPassword('123456');
@@ -60,11 +52,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       setAvatar(MILITARY_FALLBACK_AVATAR);
       setCanViewDoc(true);
       setCanUploadDoc(false);
-      setCanJoinPartyMeeting(false);
-      setCanUploadMeetingDoc(false);
-      setCanDeleteMeetingDoc(false);
       setCanViewCollaborativeEdits(false);
-      setCanCreateMeeting(false);
     }
     setError('');
   }, [userToEdit, isOpen]);
@@ -96,11 +84,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
       avatar: avatar || '',
       canViewDoc: role === 'admin' ? true : canViewDoc,
       canUploadDoc: role === 'admin' ? true : canUploadDoc,
-      canJoinPartyMeeting: role === 'admin' ? true : canJoinPartyMeeting,
-      canUploadMeetingDoc: role === 'admin' ? true : canUploadMeetingDoc,
-      canDeleteMeetingDoc: role === 'admin' ? true : canDeleteMeetingDoc,
       canViewCollaborativeEdits: role === 'admin' ? true : canViewCollaborativeEdits,
-      canCreateMeeting: role === 'admin' ? true : canCreateMeeting,
     };
 
     if (password.trim()) {
@@ -227,11 +211,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                     if (matchedRole?.defaultPermissions && !userToEdit) {
                       setCanViewDoc(matchedRole.defaultPermissions.canViewDoc ?? true);
                       setCanUploadDoc(matchedRole.defaultPermissions.canUploadDoc ?? false);
-                      setCanJoinPartyMeeting(matchedRole.defaultPermissions.canJoinPartyMeeting ?? false);
-                      setCanUploadMeetingDoc(matchedRole.defaultPermissions.canUploadMeetingDoc ?? false);
-                      setCanDeleteMeetingDoc(matchedRole.defaultPermissions.canDeleteMeetingDoc ?? false);
                       setCanViewCollaborativeEdits(matchedRole.defaultPermissions.canViewCollaborativeEdits ?? false);
-                      setCanCreateMeeting(matchedRole.defaultPermissions.canCreateMeeting ?? false);
                     }
                   }}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-600 focus:border-red-600 font-bold text-gray-800 bg-gray-50 outline-hidden cursor-pointer"

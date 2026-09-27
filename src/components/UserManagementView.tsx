@@ -80,10 +80,6 @@ interface UserManagementViewProps {
     field:
       | 'canViewDoc'
       | 'canUploadDoc'
-      | 'canJoinPartyMeeting'
-      | 'canCreateMeeting'
-      | 'canUploadMeetingDoc'
-      | 'canDeleteMeetingDoc'
       | 'canViewCollaborativeEdits',
     checked: boolean
   ) => void;
@@ -230,9 +226,6 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
         isOnline: false,
         canViewDoc: userData.canViewDoc ?? true,
         canUploadDoc: userData.canUploadDoc ?? false,
-        canJoinPartyMeeting: userData.canJoinPartyMeeting ?? false,
-        canUploadMeetingDoc: userData.canUploadMeetingDoc ?? false,
-        canDeleteMeetingDoc: userData.canDeleteMeetingDoc ?? false,
         canViewCollaborativeEdits: userData.canViewCollaborativeEdits ?? false,
       };
 

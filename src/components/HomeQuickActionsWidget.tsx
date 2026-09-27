@@ -25,7 +25,6 @@ const ICON_MAP = {
   exam: Award,
   doc: FolderLock,
   video: GraduationCap,
-  meeting: Shield,
   book: BookOpen,
   award: Award,
   link: LinkIcon,
