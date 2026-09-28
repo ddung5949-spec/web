@@ -641,10 +641,12 @@ export const supabaseDb = {
         id: Number(item.id),
         code: item.code || '',
         title: item.title || '',
-        category: item.category || 'Văn bản chỉ đạo',
+        category: item.category || 'VĂN BẢN - CHỈ THỊ',
+        sub_category: item.sub_category || item.subCategory || item.category || '',
+        subCategory: item.sub_category || item.subCategory || item.category || '',
         issuer: item.issuer || 'Trung đoàn 95',
         date: item.date || '26/08/2026',
-        type: item.type || 'Quyết định',
+        type: item.type || 'pdf',
         description: item.description || undefined,
         fileName: item.file_name || item.fileName || undefined,
         fileSize: item.file_size || item.fileSize || undefined,
@@ -667,7 +669,8 @@ export const supabaseDb = {
         id: doc.id,
         code: doc.code,
         title: doc.title,
-        category: doc.category || '',
+        category: doc.category || 'VĂN BẢN - CHỈ THỊ',
+        sub_category: doc.sub_category || doc.subCategory || '',
         issuer: doc.issuer,
         date: doc.date,
         type: doc.type,
@@ -679,7 +682,12 @@ export const supabaseDb = {
         secret_level: doc.secretLevel || 'normal',
       };
 
-      const { error } = await supabase.from('documents').upsert(payload, { onConflict: 'id' });
+      let { error } = await supabase.from('documents').upsert(payload, { onConflict: 'id' });
+      if (error && error.message?.toLowerCase().includes('sub_category')) {
+        delete payload.sub_category;
+        const retry = await supabase.from('documents').upsert(payload, { onConflict: 'id' });
+        error = retry.error;
+      }
       if (error) {
         console.error('Supabase upsertDocument error:', error);
         return { success: false, error: error.message };
@@ -729,8 +737,11 @@ export const supabaseDb = {
 
       return data.map((item: any) => ({
         id: Number(item.id),
+        code: item.code || `BG-${item.id}`,
         title: item.title || '',
-        category: item.category || 'Giáo dục chính trị',
+        category: item.category || 'BÀI GIẢNG SỐ',
+        sub_category: item.sub_category || item.subCategory || item.target || '',
+        subCategory: item.sub_category || item.subCategory || item.target || '',
         target: item.target || 'Toàn thể cán bộ, chiến sĩ',
         author: item.author || 'Ban Chính trị',
         desc: item.desc || '',
@@ -754,8 +765,10 @@ export const supabaseDb = {
     try {
       const payload: any = {
         id: lecture.id,
+        code: lecture.code || `BG-${lecture.id}`,
         title: lecture.title,
-        category: lecture.category || 'Giáo dục chính trị',
+        category: lecture.category || 'BÀI GIẢNG SỐ',
+        sub_category: lecture.sub_category || lecture.subCategory || lecture.target || '',
         target: lecture.target,
         author: lecture.author,
         desc: lecture.desc,
@@ -767,7 +780,12 @@ export const supabaseDb = {
         downloads: lecture.downloads || 0,
       };
 
-      const { error } = await supabase.from('lectures').upsert(payload, { onConflict: 'id' });
+      let { error } = await supabase.from('lectures').upsert(payload, { onConflict: 'id' });
+      if (error && error.message?.toLowerCase().includes('sub_category')) {
+        delete payload.sub_category;
+        const retry = await supabase.from('lectures').upsert(payload, { onConflict: 'id' });
+        error = retry.error;
+      }
       if (error) {
         console.error('Supabase upsertLecture error:', error);
         return { success: false, error: error.message };

@@ -38,6 +38,7 @@ interface LectureLibraryViewProps {
   onUpdateLecture?: (lec: LectureItem) => void;
   onSelectSection?: (section: PageView) => void;
   onGoHome?: () => void;
+  onBackHome?: () => void;
   onOpenTabIntroModal?: (tabKey: string) => void;
   onSaveCategories?: (categories: string[]) => void;
   onRenameCategory?: (oldCat: string, newCat: string) => void;
@@ -54,6 +55,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
   onUpdateLecture,
   onSelectSection,
   onGoHome,
+  onBackHome,
   onOpenTabIntroModal,
   onSaveCategories,
   onRenameCategory,
@@ -69,6 +71,8 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [previewLecture, setPreviewLecture] = useState<LectureItem | null>(null);
+
+  const handleBack = onBackHome || onGoHome;
 
   const title =
     siteConfig?.sections?.lecture?.title ||
@@ -246,7 +250,7 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
       <nav className="flex items-center gap-1.5 text-xs text-gray-500 pb-2 border-b border-gray-200">
         <button
           type="button"
-          onClick={onGoHome}
+          onClick={handleBack}
           className="hover:text-teal-800 flex items-center gap-1 cursor-pointer font-medium"
         >
           <Home className="w-3.5 h-3.5" />

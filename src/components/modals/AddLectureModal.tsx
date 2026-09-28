@@ -185,7 +185,9 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         ...lectureToEdit,
         code: finalCode,
         title: cleanTitle,
-        category,
+        category: 'BÀI GIẢNG SỐ',
+        sub_category: category,
+        subCategory: category,
         target: target.trim(),
         desc: desc.trim() || 'Giáo án điện tử và học liệu đa phương tiện phục vụ huấn luyện.',
         author: author.trim(),
@@ -194,7 +196,6 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         fileSize: finalFileSize,
         fileUrl: fileUrl.trim() || lectureToEdit.fileUrl || '',
       });
-      toast.success('Cập nhật thành công', 'Đã cập nhật thông tin và tệp bài giảng thành công!');
     } else {
       const today = new Date();
       const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(
@@ -206,7 +207,9 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
       onAddLecture({
         code: finalCode,
         title: cleanTitle,
-        category,
+        category: 'BÀI GIẢNG SỐ',
+        sub_category: category,
+        subCategory: category,
         target: target.trim(),
         desc: desc.trim() || 'Giáo án điện tử và học liệu đa phương tiện phục vụ huấn luyện.',
         author: author.trim(),
@@ -217,7 +220,6 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         fileUrl: fileUrl.trim() || undefined,
         downloads: 0,
       });
-      toast.success('Tải lên thành công', 'Đã thêm và lưu trữ bài giảng số vào hệ thống thành công!');
     }
 
     onClose();

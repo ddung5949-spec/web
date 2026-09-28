@@ -177,7 +177,9 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         ...editingDoc,
         code: code.trim(),
         title: title.trim(),
-        category,
+        category: 'VĂN BẢN - CHỈ THỊ',
+        sub_category: category,
+        subCategory: category,
         description: description.trim() || undefined,
         issuer: issuer.trim(),
         type,
@@ -186,7 +188,6 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         fileUrl: fileUrl.trim() || editingDoc.fileUrl || undefined,
         secretLevel,
       });
-      toast.success('Cập nhật thành công', 'Đã cập nhật thông tin văn bản thành công!');
     } else {
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
@@ -196,7 +197,9 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
       onAddDoc({
         code: code.trim(),
         title: title.trim(),
-        category,
+        category: 'VĂN BẢN - CHỈ THỊ',
+        sub_category: category,
+        subCategory: category,
         description: description.trim() || undefined,
         issuer: issuer.trim(),
         date: dateStr,
@@ -207,7 +210,6 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         downloads: 0,
         secretLevel,
       });
-      toast.success('Lưu văn bản thành công', 'Đã lưu văn bản vào Kho lưu trữ điện tử thành công!');
     }
 
     onClose();

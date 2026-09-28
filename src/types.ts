@@ -113,6 +113,8 @@ export interface DocumentItem {
   code: string;
   title: string;
   category?: string;
+  sub_category?: string;
+  subCategory?: string;
   issuer: string;
   date: string;
   type: 'pdf' | 'docx' | 'doc' | 'xlsx' | 'xls' | 'pptx' | 'ppt' | 'zip' | 'rar' | string;
@@ -129,6 +131,8 @@ export interface LectureItem {
   code?: string;
   title: string;
   category?: string;
+  sub_category?: string;
+  subCategory?: string;
   target: string;
   author: string;
   desc: string;

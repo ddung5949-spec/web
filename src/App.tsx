@@ -444,6 +444,7 @@ export function App() {
   const [currentPage, setCurrentPage] = useState<PageView>("home");
   const [previousPage, setPreviousPage] = useState<PageView>("home");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
 
   // Modals state
@@ -1438,35 +1439,111 @@ export function App() {
     (a) => a.status === "pending",
   ).length;
 
-  // Page Key Normalizer for Dedicated Libraries (Document & Lecture)
-  const normalizePageKey = (raw: string): PageView => {
-    const lower = (raw || "").toLowerCase().trim();
+  // Helper to detect if a category key or name belongs to Document Library
+  const isDocCategory = (key: string): boolean => {
+    if (!key) return false;
+    const lower = key.toLowerCase().trim();
     if (
       lower === "doc" ||
       lower === "documents" ||
       lower === "van-ban" ||
       lower === "vanban" ||
+      lower === "van-ban-chi-thi" ||
       lower === "kho-van-ban" ||
-      lower === "kho-van-ban-chi-thi"
+      lower.includes("van-ban") ||
+      lower.includes("vanban") ||
+      lower.includes("văn bản")
     ) {
-      return "doc";
+      return true;
     }
+    if (Array.isArray(siteConfig?.categories_config)) {
+      const match = siteConfig.categories_config.find(
+        (c: any) => c.id === key || c.targetPage === key,
+      );
+      if (match) {
+        const nameLower = (
+          match.name ||
+          match.navName ||
+          match.label ||
+          ""
+        ).toLowerCase();
+        if (
+          nameLower.includes("văn bản") ||
+          nameLower.includes("van-ban") ||
+          nameLower.includes("chỉ thị")
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  // Helper to detect if a category key or name belongs to Lecture Library
+  const isLectureCategory = (key: string): boolean => {
+    if (!key) return false;
+    const lower = key.toLowerCase().trim();
     if (
       lower === "lecture" ||
       lower === "lectures" ||
       lower === "bai-giang" ||
       lower === "baigiang" ||
       lower === "bai-giang-so" ||
-      lower === "kho-bai-giang"
+      lower === "kho-bai-giang" ||
+      lower.includes("bai-giang") ||
+      lower.includes("baigiang") ||
+      lower.includes("bài giảng")
     ) {
-      return "lecture";
+      return true;
     }
+    if (Array.isArray(siteConfig?.categories_config)) {
+      const match = siteConfig.categories_config.find(
+        (c: any) => c.id === key || c.targetPage === key,
+      );
+      if (match) {
+        const nameLower = (
+          match.name ||
+          match.navName ||
+          match.label ||
+          ""
+        ).toLowerCase();
+        if (
+          nameLower.includes("bài giảng") ||
+          nameLower.includes("bai-giang") ||
+          nameLower.includes("giáo án")
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  // Page Key Normalizer for Dedicated Libraries (Document & Lecture)
+  const normalizePageKey = (raw: string): PageView => {
+    if (isDocCategory(raw)) return "doc";
+    if (isLectureCategory(raw)) return "lecture";
     return raw as PageView;
   };
 
   // Navigation Handlers
   const handleSelectPage = (rawPage: PageView) => {
     const page = normalizePageKey(rawPage);
+    if (page === "home") {
+      setSelectedCategory(null);
+    } else {
+      const matched = (Array.isArray(categories) ? categories : []).find(
+        (c: any) => c.id === page || c.targetPage === page,
+      );
+      if (matched) {
+        setSelectedCategory(matched);
+      } else if (page === "doc") {
+        setSelectedCategory({ id: "van-ban-chi-thi", name: "VĂN BẢN - CHỈ THỊ" });
+      } else if (page === "lecture") {
+        setSelectedCategory({ id: "bai-giang-so", name: "BÀI GIẢNG SỐ" });
+      }
+    }
+
     // Access Control Guards
     if (
       page === "doc" &&
@@ -1506,6 +1583,10 @@ export function App() {
   const handleSelectCategory = (categoryId: string, sub?: string) => {
     const page = normalizePageKey(categoryId);
     setSelectedSubcategory(sub || "all");
+    const matchedCategory = (Array.isArray(categories) ? categories : []).find(
+      (c: any) => c.id === categoryId || c.targetPage === categoryId,
+    ) || { id: categoryId, name: categoryId };
+    setSelectedCategory(matchedCategory);
     handleSelectPage(page);
   };
 
@@ -2431,6 +2512,9 @@ export function App() {
     const newDoc: DocumentItem = {
       id: Date.now(),
       ...doc,
+      category: "VĂN BẢN - CHỈ THỊ",
+      sub_category: doc.sub_category || doc.subCategory || doc.category || "",
+      subCategory: doc.sub_category || doc.subCategory || doc.category || "",
     };
     setDocuments((prev) => [newDoc, ...prev]);
     const res = await cloudStorage.saveDocument(newDoc);
@@ -2469,15 +2553,21 @@ export function App() {
   };
 
   const handleUpdateDoc = async (updated: DocumentItem) => {
+    const docWithCategory: DocumentItem = {
+      ...updated,
+      category: "VĂN BẢN - CHỈ THỊ",
+      sub_category: updated.sub_category || updated.subCategory || updated.category || "",
+      subCategory: updated.sub_category || updated.subCategory || updated.category || "",
+    };
     setDocuments((prev) =>
-      prev.map((d) => (d.id === updated.id ? updated : d)),
+      prev.map((d) => (d.id === docWithCategory.id ? docWithCategory : d)),
     );
-    const res = await cloudStorage.saveDocument(updated);
+    const res = await cloudStorage.saveDocument(docWithCategory);
     if (res.success) {
       showToast(
         "success",
         "Đã cập nhật văn bản",
-        `Thông tin văn bản [${updated.code}] đã được lưu thay đổi.`,
+        `Thông tin văn bản [${docWithCategory.code}] đã được lưu thay đổi.`,
       );
     } else {
       showToast("error", "Lỗi cập nhật văn bản", res.error);
@@ -2503,6 +2593,9 @@ export function App() {
     const newLec: LectureItem = {
       id: Date.now(),
       ...lecture,
+      category: "BÀI GIẢNG SỐ",
+      sub_category: lecture.sub_category || lecture.subCategory || lecture.target || "",
+      subCategory: lecture.sub_category || lecture.subCategory || lecture.target || "",
     };
     setLectures((prev) => [newLec, ...prev]);
     const res = await cloudStorage.saveLecture(newLec);
@@ -2541,13 +2634,21 @@ export function App() {
   };
 
   const handleUpdateLecture = async (updated: LectureItem) => {
-    setLectures((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-    const res = await cloudStorage.saveLecture(updated);
+    const lecWithCategory: LectureItem = {
+      ...updated,
+      category: "BÀI GIẢNG SỐ",
+      sub_category: updated.sub_category || updated.subCategory || updated.target || "",
+      subCategory: updated.sub_category || updated.subCategory || updated.target || "",
+    };
+    setLectures((prev) =>
+      prev.map((l) => (l.id === lecWithCategory.id ? lecWithCategory : l)),
+    );
+    const res = await cloudStorage.saveLecture(lecWithCategory);
     if (res.success) {
       showToast(
         "success",
         "Đã cập nhật bài giảng",
-        `Thông tin bài giảng "${updated.title}" đã được cập nhật.`,
+        `Thông tin bài giảng "${lecWithCategory.title}" đã được cập nhật.`,
       );
     } else {
       showToast("error", "Lỗi cập nhật bài giảng", res.error);
@@ -3529,6 +3630,16 @@ export function App() {
               currentPage !== "vanban" &&
               currentPage !== "bai-giang" &&
               currentPage !== "baigiang" &&
+              !isDocCategory(currentPage) &&
+              !isLectureCategory(currentPage) &&
+              selectedCategory?.id !== "van-ban-chi-thi" &&
+              selectedCategory?.id !== "van-ban" &&
+              selectedCategory?.id !== "doc" &&
+              selectedCategory?.id !== "bai-giang-so" &&
+              selectedCategory?.id !== "bai-giang" &&
+              selectedCategory?.id !== "lecture" &&
+              !((selectedCategory?.name || selectedCategory?.navName || "").toUpperCase().includes("VĂN BẢN")) &&
+              !((selectedCategory?.name || selectedCategory?.navName || "").toUpperCase().includes("BÀI GIẢNG")) &&
               (currentPage === "ctd" ||
                 currentPage === "hl" ||
                 currentPage === "bac" ||
@@ -3540,6 +3651,8 @@ export function App() {
                       c.id !== "lecture" &&
                       c.targetPage !== "doc" &&
                       c.targetPage !== "lecture" &&
+                      !isDocCategory(c.id) &&
+                      !isLectureCategory(c.id) &&
                       (c.id === currentPage || c.targetPage === currentPage),
                   ))) && (
               <CategoryView
@@ -3557,7 +3670,10 @@ export function App() {
                 onEditArticle={handleOpenEditArticleModal}
                 onDeleteArticle={handleDeleteArticle}
                 onSelectSection={handleSelectCategory}
-                onGoHome={() => handleSelectCategory("home", "all")}
+                onGoHome={() => {
+                  setSelectedCategory(null);
+                  handleSelectCategory("home", "all");
+                }}
                 onOpenTabIntroModal={(tabKey) =>
                   setTabIntroModal({ isOpen: true, tabKey })
                 }
@@ -3657,11 +3773,21 @@ export function App() {
             {(currentPage === "doc" ||
               currentPage === "documents" ||
               currentPage === "van-ban" ||
-              currentPage === "vanban") && (
+              currentPage === "vanban" ||
+              isDocCategory(currentPage) ||
+              selectedCategory?.id === "van-ban-chi-thi" ||
+              selectedCategory?.id === "van-ban" ||
+              selectedCategory?.id === "doc" ||
+              (selectedCategory?.name &&
+                selectedCategory.name.toUpperCase().includes("VĂN BẢN")) ||
+              (selectedCategory?.navName &&
+                selectedCategory.navName.toUpperCase().includes("VĂN BẢN"))) && (
               <DocumentLibraryView
                 documents={documents}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
+                selectedSubcategory={selectedSubcategory}
+                onSelectSubcategory={setSelectedSubcategory}
                 onOpenAuth={() => setAuthModal({ isOpen: true, tab: "login" })}
                 onOpenAddDocModal={() => {
                   setDocToEdit(null);
@@ -3674,7 +3800,14 @@ export function App() {
                 onDeleteDoc={handleDeleteDoc}
                 onUpdateDoc={handleUpdateDoc}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage("home")}
+                onGoHome={() => {
+                  setSelectedCategory(null);
+                  handleSelectPage("home");
+                }}
+                onBackHome={() => {
+                  setSelectedCategory(null);
+                  handleSelectPage("home");
+                }}
                 onSaveCategories={handleSaveDocCategories}
                 onRenameCategory={handleRenameDocCategory}
                 onDeleteCategory={handleDeleteDocCategory}
@@ -3687,7 +3820,15 @@ export function App() {
             {(currentPage === "lecture" ||
               currentPage === "lectures" ||
               currentPage === "bai-giang" ||
-              currentPage === "baigiang") && (
+              currentPage === "baigiang" ||
+              isLectureCategory(currentPage) ||
+              selectedCategory?.id === "bai-giang-so" ||
+              selectedCategory?.id === "bai-giang" ||
+              selectedCategory?.id === "lecture" ||
+              (selectedCategory?.name &&
+                selectedCategory.name.toUpperCase().includes("BÀI GIẢNG")) ||
+              (selectedCategory?.navName &&
+                selectedCategory.navName.toUpperCase().includes("BÀI GIẢNG"))) && (
               <LectureLibraryView
                 lectures={lectures}
                 currentUser={currentUser}
@@ -3697,7 +3838,14 @@ export function App() {
                 onDeleteLecture={handleDeleteLecture}
                 onUpdateLecture={handleUpdateLecture}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage("home")}
+                onGoHome={() => {
+                  setSelectedCategory(null);
+                  handleSelectPage("home");
+                }}
+                onBackHome={() => {
+                  setSelectedCategory(null);
+                  handleSelectPage("home");
+                }}
                 onOpenTabIntroModal={(tabKey) =>
                   setTabIntroModal({ isOpen: true, tabKey })
                 }
@@ -3809,6 +3957,17 @@ export function App() {
           <AddDocModal
             isOpen={addDocModalOpen}
             editingDoc={docToEdit}
+            categories={
+              Array.isArray(siteConfig?.sections?.doc?.categories)
+                ? siteConfig.sections.doc.categories
+                    .map((c: any) =>
+                      typeof c === "string"
+                        ? c
+                        : c?.name || c?.label || String(c || "")
+                    )
+                    .filter(Boolean)
+                : undefined
+            }
             onClose={() => {
               setAddDocModalOpen(false);
               setDocToEdit(null);
@@ -3823,6 +3982,17 @@ export function App() {
             isOpen={lectureModal.isOpen}
             currentUser={currentUser}
             lectureToEdit={lectureModal.lectureToEdit}
+            categories={
+              Array.isArray(siteConfig?.sections?.lecture?.categories)
+                ? siteConfig.sections.lecture.categories
+                    .map((c: any) =>
+                      typeof c === "string"
+                        ? c
+                        : c?.name || c?.label || String(c || "")
+                    )
+                    .filter(Boolean)
+                : undefined
+            }
             onClose={() =>
               setLectureModal({ isOpen: false, lectureToEdit: null })
             }
