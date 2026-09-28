@@ -181,11 +181,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 : rawId;
 
             if (normKey) {
+              const url = row.image_url || row.image_data || row.imageUrl || row.image || '';
               const entry = {
-                image_data: row.image_data || row.imageUrl || row.image || '',
+                image_data: url,
+                image_url: url,
                 aspect_ratio: row.aspect_ratio || row.aspectRatio || row.aspectRatioMode || 'auto',
                 title: row.title || '',
                 category_name: row.category_name || row.categoryName || '',
+                updated_at: row.updated_at || '',
               };
               map[normKey] = entry;
               map[rawId] = entry;

@@ -70,10 +70,10 @@ export const HomeMiddleFeatured: React.FC<HomeMiddleFeaturedProps> = ({
       >
         {currentArticle ? (
           <div className="flex flex-col w-full">
-            {/* Khung ảnh thuần túy (Phần trên 16:9, không chữ đè lên ảnh) */}
+            {/* Khung ảnh thuần túy (Phần trên 16:9 chuẩn aspect-video) */}
             <div
               onClick={() => onOpenArticle(currentArticle)}
-              className="relative h-[240px] sm:h-[300px] md:h-[340px] lg:h-[360px] xl:h-[380px] w-full overflow-hidden bg-slate-900 rounded-t-xl cursor-pointer"
+              className="w-full aspect-video relative overflow-hidden rounded-t-xl bg-slate-900 shadow cursor-pointer"
             >
               <img
                 src={
@@ -82,7 +82,7 @@ export const HomeMiddleFeatured: React.FC<HomeMiddleFeaturedProps> = ({
                 }
                 alt={currentArticle.title}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-500"
                 loading="lazy"
                 decoding="async"
               />

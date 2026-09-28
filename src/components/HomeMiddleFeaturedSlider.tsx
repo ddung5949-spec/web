@@ -82,10 +82,10 @@ export const HomeMiddleFeaturedSlider: React.FC<
     >
       {currentArticle ? (
         <div className="flex flex-col w-full">
-          {/* 1. KHUNG ẢNH THUẦN TÚY (Phần trên - Tỉ lệ 16:9, không chữ đè lên ảnh) */}
+          {/* 1. KHUNG ẢNH THUẦN TÚY (Phần trên - Tỉ lệ 16:9 chuẩn aspect-video) */}
           <div
             onClick={() => onOpenArticle(currentArticle)}
-            className="relative w-full h-[240px] sm:h-[300px] md:h-[340px] lg:h-[360px] xl:h-[380px] overflow-hidden bg-slate-900 rounded-t-xl cursor-pointer"
+            className="w-full aspect-video relative overflow-hidden rounded-t-xl bg-slate-900 shadow cursor-pointer"
           >
             <img
               src={
@@ -94,7 +94,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
               }
               alt={currentArticle.title}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
               decoding="async"
             />

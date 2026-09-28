@@ -275,11 +275,38 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
     try {
       setIsCompressing(true);
-      // Nén ảnh JPEG chất lượng 0.7, chiều rộng 800px bằng Canvas
-      const compressedBase64 = await compressPosterImage(file, 800, 0.7);
-      setFormImage(compressedBase64);
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const posterId = posterKey;
+      const fileName = `poster_${posterId}_${Date.now()}.${fileExt}`;
+      const supabase = getSupabase();
+
+      let uploadedUrl = '';
+      if (supabase && supabase.storage) {
+        try {
+          const { data: uploadData, error: uploadErr } = await supabase.storage
+            .from('posters')
+            .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+          if (!uploadErr && uploadData) {
+            const { data: publicData } = supabase.storage.from('posters').getPublicUrl(fileName);
+            if (publicData?.publicUrl) {
+              uploadedUrl = `${publicData.publicUrl}?t=${Date.now()}`;
+            }
+          }
+        } catch (storageErr) {
+          console.warn('[DailyPosterWidget] Supabase storage upload fallback:', storageErr);
+        }
+      }
+
+      if (uploadedUrl) {
+        setFormImage(uploadedUrl);
+      } else {
+        // Nén ảnh JPEG chất lượng 0.7, chiều rộng 800px bằng Canvas
+        const compressedBase64 = await compressPosterImage(file, 800, 0.7);
+        setFormImage(compressedBase64);
+      }
     } catch (err) {
-      console.error('Error compressing poster image:', err);
+      console.error('Error handling poster image:', err);
       toast.error('Lỗi xử lý ảnh', 'Không thể xử lý ảnh tải lên. Vui lòng thử lại với ảnh khác.');
     } finally {
       setIsCompressing(false);
@@ -292,7 +319,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       setIsSaving(true);
       const nowIso = new Date().toISOString();
       const todayStr = new Date().toLocaleDateString('vi-VN');
-      const finalImg = formImage || currentItem.imageUrl;
+      const rawImg = formImage || currentItem.imageUrl;
+      const finalUrl = rawImg.startsWith('http')
+        ? (rawImg.includes('?t=') ? rawImg : `${rawImg}?t=${Date.now()}`)
+        : rawImg;
       const finalCat = formCategory.trim() || styleConfig.defaultCategory;
       const finalTitle = formTitle.trim() || styleConfig.defaultCategory;
 
@@ -300,14 +330,13 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
         id: cleanId,
         categoryName: finalCat,
         title: finalTitle,
-        imageUrl: finalImg,
+        imageUrl: finalUrl,
         aspectRatioMode: formAspectRatio,
-        updatedAt: todayStr,
+        updatedAt: nowIso,
       };
 
       // -------------------------------------------------------------
-      // 1. Supabase: Lưu chuỗi base64 vào bảng 'daily_posters'
-      //    supabase.from('daily_posters').upsert({ id, title, image_data, aspect_ratio, content, extra_data, updated_at })
+      // 1. Supabase: Lưu vào bảng 'daily_posters'
       // -------------------------------------------------------------
       const supabase = getSupabase();
       if (supabase) {
@@ -317,9 +346,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
             {
               id: posterId,
               title: finalTitle,
-              image_data: finalImg,
-              aspect_ratio: formAspectRatio,
               category_name: finalCat,
+              image_url: finalUrl,
+              image_data: finalUrl,
+              aspect_ratio: formAspectRatio,
               content: finalTitle || '',
               extra_data: { category_name: finalCat },
               updated_at: nowIso,
@@ -340,7 +370,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 2. LocalStorage: Lưu vào localStorage('daily_posters') để nạp hiển thị ngay lập tức khi mở web
+      // 2. LocalStorage: Lưu vào localStorage('daily_posters')
       // -------------------------------------------------------------
       try {
         const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
@@ -348,9 +378,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
         const cacheEntry = {
           id: posterKey,
           title: finalTitle,
-          image_data: finalImg,
-          aspect_ratio: formAspectRatio,
           category_name: finalCat,
+          image_url: finalUrl,
+          image_data: finalUrl,
+          aspect_ratio: formAspectRatio,
           content: finalTitle || '',
           extra_data: { category_name: finalCat },
           updated_at: nowIso,
@@ -366,7 +397,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       }
 
       // -------------------------------------------------------------
-      // Cập nhật State chung & siteConfig toàn ứng dụng
+      // Cập nhật State chung & siteConfig toàn ứng dụng (tạo mảng mới kích hoạt re-render)
       // -------------------------------------------------------------
       const existingList = Array.isArray(dailyWidgets) && dailyWidgets.length > 0 ? [...dailyWidgets] : [...defaultDailyWidgets];
       const index = existingList.findIndex(
@@ -380,7 +411,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
 
       let finalList: DailyWidgetItem[];
       if (index >= 0) {
-        finalList = existingList.map((w, i) => (i === index ? updatedItem : w));
+        finalList = existingList.map((w, i) => (i === index ? updatedItem : { ...w }));
       } else {
         finalList = [...existingList, updatedItem];
       }
@@ -452,10 +483,19 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
               title="Bấm để phóng to xem trọn vẹn poster"
             >
               <img
-                src={currentItem.imageUrl}
+                key={currentItem.updatedAt || currentItem.imageUrl}
+                src={
+                  currentItem.imageUrl
+                    ? currentItem.imageUrl.startsWith('data:')
+                      ? currentItem.imageUrl
+                      : `${currentItem.imageUrl.split('?')[0]}?t=${new Date(
+                          currentItem.updatedAt || Date.now()
+                        ).getTime()}`
+                    : ''
+                }
                 alt={currentItem.categoryName}
                 className={`rounded-lg transition-transform duration-300 group-hover:scale-[1.02] ${getAspectRatioClasses()}`}
-                loading="lazy"
+                loading="eager"
                 decoding="async"
               />
 

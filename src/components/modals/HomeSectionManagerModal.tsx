@@ -31,6 +31,19 @@ import { CategoryConfig, HomeCategoryColumn, SectionType, SiteConfig } from '../
 import { toast } from '../Toast';
 import { getSupabase, supabase } from '../../utils/supabase';
 
+export function normalizeYouTubeEmbedUrl(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+  const iframeSrcMatch = trimmed.match(/src=["'](.*?)["']/);
+  const target = iframeSrcMatch ? iframeSrcMatch[1] : trimmed;
+
+  const match = target.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (match && match[1]) {
+    return `https://www.youtube.com/embed/${match[1]}`;
+  }
+  return target;
+}
+
 export interface HomeSectionManagerModalProps {
   isOpen: boolean;
   siteConfig: SiteConfig;
@@ -112,7 +125,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const syncColumnsWithCategories = React.useCallback(
     (cols: HomeCategoryColumn[]): HomeCategoryColumn[] => {
       return cols.map((col) => {
-        if (col.type === 'embed_code') return col;
+        if (col.type === 'embed_code' || col.type === 'video' || col.type === 'embed') return col;
         const matched = availableCategories.find(
           (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
         );
