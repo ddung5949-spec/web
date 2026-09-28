@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   BookOpen,
   Calendar,
@@ -38,9 +38,9 @@ import {
   Trash2,
   UserCheck,
   X,
-} from 'lucide-react';
-import { DocumentItem, PageView, SiteConfig, User } from '../types';
-import { DocumentCategoryManagerModal } from './modals/DocumentCategoryManagerModal';
+} from "lucide-react";
+import { DocumentItem, PageView, SiteConfig, User } from "../types";
+import { DocumentCategoryManagerModal } from "./modals/DocumentCategoryManagerModal";
 
 interface DocumentArchiveViewProps {
   documents: DocumentItem[];
@@ -60,13 +60,13 @@ interface DocumentArchiveViewProps {
 }
 
 const DEFAULT_CATEGORIES = [
-  'Nghị quyết - Chỉ thị',
-  'Kế hoạch - Mệnh lệnh tác chiến',
-  'Hướng dẫn CTĐ - CTCT',
-  'Quy định - Điều lệnh & Kỷ luật',
-  'Hậu cần - Kỹ thuật & Quân y',
-  'Biểu mẫu & Báo cáo số',
-  'Văn bản khác',
+  "Nghị quyết - Chỉ thị",
+  "Kế hoạch - Mệnh lệnh tác chiến",
+  "Hướng dẫn CTĐ - CTCT",
+  "Quy định - Điều lệnh & Kỷ luật",
+  "Hậu cần - Kỹ thuật & Quân y",
+  "Biểu mẫu & Báo cáo số",
+  "Văn bản khác",
 ];
 
 export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
@@ -85,33 +85,46 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
   onDeleteCategory,
   onOpenTabIntroModal,
 }) => {
-  const isAdmin = currentUser?.role === 'admin';
-  const canUpload = !!(currentUser && (isAdmin || currentUser.canUploadDoc || currentUser.role === 'editor'));
+  const isAdmin = currentUser?.role === "admin";
+  const canUpload = !!(
+    currentUser &&
+    (isAdmin || currentUser.canUploadDoc || currentUser.role === "editor")
+  );
 
   // Categories from config
-  const rawCategories = siteConfig.sections?.doc?.categories || DEFAULT_CATEGORIES;
-  const configuredCategories = (Array.isArray(rawCategories) ? rawCategories : [])
-    .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.label || c?.shortLabel || String(c || ''))))
+  const rawCategories =
+    siteConfig.sections?.doc?.categories || DEFAULT_CATEGORIES;
+  const configuredCategories = (
+    Array.isArray(rawCategories) ? rawCategories : []
+  )
+    .map((c: any) =>
+      typeof c === "string"
+        ? c
+        : c?.name || c?.label || c?.shortLabel || String(c || ""),
+    )
     .filter(Boolean);
 
   // States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedFormat, setSelectedFormat] = useState<string>('all');
-  const [selectedIssuer, setSelectedIssuer] = useState<string>('all');
-  const [selectedSecretLevel, setSelectedSecretLevel] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedFormat, setSelectedFormat] = useState<string>("all");
+  const [selectedIssuer, setSelectedIssuer] = useState<string>("all");
+  const [selectedSecretLevel, setSelectedSecretLevel] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // Extract unique issuers for filtering
   const safeDocs = Array.isArray(documents) ? documents : [];
   const uniqueIssuers = Array.from(
-    new Set(safeDocs.map((d) => d?.issuer).filter(Boolean))
+    new Set(safeDocs.map((d) => d?.issuer).filter(Boolean)),
   );
 
   // Calculate total downloads
-  const totalDownloads = safeDocs.reduce((sum, d) => sum + (d?.downloads || 0), 0);
+  const totalDownloads = safeDocs.reduce(
+    (sum, d) => sum + (d?.downloads || 0),
+    0,
+  );
 
   // Download handler
   const handleDownload = (doc: DocumentItem) => {
@@ -124,23 +137,23 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
     }
 
     const ext =
-      doc.type === 'docx' || doc.type === 'doc'
-        ? 'docx'
-        : doc.type === 'xlsx' || doc.type === 'xls'
-        ? 'xlsx'
-        : doc.type === 'pptx' || doc.type === 'ppt'
-        ? 'pptx'
-        : doc.type === 'zip' || doc.type === 'rar'
-        ? 'zip'
-        : 'pdf';
+      doc.type === "docx" || doc.type === "doc"
+        ? "docx"
+        : doc.type === "xlsx" || doc.type === "xls"
+          ? "xlsx"
+          : doc.type === "pptx" || doc.type === "ppt"
+            ? "pptx"
+            : doc.type === "zip" || doc.type === "rar"
+              ? "zip"
+              : "pdf";
 
     const defaultFileName =
       doc.fileName ||
-      `${doc.code.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, '_')}_${doc.title.slice(0, 25)}.${ext}`;
+      `${doc.code.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, "_")}_${doc.title.slice(0, 25)}.${ext}`;
 
     if (doc.fileUrl) {
-      if (doc.fileUrl.startsWith('data:') || doc.fileUrl.startsWith('blob:')) {
-        const link = document.createElement('a');
+      if (doc.fileUrl.startsWith("data:") || doc.fileUrl.startsWith("blob:")) {
+        const link = document.createElement("a");
         link.href = doc.fileUrl;
         link.download = defaultFileName;
         document.body.appendChild(link);
@@ -148,21 +161,25 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
         document.body.removeChild(link);
       } else {
         // Direct remote storage URL
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = doc.fileUrl;
-        link.target = '_blank';
+        link.target = "_blank";
         link.download = defaultFileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       }
     } else {
-      const blobContent = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nCHỈ HUY TRUNG ĐOÀN 95, SƯ ĐOÀN 2\n${doc.issuer.toUpperCase()}\n--------------------\n\nSố/Ký hiệu: ${doc.code}\nNgày ban hành: ${doc.date}\nTiểu mục: ${doc.category || 'Văn bản hành chính quân sự'}\n\nTRÍCH YẾU NỘI DUNG:\n${doc.title}\n\nNỘI DUNG TÓM TẮT & HƯỚNG DẪN:\n${doc.description || 'Văn bản quy định nội bộ phục vụ công tác lãnh đạo, chỉ huy và duy trì nền nếp chính quy trong toàn đơn vị.'}\n\n(Tài liệu lưu trữ tại Kho Văn bản số - Trung đoàn 95, Sư đoàn 2)`;
-      const blob = new Blob([blobContent], { type: 'text/plain;charset=utf-8' });
+      const blobContent = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nCHỈ HUY TRUNG ĐOÀN 95, SƯ ĐOÀN 2\n${doc.issuer.toUpperCase()}\n--------------------\n\nSố/Ký hiệu: ${doc.code}\nNgày ban hành: ${doc.date}\nTiểu mục: ${doc.category || "Văn bản hành chính quân sự"}\n\nTRÍCH YẾU NỘI DUNG:\n${doc.title}\n\nNỘI DUNG TÓM TẮT & HƯỚNG DẪN:\n${doc.description || "Văn bản quy định nội bộ phục vụ công tác lãnh đạo, chỉ huy và duy trì nền nếp chính quy trong toàn đơn vị."}\n\n(Tài liệu lưu trữ tại Kho Văn bản số - Trung đoàn 95, Sư đoàn 2)`;
+      const blob = new Blob([blobContent], {
+        type: "text/plain;charset=utf-8",
+      });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = defaultFileName.endsWith('.txt') ? defaultFileName : `${defaultFileName}.txt`;
+      a.download = defaultFileName.endsWith(".txt")
+        ? defaultFileName
+        : `${defaultFileName}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -170,36 +187,60 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
     }
   };
 
-  const getFormatBadge = (type?: string) => {
-    switch (type) {
-      case 'docx':
-      case 'doc':
+  const handleQuickView = (doc: DocumentItem) => {
+    if (doc.fileUrl) {
+      if (doc.fileUrl.startsWith("data:")) {
+        setPreviewDoc(doc);
+      } else {
+        window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
+      }
+    } else {
+      setPreviewDoc(doc);
+    }
+  };
+
+  const getFormatBadge = (type?: string, fileSize?: string) => {
+    const t = (type || "pdf").toLowerCase();
+    const sizeStr = fileSize ? ` - ${fileSize}` : "";
+    switch (t) {
+      case "docx":
+      case "doc":
         return (
-          <span className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-            <FileText className="w-3 h-3 text-blue-600" />
-            <span>Word (.docx)</span>
+          <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+            <span className="bg-blue-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded">
+              W
+            </span>
+            <span>Word{sizeStr}</span>
           </span>
         );
-      case 'xlsx':
+      case "xlsx":
+      case "xls":
         return (
-          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-            <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-            <span>Excel (.xlsx)</span>
+          <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+            <span className="bg-emerald-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded">
+              X
+            </span>
+            <span>Excel{sizeStr}</span>
           </span>
         );
-      case 'pptx':
+      case "pptx":
+      case "ppt":
         return (
-          <span className="bg-orange-50 text-orange-800 border border-orange-200 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-            <Presentation className="w-3 h-3 text-orange-600" />
-            <span>PowerPoint</span>
+          <span className="inline-flex items-center gap-1.5 bg-orange-50 text-orange-900 border border-orange-200 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+            <span className="bg-orange-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded">
+              P
+            </span>
+            <span>PowerPoint{sizeStr}</span>
           </span>
         );
-      case 'pdf':
+      case "pdf":
       default:
         return (
-          <span className="bg-red-50 text-red-800 border border-red-200 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-            <FileType className="w-3 h-3 text-red-600" />
-            <span>PDF (.pdf)</span>
+          <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-900 border border-red-200 text-[11px] font-bold px-2 py-0.5 rounded shadow-2xs">
+            <span className="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded">
+              PDF
+            </span>
+            <span>PDF{sizeStr}</span>
           </span>
         );
     }
@@ -207,14 +248,14 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
 
   const getFormatIcon = (type?: string) => {
     switch (type) {
-      case 'docx':
-      case 'doc':
+      case "docx":
+      case "doc":
         return <FileText className="w-4 h-4 text-blue-600" />;
-      case 'xlsx':
+      case "xlsx":
         return <FileSpreadsheet className="w-4 h-4 text-emerald-600" />;
-      case 'pptx':
+      case "pptx":
         return <Presentation className="w-4 h-4 text-orange-600" />;
-      case 'pdf':
+      case "pdf":
       default:
         return <FileType className="w-4 h-4 text-red-600" />;
     }
@@ -234,32 +275,42 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
       doc.date.toLowerCase().includes(term);
 
     const matchesCategory =
-      selectedCategory === 'all' ||
+      selectedCategory === "all" ||
       doc.category?.toLowerCase() === selectedCategory.toLowerCase();
 
     const matchesFormat =
-      selectedFormat === 'all' ||
-      (selectedFormat === 'docx' && (doc.type === 'docx' || doc.type === 'doc')) ||
-      (selectedFormat === 'pdf' && (doc.type === 'pdf' || !doc.type)) ||
-      (selectedFormat === 'xlsx' && doc.type === 'xlsx') ||
-      (selectedFormat === 'pptx' && doc.type === 'pptx');
+      selectedFormat === "all" ||
+      (selectedFormat === "docx" &&
+        (doc.type === "docx" || doc.type === "doc")) ||
+      (selectedFormat === "pdf" && (doc.type === "pdf" || !doc.type)) ||
+      (selectedFormat === "xlsx" && doc.type === "xlsx") ||
+      (selectedFormat === "pptx" && doc.type === "pptx");
 
-    const matchesIssuer = selectedIssuer === 'all' || doc.issuer === selectedIssuer;
+    const matchesIssuer =
+      selectedIssuer === "all" || doc.issuer === selectedIssuer;
 
     const matchesSecret =
-      selectedSecretLevel === 'all' ||
-      (selectedSecretLevel === 'normal' && (!doc.secretLevel || doc.secretLevel === 'normal')) ||
-      (selectedSecretLevel === 'mat' && doc.secretLevel === 'mat') ||
-      (selectedSecretLevel === 'toi_mat' && doc.secretLevel === 'toi_mat');
+      selectedSecretLevel === "all" ||
+      (selectedSecretLevel === "normal" &&
+        (!doc.secretLevel || doc.secretLevel === "normal")) ||
+      (selectedSecretLevel === "mat" && doc.secretLevel === "mat") ||
+      (selectedSecretLevel === "toi_mat" && doc.secretLevel === "toi_mat");
 
-    return matchesSearch && matchesCategory && matchesFormat && matchesIssuer && matchesSecret;
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesFormat &&
+      matchesIssuer &&
+      matchesSecret
+    );
   });
 
-  const docTitle = siteConfig.sections?.doc?.title || 'Kho Văn bản - Tài liệu Quân sự';
+  const docTitle =
+    siteConfig.sections?.doc?.title || "Kho Văn bản - Tài liệu Quân sự";
   const docSubtitle =
     siteConfig.sections?.doc?.subTitle ||
     siteConfig.sections?.doc?.desc ||
-    'Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Trung đoàn 95, Sư đoàn 2';
+    "Hệ thống lưu trữ chỉ thị, nghị quyết, kế hoạch tác chiến & hướng dẫn nghiệp vụ Trung đoàn 95, Sư đoàn 2";
 
   return (
     <div className="space-y-4">
@@ -306,7 +357,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
           {isAdmin && onOpenTabIntroModal && (
             <button
               type="button"
-              onClick={() => onOpenTabIntroModal('doc')}
+              onClick={() => onOpenTabIntroModal("doc")}
               className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer shadow-xs"
               title="Chỉnh sửa nội dung giới thiệu tab này"
             >
@@ -324,7 +375,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
               className="bg-amber-400 hover:bg-amber-300 text-blue-950 font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shrink-0 transition-all shadow-md hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5 border border-amber-200"
             >
               <HardDriveUpload className="w-4 h-4 text-blue-900" />
-              <span>LƯU TRỮ VĂN BẢN MỚI</span>
+              <span>+ TẢI LÊN TÀI LIỆU / VĂN BẢN MỚI</span>
             </button>
           )}
         </div>
@@ -362,11 +413,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
             <div className="p-2 space-y-1">
               <button
                 type="button"
-                onClick={() => setSelectedCategory('all')}
+                onClick={() => setSelectedCategory("all")}
                 className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                  selectedCategory === 'all'
-                    ? 'bg-blue-800 text-white shadow-xs'
-                    : 'text-gray-700 hover:bg-gray-100'
+                  selectedCategory === "all"
+                    ? "bg-blue-800 text-white shadow-xs"
+                    : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
@@ -375,9 +426,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                 </div>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
-                    selectedCategory === 'all'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-gray-100 text-gray-600'
+                    selectedCategory === "all"
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-100 text-gray-600"
                   }`}
                 >
                   {documents.length}
@@ -385,11 +436,15 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
               </button>
 
               {configuredCategories.map((cat, catIdx) => {
-                const catStr = typeof cat === 'string' ? cat : (cat?.name || cat?.label || String(cat || ''));
+                const catStr =
+                  typeof cat === "string"
+                    ? cat
+                    : cat?.name || cat?.label || String(cat || "");
                 const count = documents.filter(
-                  (d) => d.category?.toLowerCase() === catStr.toLowerCase()
+                  (d) => d.category?.toLowerCase() === catStr.toLowerCase(),
                 ).length;
-                const isSelected = selectedCategory.toLowerCase() === catStr.toLowerCase();
+                const isSelected =
+                  selectedCategory.toLowerCase() === catStr.toLowerCase();
                 return (
                   <button
                     key={`${catStr}-${catIdx}`}
@@ -397,19 +452,21 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                     onClick={() => setSelectedCategory(catStr)}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-700 text-white font-bold shadow-xs'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? "bg-blue-700 text-white font-bold shadow-xs"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <ChevronRight className={`w-3 h-3 shrink-0 ${isSelected ? 'text-amber-300' : 'text-gray-400'}`} />
+                      <ChevronRight
+                        className={`w-3 h-3 shrink-0 ${isSelected ? "text-amber-300" : "text-gray-400"}`}
+                      />
                       <span className="truncate">{catStr}</span>
                     </div>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
                         isSelected
-                          ? 'bg-white/20 text-white'
-                          : 'bg-gray-100 text-gray-600'
+                          ? "bg-white/20 text-white"
+                          : "bg-gray-100 text-gray-600"
                       }`}
                     >
                       {count}
@@ -434,30 +491,38 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
 
             <div className="p-2 space-y-1">
               {[
-                { id: 'all', label: 'Tất cả định dạng', icon: FolderArchive, count: documents.length },
                 {
-                  id: 'docx',
-                  label: 'Văn bản Word (.docx)',
+                  id: "all",
+                  label: "Tất cả định dạng",
+                  icon: FolderArchive,
+                  count: documents.length,
+                },
+                {
+                  id: "docx",
+                  label: "Văn bản Word (.docx)",
                   icon: FileText,
-                  count: documents.filter((d) => d.type === 'docx' || d.type === 'doc').length,
+                  count: documents.filter(
+                    (d) => d.type === "docx" || d.type === "doc",
+                  ).length,
                 },
                 {
-                  id: 'pdf',
-                  label: 'Tài liệu PDF (.pdf)',
+                  id: "pdf",
+                  label: "Tài liệu PDF (.pdf)",
                   icon: FileType,
-                  count: documents.filter((d) => d.type === 'pdf' || !d.type).length,
+                  count: documents.filter((d) => d.type === "pdf" || !d.type)
+                    .length,
                 },
                 {
-                  id: 'xlsx',
-                  label: 'Bảng tính Excel (.xlsx)',
+                  id: "xlsx",
+                  label: "Bảng tính Excel (.xlsx)",
                   icon: FileSpreadsheet,
-                  count: documents.filter((d) => d.type === 'xlsx').length,
+                  count: documents.filter((d) => d.type === "xlsx").length,
                 },
                 {
-                  id: 'pptx',
-                  label: 'Báo cáo PowerPoint (.pptx)',
+                  id: "pptx",
+                  label: "Báo cáo PowerPoint (.pptx)",
                   icon: Presentation,
-                  count: documents.filter((d) => d.type === 'pptx').length,
+                  count: documents.filter((d) => d.type === "pptx").length,
                 },
               ].map((item) => {
                 const isSelected = selectedFormat === item.id;
@@ -469,8 +534,8 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                     onClick={() => setSelectedFormat(item.id)}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-800 text-white shadow-xs'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? "bg-blue-800 text-white shadow-xs"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -480,8 +545,8 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold ${
                         isSelected
-                          ? 'bg-white/20 text-white'
-                          : 'bg-gray-100 text-gray-600'
+                          ? "bg-white/20 text-white"
+                          : "bg-gray-100 text-gray-600"
                       }`}
                     >
                       {item.count}
@@ -501,23 +566,35 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-2.5 bg-blue-50/70 rounded-lg border border-blue-100">
-                <div className="text-base font-black text-blue-900">{documents.length}</div>
-                <div className="text-[10px] text-blue-700 font-bold uppercase mt-0.5">Tổng số VB</div>
+                <div className="text-base font-black text-blue-900">
+                  {documents.length}
+                </div>
+                <div className="text-[10px] text-blue-700 font-bold uppercase mt-0.5">
+                  Tổng số VB
+                </div>
               </div>
               <div className="p-2.5 bg-emerald-50/70 rounded-lg border border-emerald-100">
-                <div className="text-base font-black text-emerald-800">{totalDownloads}</div>
-                <div className="text-[10px] text-emerald-700 font-bold uppercase mt-0.5">Lượt tải về</div>
+                <div className="text-base font-black text-emerald-800">
+                  {totalDownloads}
+                </div>
+                <div className="text-[10px] text-emerald-700 font-bold uppercase mt-0.5">
+                  Lượt tải về
+                </div>
               </div>
             </div>
 
             <div className="space-y-1.5 pt-1 text-[11px] text-gray-600">
               <div className="flex items-center justify-between">
                 <span>Cấp độ an toàn:</span>
-                <span className="font-bold text-emerald-700">100% Nội bộ QS</span>
+                <span className="font-bold text-emerald-700">
+                  100% Nội bộ QS
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Quản trị viên:</span>
-                <span className="font-bold text-blue-800">Ban Cơ yếu / Tuyên huấn</span>
+                <span className="font-bold text-blue-800">
+                  Ban Cơ yếu / Tuyên huấn
+                </span>
               </div>
             </div>
           </div>
@@ -541,7 +618,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                 {searchTerm && (
                   <button
                     type="button"
-                    onClick={() => setSearchTerm('')}
+                    onClick={() => setSearchTerm("")}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -553,11 +630,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setViewMode('grid')}
+                  onClick={() => setViewMode("grid")}
                   className={`p-1.5 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                    viewMode === 'grid'
-                      ? 'bg-white text-blue-900 shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
+                    viewMode === "grid"
+                      ? "bg-white text-blue-900 shadow-xs"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                   title="Chế độ thẻ thư viện"
                 >
@@ -566,11 +643,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('table')}
+                  onClick={() => setViewMode("table")}
                   className={`p-1.5 px-2.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                    viewMode === 'table'
-                      ? 'bg-white text-blue-900 shadow-xs'
-                      : 'text-gray-600 hover:text-gray-900'
+                    viewMode === "table"
+                      ? "bg-white text-blue-900 shadow-xs"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                   title="Chế độ bảng danh mục"
                 >
@@ -583,7 +660,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
             {/* Dropdown Filters (Issuer & Secret Level) */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-gray-500">Cơ quan:</span>
+                <span className="text-[11px] font-bold text-gray-500">
+                  Cơ quan:
+                </span>
                 <select
                   value={selectedIssuer}
                   onChange={(e) => setSelectedIssuer(e.target.value)}
@@ -599,7 +678,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-gray-500">Độ mật:</span>
+                <span className="text-[11px] font-bold text-gray-500">
+                  Độ mật:
+                </span>
                 <select
                   value={selectedSecretLevel}
                   onChange={(e) => setSelectedSecretLevel(e.target.value)}
@@ -613,7 +694,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
               </div>
 
               <div className="ml-auto text-[11px] text-gray-500">
-                Hiển thị <strong className="text-blue-800">{filteredDocuments.length}</strong> / {documents.length} văn bản
+                Hiển thị{" "}
+                <strong className="text-blue-800">
+                  {filteredDocuments.length}
+                </strong>{" "}
+                / {documents.length} văn bản
               </div>
             </div>
           </div>
@@ -621,30 +706,33 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
           {/* Content Views: Grid or Table */}
           {safeDocs.length === 0 ? (
             <div className="w-full py-16 text-center text-slate-500 font-medium bg-white rounded-lg border border-dashed border-slate-300 my-4">
-              Chưa có dữ liệu nào được đăng tải trong mục này.
+              Chưa có tài liệu/tệp tin nào được tải lên trong mục này
             </div>
           ) : filteredDocuments.length === 0 ? (
             <div className="p-10 bg-white rounded-xl border border-gray-200 text-center space-y-3">
               <FolderArchive className="w-12 h-12 text-gray-300 mx-auto" />
-              <div className="text-sm font-bold text-gray-700">Không tìm thấy văn bản phù hợp</div>
+              <div className="text-sm font-bold text-gray-700">
+                Không tìm thấy văn bản phù hợp
+              </div>
               <p className="text-xs text-gray-400 max-w-md mx-auto">
-                Vui lòng thử đổi từ khóa tìm kiếm hoặc điều chỉnh lại bộ lọc danh mục và cơ quan ban hành.
+                Vui lòng thử đổi từ khóa tìm kiếm hoặc điều chỉnh lại bộ lọc
+                danh mục và cơ quan ban hành.
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setSearchTerm('');
-                  setSelectedCategory('all');
-                  setSelectedFormat('all');
-                  setSelectedIssuer('all');
-                  setSelectedSecretLevel('all');
+                  setSearchTerm("");
+                  setSelectedCategory("all");
+                  setSelectedFormat("all");
+                  setSelectedIssuer("all");
+                  setSelectedSecretLevel("all");
                 }}
                 className="px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-lg text-xs transition-colors cursor-pointer"
               >
                 Đặt lại bộ lọc
               </button>
             </div>
-          ) : viewMode === 'grid' ? (
+          ) : viewMode === "grid" ? (
             /* ================= GRID VIEW ================= */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {filteredDocuments.map((doc) => (
@@ -659,24 +747,24 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                         {doc.code}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        {doc.secretLevel === 'toi_mat' ? (
+                        {doc.secretLevel === "toi_mat" ? (
                           <span className="bg-red-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <Lock className="w-2.5 h-2.5" />
                             <span>TỐI MẬT</span>
                           </span>
-                        ) : doc.secretLevel === 'mat' ? (
+                        ) : doc.secretLevel === "mat" ? (
                           <span className="bg-amber-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <Lock className="w-2.5 h-2.5" />
                             <span>MẬT</span>
                           </span>
                         ) : null}
-                        {getFormatBadge(doc.type)}
+                        {getFormatBadge(doc.type, doc.fileSize || "1.8 MB")}
                       </div>
                     </div>
 
                     {/* Title */}
                     <h3
-                      onClick={() => setPreviewDoc(doc)}
+                      onClick={() => handleQuickView(doc)}
                       className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-blue-800 transition-colors line-clamp-2 cursor-pointer leading-snug"
                       title={doc.title}
                     >
@@ -696,7 +784,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                         {doc.issuer}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-400 font-mono">{doc.date}</span>
+                        <span className="text-gray-400 font-mono">
+                          {doc.date}
+                        </span>
                         <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                           {doc.downloads || 0} tải
                         </span>
@@ -708,11 +798,12 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                   <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => setPreviewDoc(doc)}
-                      className="text-xs text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1 cursor-pointer"
+                      onClick={() => handleQuickView(doc)}
+                      className="text-xs bg-slate-100 hover:bg-blue-50 text-blue-800 hover:text-blue-900 border border-slate-200 hover:border-blue-300 font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Mở xem nhanh văn bản"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Xem trước</span>
+                      <span>Xem nhanh</span>
                     </button>
 
                     <div className="flex items-center gap-1.5">
@@ -720,10 +811,11 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onEditDoc(doc)}
-                          className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors"
-                          title="Sửa văn bản"
+                          className="px-2 py-1.5 text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 font-bold"
+                          title="Sửa thông tin văn bản"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
+                          <Edit3 className="w-3 h-3 text-amber-700" />
+                          <span>Sửa</span>
                         </button>
                       )}
 
@@ -731,14 +823,19 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(`Đồng chí có chắc muốn xóa văn bản "${doc.code}"?`)) {
+                            if (
+                              window.confirm(
+                                `Đồng chí có chắc muốn xóa văn bản "${doc.code}"?`,
+                              )
+                            ) {
                               onDeleteDoc(doc.id);
                             }
                           }}
-                          className="p-1.5 text-gray-400 hover:text-red-700 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                          className="px-2 py-1.5 text-xs text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg cursor-pointer transition-colors flex items-center gap-1 font-bold"
                           title="Xóa văn bản"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3 text-red-600" />
+                          <span>Xóa</span>
                         </button>
                       )}
 
@@ -746,9 +843,10 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                         type="button"
                         onClick={() => handleDownload(doc)}
                         className="bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        title="Tải tệp văn bản về thiết bị"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>Tải về</span>
+                        <span>Tải về máy</span>
                       </button>
                     </div>
                   </div>
@@ -773,8 +871,13 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredDocuments.map((doc, idx) => (
-                      <tr key={doc.id} className="hover:bg-blue-50/40 transition-colors">
-                        <td className="p-3 text-center font-bold text-gray-500">{idx + 1}</td>
+                      <tr
+                        key={doc.id}
+                        className="hover:bg-blue-50/40 transition-colors"
+                      >
+                        <td className="p-3 text-center font-bold text-gray-500">
+                          {idx + 1}
+                        </td>
                         <td className="p-3 font-mono font-black text-red-700 whitespace-nowrap">
                           {doc.code}
                         </td>
@@ -791,20 +894,22 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                             </span>
                           )}
                         </td>
-                        <td className="p-3 text-gray-700 font-medium">{doc.issuer}</td>
+                        <td className="p-3 text-gray-700 font-medium">
+                          {doc.issuer}
+                        </td>
                         <td className="p-3 text-center text-gray-500 font-mono whitespace-nowrap">
                           {doc.date}
                         </td>
                         <td className="p-3 text-center whitespace-nowrap">
-                          {getFormatBadge(doc.type)}
+                          {getFormatBadge(doc.type, doc.fileSize || "1.8 MB")}
                         </td>
                         <td className="p-3 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => setPreviewDoc(doc)}
+                              onClick={() => handleQuickView(doc)}
                               className="p-1.5 text-blue-700 hover:bg-blue-50 rounded cursor-pointer"
-                              title="Xem chi tiết"
+                              title="Xem nhanh"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -812,7 +917,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                               type="button"
                               onClick={() => handleDownload(doc)}
                               className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
-                              title="Tải về"
+                              title="Tải về máy"
                             >
                               <Download className="w-4 h-4" />
                             </button>
@@ -830,7 +935,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (window.confirm(`Xóa văn bản "${doc.code}"?`)) {
+                                  if (
+                                    window.confirm(`Xóa văn bản "${doc.code}"?`)
+                                  ) {
                                     onDeleteDoc(doc.id);
                                   }
                                 }}
@@ -881,12 +988,17 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                     Số: {previewDoc.code}
                   </span>
                   <div className="text-[11px] text-gray-500 mt-1">
-                    Cơ quan: <strong className="text-gray-800">{previewDoc.issuer}</strong>
+                    Cơ quan:{" "}
+                    <strong className="text-gray-800">
+                      {previewDoc.issuer}
+                    </strong>
                   </div>
                 </div>
                 <div className="text-right">
                   {getFormatBadge(previewDoc.type)}
-                  <div className="text-[11px] text-gray-400 mt-1">Ngày ban hành: {previewDoc.date}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Ngày ban hành: {previewDoc.date}
+                  </div>
                 </div>
               </div>
 
@@ -896,7 +1008,7 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                 </h2>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded">
-                    {previewDoc.category || 'Văn bản nội bộ'}
+                    {previewDoc.category || "Văn bản nội bộ"}
                   </span>
                   <span className="text-[10px] text-gray-400 font-medium">
                     {previewDoc.downloads || 0} lượt tải
@@ -906,7 +1018,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
 
               {previewDoc.description && (
                 <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-1">
-                  <div className="font-bold text-gray-700 uppercase text-[10px]">Tóm tắt nội dung:</div>
+                  <div className="font-bold text-gray-700 uppercase text-[10px]">
+                    Tóm tắt nội dung:
+                  </div>
                   <p className="text-xs text-gray-800 leading-relaxed whitespace-pre-line">
                     {previewDoc.description}
                   </p>
@@ -919,7 +1033,9 @@ export const DocumentArchiveView: React.FC<DocumentArchiveViewProps> = ({
                   <span>Quy định lưu trữ & khai thác:</span>
                 </div>
                 <p className="text-blue-900/90 leading-relaxed">
-                  Văn bản được số hóa và lưu trữ tại Kho Tư liệu điện tử Trung đoàn 95, Sư đoàn 2. Phục vụ công tác tra cứu, học tập và triển khai nhiệm vụ chính trị - quân sự trong toàn đơn vị.
+                  Văn bản được số hóa và lưu trữ tại Kho Tư liệu điện tử Trung
+                  đoàn 95, Sư đoàn 2. Phục vụ công tác tra cứu, học tập và triển
+                  khai nhiệm vụ chính trị - quân sự trong toàn đơn vị.
                 </p>
               </div>
             </div>

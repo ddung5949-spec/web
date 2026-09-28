@@ -125,7 +125,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const syncColumnsWithCategories = React.useCallback(
     (cols: HomeCategoryColumn[]): HomeCategoryColumn[] => {
       return cols.map((col) => {
-        if (col.type === 'embed_code' || col.type === 'video' || col.type === 'embed') return col;
+        if (col.type === 'embed_code' || (col.type as string) === 'video' || (col.type as string) === 'embed') return col;
         const matched = availableCategories.find(
           (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
         );

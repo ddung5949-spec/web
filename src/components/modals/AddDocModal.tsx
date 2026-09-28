@@ -472,10 +472,10 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
             </button>
             <button
               type="submit"
-              className="bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+              className="bg-amber-400 hover:bg-amber-300 text-blue-950 font-extrabold text-xs px-4 py-2 rounded-lg flex items-center gap-1.5 shadow-md hover:shadow-lg cursor-pointer transition-all border border-amber-300"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>{editingDoc ? 'Lưu cập nhật' : 'Lưu vào Kho văn bản'}</span>
+              <Save className="w-4 h-4 text-blue-900" />
+              <span>{editingDoc ? 'LƯU CẬP NHẬT' : '+ TẢI LÊN TÀI LIỆU / VĂN BẢN MỚI'}</span>
             </button>
           </div>
         </form>

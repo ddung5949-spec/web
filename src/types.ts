@@ -126,6 +126,7 @@ export interface DocumentItem {
 
 export interface LectureItem {
   id: number;
+  code?: string;
   title: string;
   category?: string;
   target: string;

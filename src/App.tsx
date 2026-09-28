@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Article,
   DailyWidgetItem,
@@ -16,7 +16,7 @@ import {
   UncleHoSettings,
   User,
   UserRole,
-} from './types';
+} from "./types";
 import {
   defaultArticles,
   defaultCategoriesConfig,
@@ -31,81 +31,109 @@ import {
   defaultUncleHoSettings,
   defaultUsers,
   MILITARY_FALLBACK_AVATAR,
-} from './data/initialData';
-import { cloudStorage, isSupabaseConfigured, safeStore } from './utils/storage';
-import { ToastContainer, ToastMessage, ToastType } from './components/Toast';
+} from "./data/initialData";
+import { cloudStorage, isSupabaseConfigured, safeStore } from "./utils/storage";
+import { ToastContainer, ToastMessage, ToastType } from "./components/Toast";
 
 // Components
-import { Header } from './components/Header';
-import { Navbar } from './components/Navbar';
-import { NewsTicker } from './components/NewsTicker';
-import { HomeView } from './components/HomeView';
-import { CategoryView, SectionView } from './components/CategoryView';
-import { ArticleDetailView } from './components/ArticleDetailView';
-import { DocumentArchiveView } from './components/DocumentArchiveView';
-import { LectureLibraryView } from './components/LectureLibraryView';
-import { ApprovalsView } from './components/ApprovalsView';
-import { UserManagementView } from './components/UserManagementView';
-import { Footer } from './components/Footer';
+import { Header } from "./components/Header";
+import { Navbar } from "./components/Navbar";
+import { NewsTicker } from "./components/NewsTicker";
+import { HomeView } from "./components/HomeView";
+import { CategoryView, SectionView } from "./components/CategoryView";
+import { ArticleDetailView } from "./components/ArticleDetailView";
+import { DocumentLibraryView } from "./components/DocumentLibraryView";
+import { DocumentArchiveView } from "./components/DocumentArchiveView";
+import { LectureLibraryView } from "./components/LectureLibraryView";
+import { ApprovalsView } from "./components/ApprovalsView";
+import { UserManagementView } from "./components/UserManagementView";
+import { Footer } from "./components/Footer";
 
 // Modals - Code-Split using React.lazy & Suspense for fast initial bundle
-import { LoginModal } from './components/LoginModal';
+import { LoginModal } from "./components/LoginModal";
 const ProfileModal = React.lazy(() =>
-  import('./components/modals/ProfileModal').then((m) => ({ default: m.ProfileModal }))
+  import("./components/modals/ProfileModal").then((m) => ({
+    default: m.ProfileModal,
+  })),
 );
 const CustomizerModal = React.lazy(() =>
-  import('./components/modals/CustomizerModal').then((m) => ({ default: m.CustomizerModal }))
+  import("./components/modals/CustomizerModal").then((m) => ({
+    default: m.CustomizerModal,
+  })),
 );
 const PostArticleModal = React.lazy(() =>
-  import('./components/modals/PostArticleModal').then((m) => ({ default: m.PostArticleModal }))
+  import("./components/modals/PostArticleModal").then((m) => ({
+    default: m.PostArticleModal,
+  })),
 );
 const AddDocModal = React.lazy(() =>
-  import('./components/modals/AddDocModal').then((m) => ({ default: m.AddDocModal }))
+  import("./components/modals/AddDocModal").then((m) => ({
+    default: m.AddDocModal,
+  })),
 );
 const AddLectureModal = React.lazy(() =>
-  import('./components/modals/AddLectureModal').then((m) => ({ default: m.AddLectureModal }))
+  import("./components/modals/AddLectureModal").then((m) => ({
+    default: m.AddLectureModal,
+  })),
 );
 const UncleHoManagerModal = React.lazy(() =>
-  import('./components/modals/UncleHoManagerModal').then((m) => ({ default: m.UncleHoManagerModal }))
+  import("./components/modals/UncleHoManagerModal").then((m) => ({
+    default: m.UncleHoManagerModal,
+  })),
 );
 const HomeAnnouncementManagerModal = React.lazy(() =>
-  import('./components/modals/HomeAnnouncementManagerModal').then((m) => ({
+  import("./components/modals/HomeAnnouncementManagerModal").then((m) => ({
     default: m.HomeAnnouncementManagerModal,
-  }))
+  })),
 );
 const TabIntroManagerModal = React.lazy(() =>
-  import('./components/modals/TabIntroManagerModal').then((m) => ({ default: m.TabIntroManagerModal }))
+  import("./components/modals/TabIntroManagerModal").then((m) => ({
+    default: m.TabIntroManagerModal,
+  })),
 );
 const QuickActionManagerModal = React.lazy(() =>
-  import('./components/modals/QuickActionManagerModal').then((m) => ({
+  import("./components/modals/QuickActionManagerModal").then((m) => ({
     default: m.QuickActionManagerModal,
-  }))
+  })),
 );
 const AccessDeniedModal = React.lazy(() =>
-  import('./components/modals/AccessDeniedModal').then((m) => ({ default: m.AccessDeniedModal }))
+  import("./components/modals/AccessDeniedModal").then((m) => ({
+    default: m.AccessDeniedModal,
+  })),
 );
-import { normalizeWidgetsList } from './components/modals/LayoutManagerModal';
+import { normalizeWidgetsList } from "./components/modals/LayoutManagerModal";
 const LayoutManagerModal = React.lazy(() =>
-  import('./components/modals/LayoutManagerModal').then((m) => ({ default: m.LayoutManagerModal }))
+  import("./components/modals/LayoutManagerModal").then((m) => ({
+    default: m.LayoutManagerModal,
+  })),
 );
 const CategoryManagerModal = React.lazy(() =>
-  import('./components/modals/CategoryManagerModal').then((m) => ({ default: m.CategoryManagerModal }))
+  import("./components/modals/CategoryManagerModal").then((m) => ({
+    default: m.CategoryManagerModal,
+  })),
 );
-import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
-import { getSupabase, supabase, supabaseAuth, supabaseDb } from './utils/supabase';
+import { GlobalSearchModal } from "./components/modals/GlobalSearchModal";
+import {
+  getSupabase,
+  supabase,
+  supabaseAuth,
+  supabaseDb,
+} from "./utils/supabase";
 
 // Home Widgets for 3-Column Layout
-import { UncleHoDailySection } from './components/UncleHoDailySection';
-import { HomeAnnouncementsWidget } from './components/HomeAnnouncementsWidget';
-import { HomeLatestNewsWidget } from './components/HomeLatestNewsWidget';
-import { HomeQuickActionsWidget } from './components/HomeQuickActionsWidget';
+import { UncleHoDailySection } from "./components/UncleHoDailySection";
+import { HomeAnnouncementsWidget } from "./components/HomeAnnouncementsWidget";
+import { HomeLatestNewsWidget } from "./components/HomeLatestNewsWidget";
+import { HomeQuickActionsWidget } from "./components/HomeQuickActionsWidget";
 
 export function App() {
   // State initialization with instant cache hydration from localStorage
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(() => {
     let cachedObj: any = null;
     try {
-      const cached = localStorage.getItem('site_config_cache') || localStorage.getItem('mangyang_site_config');
+      const cached =
+        localStorage.getItem("site_config_cache") ||
+        localStorage.getItem("mangyang_site_config");
       if (cached) cachedObj = JSON.parse(cached);
     } catch {
       cachedObj = null;
@@ -113,12 +141,14 @@ export function App() {
 
     const initial: SiteConfig = {
       ...defaultSiteConfig,
-      ...(cachedObj && typeof cachedObj === 'object' ? cachedObj : {}),
+      ...(cachedObj && typeof cachedObj === "object" ? cachedObj : {}),
     };
 
     // Hydrate categories directly from Admin cache without mock data flicker
     try {
-      const cachedCats = localStorage.getItem('cached_categories') || localStorage.getItem('categories_config_cache');
+      const cachedCats =
+        localStorage.getItem("cached_categories") ||
+        localStorage.getItem("categories_config_cache");
       if (cachedCats) {
         const parsedCats = JSON.parse(cachedCats);
         if (Array.isArray(parsedCats) && parsedCats.length > 0) {
@@ -131,56 +161,78 @@ export function App() {
     } catch {}
 
     // Ensure titles are consistent with standardized branding
-    if (!initial.title || initial.title === 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5') {
-      initial.title = 'TRUYỀN THÔNG ĐOÀN MANG YANG';
+    if (
+      !initial.title ||
+      initial.title === "TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5"
+    ) {
+      initial.title = "TRUYỀN THÔNG ĐOÀN MANG YANG";
     }
-    if (!initial.subtitle || initial.subtitle.includes('HỆ THỐNG THÔNG TIN')) {
-      initial.subtitle = 'TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5';
+    if (!initial.subtitle || initial.subtitle.includes("HỆ THỐNG THÔNG TIN")) {
+      initial.subtitle = "TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5";
     }
     if (!initial.marquee_text) {
-      initial.marquee_text = 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG';
+      initial.marquee_text =
+        "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG";
     }
     if (!initial.ticker) {
-      initial.ticker = '★ Đoàn Mang Yang: "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG"';
+      initial.ticker =
+        '★ Đoàn Mang Yang: "ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG"';
     }
 
     try {
-      const cachedRaw = localStorage.getItem('daily_posters_cache') || localStorage.getItem('daily_posters');
+      const cachedRaw =
+        localStorage.getItem("daily_posters_cache") ||
+        localStorage.getItem("daily_posters");
       if (cachedRaw) {
         const cacheMap = JSON.parse(cachedRaw);
-        const existingWidgets: DailyWidgetItem[] = Array.isArray(initial.dailyWidgets)
+        const existingWidgets: DailyWidgetItem[] = Array.isArray(
+          initial.dailyWidgets,
+        )
           ? [...initial.dailyWidgets]
           : [...defaultDailyWidgets];
 
-        ['safety', 'traffic', 'good_deed'].forEach((key) => {
+        ["safety", "traffic", "good_deed"].forEach((key) => {
           const entry =
             cacheMap[key] ||
             cacheMap[`widget_${key}`] ||
-            (key === 'safety' ? cacheMap['safety_message'] : key === 'traffic' ? cacheMap['traffic_situation'] : null);
+            (key === "safety"
+              ? cacheMap["safety_message"]
+              : key === "traffic"
+                ? cacheMap["traffic_situation"]
+                : null);
           if (entry && (entry.image_data || entry.imageUrl)) {
-            const cleanKey = key === 'safety' ? 'safety_message' : key === 'traffic' ? 'traffic_situation' : key;
+            const cleanKey =
+              key === "safety"
+                ? "safety_message"
+                : key === "traffic"
+                  ? "traffic_situation"
+                  : key;
             const idx = existingWidgets.findIndex(
               (w) =>
                 w.id === cleanKey ||
-                (key === 'safety' && w.id === 'safety') ||
-                (key === 'traffic' && w.id === 'traffic')
+                (key === "safety" && w.id === "safety") ||
+                (key === "traffic" && w.id === "traffic"),
             );
             const updatedItem: DailyWidgetItem = {
               id: cleanKey,
               categoryName:
                 entry.category_name ||
-                (key === 'safety'
-                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-                  : key === 'traffic'
-                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
-                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
-              title: entry.title || '',
+                (key === "safety"
+                  ? "MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN"
+                  : key === "traffic"
+                    ? "MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG"
+                    : "MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP"),
+              title: entry.title || "",
               imageUrl: entry.image_data || entry.imageUrl,
-              aspectRatioMode: entry.aspect_ratio || entry.aspectRatio || 'auto',
-              updatedAt: entry.updated_at || '',
+              aspectRatioMode:
+                entry.aspect_ratio || entry.aspectRatio || "auto",
+              updatedAt: entry.updated_at || "",
             };
             if (idx >= 0) {
-              existingWidgets[idx] = { ...existingWidgets[idx], ...updatedItem };
+              existingWidgets[idx] = {
+                ...existingWidgets[idx],
+                ...updatedItem,
+              };
             } else {
               existingWidgets.push(updatedItem);
             }
@@ -196,9 +248,9 @@ export function App() {
     // Ensure standardized 3-column layout initialization across all devices, private tabs, and reloads
     const initialWidgets = normalizeWidgetsList(
       initial.layoutSettings?.sidebarWidgets ||
-      initial.home_layout?.sidebarWidgets ||
-      initial.sidebarWidgets ||
-      defaultSidebarWidgets
+        initial.home_layout?.sidebarWidgets ||
+        initial.sidebarWidgets ||
+        defaultSidebarWidgets,
     );
     const standardLayout = {
       showUncleHoSection: true,
@@ -209,7 +261,9 @@ export function App() {
       showQuickActionsWidget: true,
       showCategoryColumns: true,
       showQuickLibrarySection: true,
-      topColumnsOrder: ['left', 'middle', 'right'] as ('left' | 'middle' | 'right')[],
+      topColumnsOrder: ["left", "middle", "right"] as (
+        "left" | "middle" | "right"
+      )[],
       ...(initial.layoutSettings || initial.home_layout || {}),
       sidebarWidgets: initialWidgets,
     };
@@ -223,7 +277,9 @@ export function App() {
   // Categories & Tabbar State (Zero-Latency: loaded from localStorage cache or standard unit fallback)
   const [categories, setCategories] = useState<any[]>(() => {
     try {
-      const c = localStorage.getItem('cached_categories') || localStorage.getItem('categories_config_cache');
+      const c =
+        localStorage.getItem("cached_categories") ||
+        localStorage.getItem("categories_config_cache");
       if (c) {
         const parsed = JSON.parse(c);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -234,29 +290,31 @@ export function App() {
     return defaultCategoriesConfig;
   });
 
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] =
+    useState<boolean>(false);
 
   const [users, setUsers] = useState<User[]>(() =>
-    safeStore.get('mangyang_users', defaultUsers)
+    safeStore.get("mangyang_users", defaultUsers),
   );
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Helper đảm bảo mọi bài viết luôn có category là string chuẩn, ngăn ngừa lỗi Objects are not valid as a React child
   const sanitizeArticle = (art: any): Article => {
-    if (!art || typeof art !== 'object') return art;
-    let catStr = 'Tin tức hoạt động';
-    if (typeof art.category === 'string') {
+    if (!art || typeof art !== "object") return art;
+    let catStr = "Tin tức hoạt động";
+    if (typeof art.category === "string") {
       catStr = art.category.trim();
-    } else if (art.category && typeof art.category === 'object') {
-      catStr = (
-        art.category.name ||
-        art.category.label ||
-        art.category.shortLabel ||
-        art.category.navName ||
-        art.category.title ||
-        String(art.category.id || '')
-      ).trim() || 'Tin tức hoạt động';
+    } else if (art.category && typeof art.category === "object") {
+      catStr =
+        (
+          art.category.name ||
+          art.category.label ||
+          art.category.shortLabel ||
+          art.category.navName ||
+          art.category.title ||
+          String(art.category.id || "")
+        ).trim() || "Tin tức hoạt động";
     }
     return {
       ...art,
@@ -267,26 +325,27 @@ export function App() {
   const [articles, setArticles] = useState<Article[]>(() => {
     try {
       const cached =
-        localStorage.getItem('cached_articles') ||
-        localStorage.getItem('articles_cache') ||
-        localStorage.getItem('mangyang_articles');
+        localStorage.getItem("cached_articles") ||
+        localStorage.getItem("articles_cache") ||
+        localStorage.getItem("mangyang_articles");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((a: any) => {
-            if (!a || typeof a !== 'object') return a;
-            let catStr = 'Tin tức hoạt động';
-            if (typeof a.category === 'string') {
+            if (!a || typeof a !== "object") return a;
+            let catStr = "Tin tức hoạt động";
+            if (typeof a.category === "string") {
               catStr = a.category.trim();
-            } else if (a.category && typeof a.category === 'object') {
-              catStr = (
-                a.category.name ||
-                a.category.label ||
-                a.category.shortLabel ||
-                a.category.navName ||
-                a.category.title ||
-                String(a.category.id || '')
-              ).trim() || 'Tin tức hoạt động';
+            } else if (a.category && typeof a.category === "object") {
+              catStr =
+                (
+                  a.category.name ||
+                  a.category.label ||
+                  a.category.shortLabel ||
+                  a.category.navName ||
+                  a.category.title ||
+                  String(a.category.id || "")
+                ).trim() || "Tin tức hoạt động";
             }
             return { ...a, category: catStr };
           });
@@ -301,9 +360,9 @@ export function App() {
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
       const cached =
-        localStorage.getItem('cached_documents') ||
-        localStorage.getItem('documents_cache') ||
-        localStorage.getItem('mangyang_documents');
+        localStorage.getItem("cached_documents") ||
+        localStorage.getItem("documents_cache") ||
+        localStorage.getItem("mangyang_documents");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -317,9 +376,9 @@ export function App() {
   const [lectures, setLectures] = useState<LectureItem[]>(() => {
     try {
       const cached =
-        localStorage.getItem('cached_lectures') ||
-        localStorage.getItem('lectures_cache') ||
-        localStorage.getItem('mangyang_lectures');
+        localStorage.getItem("cached_lectures") ||
+        localStorage.getItem("lectures_cache") ||
+        localStorage.getItem("mangyang_lectures");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -333,16 +392,21 @@ export function App() {
   const [uncleHoQuotes, setUncleHoQuotes] = useState<UncleHoQuote[]>(() => {
     try {
       const cached =
-        localStorage.getItem('uncle_ho_quotes_cache') ||
-        localStorage.getItem('mangyang_uncle_ho_quotes');
+        localStorage.getItem("uncle_ho_quotes_cache") ||
+        localStorage.getItem("mangyang_uncle_ho_quotes");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-      const siteCfgCache = localStorage.getItem('cached_site_config') || localStorage.getItem('site_config_cache');
+      const siteCfgCache =
+        localStorage.getItem("cached_site_config") ||
+        localStorage.getItem("site_config_cache");
       if (siteCfgCache) {
         const parsed = JSON.parse(siteCfgCache);
-        if (parsed?.uncle_ho_data?.quotes && Array.isArray(parsed.uncle_ho_data.quotes)) {
+        if (
+          parsed?.uncle_ho_data?.quotes &&
+          Array.isArray(parsed.uncle_ho_data.quotes)
+        ) {
           return parsed.uncle_ho_data.quotes;
         }
       }
@@ -353,40 +417,42 @@ export function App() {
   });
 
   const [uncleHoSettings, setUncleHoSettings] = useState<UncleHoSettings>(() =>
-    safeStore.get('mangyang_uncle_ho_settings', defaultUncleHoSettings)
+    safeStore.get("mangyang_uncle_ho_settings", defaultUncleHoSettings),
   );
 
   const [dailyPosters, setDailyPosters] = useState<Record<string, any>>(() => {
     try {
       const cached =
-        localStorage.getItem('cached_posters') ||
-        localStorage.getItem('daily_posters') ||
-        localStorage.getItem('daily_posters_cache');
+        localStorage.getItem("cached_posters") ||
+        localStorage.getItem("daily_posters") ||
+        localStorage.getItem("daily_posters_cache");
       return cached ? JSON.parse(cached) : {};
     } catch {
       return {};
     }
   });
 
-
   const [roles, setRoles] = useState<RoleDefinition[]>(() =>
-    safeStore.get('mangyang_custom_roles', defaultRoles)
+    safeStore.get("mangyang_custom_roles", defaultRoles),
   );
 
-  const [militaryProfiles, setMilitaryProfiles] = useState<MilitaryProfile[]>(() =>
-    safeStore.get('mangyang_military_profiles', defaultMilitaryProfiles)
+  const [militaryProfiles, setMilitaryProfiles] = useState<MilitaryProfile[]>(
+    () => safeStore.get("mangyang_military_profiles", defaultMilitaryProfiles),
   );
 
   // Navigation State
-  const [currentPage, setCurrentPage] = useState<PageView>('home');
-  const [previousPage, setPreviousPage] = useState<PageView>('home');
+  const [currentPage, setCurrentPage] = useState<PageView>("home");
+  const [previousPage, setPreviousPage] = useState<PageView>("home");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
 
   // Modals state
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean; tab: 'login' | 'register' }>({
+  const [authModal, setAuthModal] = useState<{
+    isOpen: boolean;
+    tab: "login" | "register";
+  }>({
     isOpen: false,
-    tab: 'login',
+    tab: "login",
   });
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [customizerModalOpen, setCustomizerModalOpen] = useState(false);
@@ -398,7 +464,7 @@ export function App() {
     tabKey: string;
   }>({
     isOpen: false,
-    tabKey: 'doc',
+    tabKey: "doc",
   });
   const [postModal, setPostModal] = useState<{
     isOpen: boolean;
@@ -406,10 +472,11 @@ export function App() {
     articleToEdit: Article | null;
   }>({
     isOpen: false,
-    section: 'ctd',
+    section: "ctd",
     articleToEdit: null,
   });
   const [addDocModalOpen, setAddDocModalOpen] = useState(false);
+  const [docToEdit, setDocToEdit] = useState<DocumentItem | null>(null);
   const [lectureModal, setLectureModal] = useState<{
     isOpen: boolean;
     lectureToEdit: LectureItem | null;
@@ -431,19 +498,24 @@ export function App() {
   // Global keyboard shortcut for search (Ctrl+K or Cmd+K)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsGlobalSearchOpen((prev) => !prev);
       }
     };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
   // Global Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = (type: ToastType, title: string, message?: string, duration = 4000) => {
+  const showToast = (
+    type: ToastType,
+    title: string,
+    message?: string,
+    duration = 4000,
+  ) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     setToasts((prev) => [...prev, { id, type, title, message, duration }]);
   };
@@ -494,33 +566,37 @@ export function App() {
         const lightweight = list.slice(0, 20).map((art) => {
           const copy: any = { ...art };
           delete copy.content; // Tuyệt đối không lưu content chi tiết vào localStorage danh sách
-          if (typeof copy.image === 'string' && copy.image.startsWith('data:image') && copy.image.length > 2000) {
-            copy.image = '';
+          if (
+            typeof copy.image === "string" &&
+            copy.image.startsWith("data:image") &&
+            copy.image.length > 2000
+          ) {
+            copy.image = "";
           }
           if (Array.isArray(copy.images)) {
             copy.images = copy.images.filter((img: any) => {
-              const u = typeof img === 'string' ? img : img?.url || '';
-              return !u.startsWith('data:image') || u.length <= 2000;
+              const u = typeof img === "string" ? img : img?.url || "";
+              return !u.startsWith("data:image") || u.length <= 2000;
             });
           }
           return copy;
         });
-        localStorage.setItem('cached_articles', JSON.stringify(lightweight));
-        localStorage.setItem('articles_cache', JSON.stringify(lightweight));
-        localStorage.setItem('mangyang_articles', JSON.stringify(lightweight));
+        localStorage.setItem("cached_articles", JSON.stringify(lightweight));
+        localStorage.setItem("articles_cache", JSON.stringify(lightweight));
+        localStorage.setItem("mangyang_articles", JSON.stringify(lightweight));
       } catch (e) {
-        console.warn('Error caching articles:', e);
+        console.warn("Error caching articles:", e);
       }
     };
 
     const safeCacheDocuments = (list: DocumentItem[]) => {
       try {
         const lightweight = list.slice(0, 20);
-        localStorage.setItem('cached_documents', JSON.stringify(lightweight));
-        localStorage.setItem('documents_cache', JSON.stringify(lightweight));
-        localStorage.setItem('mangyang_documents', JSON.stringify(lightweight));
+        localStorage.setItem("cached_documents", JSON.stringify(lightweight));
+        localStorage.setItem("documents_cache", JSON.stringify(lightweight));
+        localStorage.setItem("mangyang_documents", JSON.stringify(lightweight));
       } catch (e) {
-        console.warn('Error caching documents:', e);
+        console.warn("Error caching documents:", e);
       }
     };
 
@@ -528,31 +604,40 @@ export function App() {
       try {
         const lightweight: Record<string, any> = {};
         Object.entries(map).forEach(([k, v]) => {
-          if (v && typeof v.image_data === 'string' && v.image_data.startsWith('data:image') && v.image_data.length > 300000) {
-            lightweight[k] = { ...v, image_data: '' };
+          if (
+            v &&
+            typeof v.image_data === "string" &&
+            v.image_data.startsWith("data:image") &&
+            v.image_data.length > 300000
+          ) {
+            lightweight[k] = { ...v, image_data: "" };
           } else {
             lightweight[k] = v;
           }
         });
-        localStorage.setItem('cached_posters', JSON.stringify(lightweight));
-        localStorage.setItem('daily_posters', JSON.stringify(lightweight));
-        localStorage.setItem('daily_posters_cache', JSON.stringify(lightweight));
+        localStorage.setItem("cached_posters", JSON.stringify(lightweight));
+        localStorage.setItem("daily_posters", JSON.stringify(lightweight));
+        localStorage.setItem(
+          "daily_posters_cache",
+          JSON.stringify(lightweight),
+        );
       } catch (e) {
-        console.warn('Error caching daily_posters:', e);
+        console.warn("Error caching daily_posters:", e);
       }
     };
 
     // Helper: Process site_config
     const processSiteConfigData = (config: any) => {
       let parsed = config.config_json || config.config || config.data || config;
-      if (typeof parsed === 'string') {
+      if (typeof parsed === "string") {
         try {
           parsed = JSON.parse(parsed);
         } catch {
           // ignore
         }
       }
-      const mergedConfig: any = typeof parsed === 'object' && parsed !== null ? { ...parsed } : {};
+      const mergedConfig: any =
+        typeof parsed === "object" && parsed !== null ? { ...parsed } : {};
       if (config.title) mergedConfig.title = config.title;
       if (config.subtitle) mergedConfig.subtitle = config.subtitle;
       if (config.unit_name) mergedConfig.footerUnitName = config.unit_name;
@@ -563,7 +648,12 @@ export function App() {
       }
       if (config.marquee_mode) {
         mergedConfig.marquee_mode = config.marquee_mode;
-        mergedConfig.tickerMode = config.marquee_mode === 'today' ? 'auto_today' : config.marquee_mode === 'recent_days' ? 'auto_days' : config.marquee_mode;
+        mergedConfig.tickerMode =
+          config.marquee_mode === "today"
+            ? "auto_today"
+            : config.marquee_mode === "recent_days"
+              ? "auto_days"
+              : config.marquee_mode;
       }
       if (config.marquee_days !== undefined) {
         mergedConfig.marquee_days = config.marquee_days;
@@ -597,7 +687,9 @@ export function App() {
           showQuickActionsWidget: true,
           showCategoryColumns: true,
           showQuickLibrarySection: true,
-          topColumnsOrder: ['left', 'middle', 'right'] as ('left' | 'middle' | 'right')[],
+          topColumnsOrder: ["left", "middle", "right"] as (
+            "left" | "middle" | "right"
+          )[],
           ...rawLayout,
           sidebarWidgets: normalizeWidgetsList(rawLayout?.sidebarWidgets),
         };
@@ -614,36 +706,51 @@ export function App() {
       if (Array.isArray(catsList) && catsList.length > 0) {
         setCategories(catsList);
         try {
-          localStorage.setItem('cached_categories', JSON.stringify(catsList));
+          localStorage.setItem("cached_categories", JSON.stringify(catsList));
         } catch {}
         mergedConfig.categories_config = catsList;
         mergedConfig.categoriesConfig = catsList;
         mergedConfig.categories = catsList;
       }
 
-      const navTabsList = config.navigation_tabs || parsed.navigation_tabs || parsed.navTabs;
+      const navTabsList =
+        config.navigation_tabs || parsed.navigation_tabs || parsed.navTabs;
       if (Array.isArray(navTabsList) && navTabsList.length > 0) {
         // Ensure navTabs items have proper string label and not raw objects
         const cleanTabs = navTabsList.map((t: any, idx: number) => {
-          if (typeof t !== 'object' || t === null) {
+          if (typeof t !== "object" || t === null) {
             return {
               id: String(t),
               label: String(t),
               enabled: true,
               order: idx,
-              type: 'internal',
+              type: "internal",
             };
           }
           return {
             id: String(t.id || `tab-${idx}`),
-            label: typeof t.label === 'string' ? t.label : (typeof t.name === 'string' ? t.name : (typeof t.navName === 'string' ? t.navName : String(t.id || ''))),
-            short_name: typeof t.short_name === 'string' ? t.short_name : (typeof t.shortLabel === 'string' ? t.shortLabel : (typeof t.navName === 'string' ? t.navName : undefined)),
-            targetPage: (t.targetPage || t.id),
-            type: t.type || 'internal',
+            label:
+              typeof t.label === "string"
+                ? t.label
+                : typeof t.name === "string"
+                  ? t.name
+                  : typeof t.navName === "string"
+                    ? t.navName
+                    : String(t.id || ""),
+            short_name:
+              typeof t.short_name === "string"
+                ? t.short_name
+                : typeof t.shortLabel === "string"
+                  ? t.shortLabel
+                  : typeof t.navName === "string"
+                    ? t.navName
+                    : undefined,
+            targetPage: t.targetPage || t.id,
+            type: t.type || "internal",
             externalUrl: t.externalUrl,
             openNewTab: t.openNewTab,
             enabled: t.enabled !== false,
-            order: typeof t.order === 'number' ? t.order : idx,
+            order: typeof t.order === "number" ? t.order : idx,
           };
         });
         mergedConfig.navigation_tabs = cleanTabs;
@@ -656,7 +763,12 @@ export function App() {
         mergedConfig.dailyWidgets = config.daily_widgets || config.dailyWidgets;
       }
 
-      const rawUtils = config.military_utilities || config.quick_links || mergedConfig.quickActionCards || mergedConfig.homeQuickActions || mergedConfig.military_utilities;
+      const rawUtils =
+        config.military_utilities ||
+        config.quick_links ||
+        mergedConfig.quickActionCards ||
+        mergedConfig.homeQuickActions ||
+        mergedConfig.military_utilities;
       if (rawUtils && Array.isArray(rawUtils) && rawUtils.length > 0) {
         mergedConfig.quickActionCards = rawUtils;
         mergedConfig.homeQuickActions = rawUtils;
@@ -669,12 +781,20 @@ export function App() {
         if (Array.isArray(uhData.quotes) && uhData.quotes.length > 0) {
           setUncleHoQuotes(uhData.quotes);
           try {
-            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(uhData.quotes));
-            localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(uhData.quotes));
+            localStorage.setItem(
+              "uncle_ho_quotes_cache",
+              JSON.stringify(uhData.quotes),
+            );
+            localStorage.setItem(
+              "mangyang_uncle_ho_quotes",
+              JSON.stringify(uhData.quotes),
+            );
           } catch {}
         }
         if (Array.isArray(uhData.images) && uhData.images.length > 0) {
-          const cleanImgs = uhData.images.filter((x: string) => x && !x.includes('unsplash.com'));
+          const cleanImgs = uhData.images.filter(
+            (x: string) => x && !x.includes("unsplash.com"),
+          );
           setUncleHoSettings((prev) => ({
             ...prev,
             ...(uhData.settings || {}),
@@ -682,24 +802,38 @@ export function App() {
             bannerTitle: uhData.settings?.bannerTitle || prev.bannerTitle,
           }));
           try {
-            localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
-            localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
+            localStorage.setItem("uncle_ho_images", JSON.stringify(cleanImgs));
+            localStorage.setItem(
+              "mangyang_uncle_ho_images",
+              JSON.stringify(cleanImgs),
+            );
           } catch {}
         }
       }
 
-      const hoImgs = config.uncle_ho_images || mergedConfig.uncle_ho_images || mergedConfig.uncleHoSettings?.images;
+      const hoImgs =
+        config.uncle_ho_images ||
+        mergedConfig.uncle_ho_images ||
+        mergedConfig.uncleHoSettings?.images;
       if (Array.isArray(hoImgs) && hoImgs.length > 0) {
-        const cleanImgs = hoImgs.filter((x: string) => x && !x.includes('unsplash.com'));
+        const cleanImgs = hoImgs.filter(
+          (x: string) => x && !x.includes("unsplash.com"),
+        );
         setUncleHoSettings((prev) => ({
           ...prev,
-          ...(mergedConfig.uncleHoSettings || mergedConfig.uncle_ho_settings || {}),
+          ...(mergedConfig.uncleHoSettings ||
+            mergedConfig.uncle_ho_settings ||
+            {}),
           images: cleanImgs,
-          bannerTitle: mergedConfig.uncleHoSettings?.bannerTitle || prev.bannerTitle,
+          bannerTitle:
+            mergedConfig.uncleHoSettings?.bannerTitle || prev.bannerTitle,
         }));
         try {
-          localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImgs));
-          localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImgs));
+          localStorage.setItem("uncle_ho_images", JSON.stringify(cleanImgs));
+          localStorage.setItem(
+            "mangyang_uncle_ho_images",
+            JSON.stringify(cleanImgs),
+          );
         } catch {
           // ignore
         }
@@ -709,9 +843,9 @@ export function App() {
         ...prev,
         ...mergedConfig,
       }));
-      safeStore.set('mangyang_site_config', { ...mergedConfig });
+      safeStore.set("mangyang_site_config", { ...mergedConfig });
       try {
-        localStorage.setItem('site_config_cache', JSON.stringify(mergedConfig));
+        localStorage.setItem("site_config_cache", JSON.stringify(mergedConfig));
       } catch {
         // ignore
       }
@@ -721,57 +855,78 @@ export function App() {
     const processDailyPostersData = (posters: any[]) => {
       const posterMap: Record<string, any> = {};
       posters.forEach((p: any) => {
-        const id = (p.id || p.key || p.widget_id || '').replace(/^widget_/, '');
+        const id = (p.id || p.key || p.widget_id || "").replace(/^widget_/, "");
         const normKey =
-          id === 'uncle_ho' || id === 'uncleHo' || id === 'bac_ho'
-            ? 'uncle_ho'
-            : id === 'safety_message' || id === 'safety'
-            ? 'safety'
-            : id === 'traffic_situation' || id === 'traffic'
-            ? 'traffic'
-            : id === 'good_deed'
-            ? 'good_deed'
-            : id;
+          id === "uncle_ho" || id === "uncleHo" || id === "bac_ho"
+            ? "uncle_ho"
+            : id === "safety_message" || id === "safety"
+              ? "safety"
+              : id === "traffic_situation" || id === "traffic"
+                ? "traffic"
+                : id === "good_deed"
+                  ? "good_deed"
+                  : id;
 
         const entry = {
           id: normKey,
-          image_data: p.image_data || p.imageUrl || p.image || '',
-          aspect_ratio: p.aspect_ratio || p.aspectRatio || p.aspectRatioMode || 'auto',
-          title: p.title || '',
-          category_name: p.category_name || p.categoryName || '',
-          content: p.content || '',
+          image_data: p.image_data || p.imageUrl || p.image || "",
+          aspect_ratio:
+            p.aspect_ratio || p.aspectRatio || p.aspectRatioMode || "auto",
+          title: p.title || "",
+          category_name: p.category_name || p.categoryName || "",
+          content: p.content || "",
           extra_data: p.extra_data || {},
-          updated_at: p.updated_at || p.updatedAt || '',
+          updated_at: p.updated_at || p.updatedAt || "",
         };
         posterMap[normKey] = entry;
         posterMap[id] = entry;
-        if (normKey === 'safety') posterMap['safety_message'] = entry;
-        if (normKey === 'traffic') posterMap['traffic_situation'] = entry;
+        if (normKey === "safety") posterMap["safety_message"] = entry;
+        if (normKey === "traffic") posterMap["traffic_situation"] = entry;
       });
 
       safeCacheDailyPosters(posterMap);
       setDailyPosters(posterMap);
 
-      if (posterMap['uncle_ho']) {
-        const hoData = posterMap['uncle_ho'];
-        if (hoData.extra_data?.quotes && Array.isArray(hoData.extra_data.quotes) && hoData.extra_data.quotes.length > 0) {
+      if (posterMap["uncle_ho"]) {
+        const hoData = posterMap["uncle_ho"];
+        if (
+          hoData.extra_data?.quotes &&
+          Array.isArray(hoData.extra_data.quotes) &&
+          hoData.extra_data.quotes.length > 0
+        ) {
           setUncleHoQuotes(hoData.extra_data.quotes);
           try {
-            localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(hoData.extra_data.quotes));
-            localStorage.setItem('mangyang_uncle_ho_quotes', JSON.stringify(hoData.extra_data.quotes));
+            localStorage.setItem(
+              "uncle_ho_quotes_cache",
+              JSON.stringify(hoData.extra_data.quotes),
+            );
+            localStorage.setItem(
+              "mangyang_uncle_ho_quotes",
+              JSON.stringify(hoData.extra_data.quotes),
+            );
           } catch {}
         }
-        const hoImages = hoData.extra_data?.images || (hoData.image_data ? [hoData.image_data] : []);
+        const hoImages =
+          hoData.extra_data?.images ||
+          (hoData.image_data ? [hoData.image_data] : []);
         if (Array.isArray(hoImages) && hoImages.length > 0) {
-          const cleanImages = hoImages.filter((x: string) => x && !x.includes('unsplash.com'));
+          const cleanImages = hoImages.filter(
+            (x: string) => x && !x.includes("unsplash.com"),
+          );
           setUncleHoSettings((prev) => ({
             ...prev,
             images: cleanImages,
             bannerTitle: hoData.title || prev.bannerTitle,
           }));
           try {
-            localStorage.setItem('uncle_ho_images', JSON.stringify(cleanImages));
-            localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(cleanImages));
+            localStorage.setItem(
+              "uncle_ho_images",
+              JSON.stringify(cleanImages),
+            );
+            localStorage.setItem(
+              "mangyang_uncle_ho_images",
+              JSON.stringify(cleanImages),
+            );
           } catch {
             // ignore
           }
@@ -779,33 +934,43 @@ export function App() {
       }
 
       setSiteConfig((prev) => {
-        const existingWidgets: DailyWidgetItem[] = Array.isArray(prev.dailyWidgets)
+        const existingWidgets: DailyWidgetItem[] = Array.isArray(
+          prev.dailyWidgets,
+        )
           ? [...prev.dailyWidgets]
           : [...defaultDailyWidgets];
 
-        ['safety', 'traffic', 'good_deed'].forEach((k) => {
-          const cleanKey = k === 'safety' ? 'safety_message' : k === 'traffic' ? 'traffic_situation' : 'good_deed';
+        ["safety", "traffic", "good_deed"].forEach((k) => {
+          const cleanKey =
+            k === "safety"
+              ? "safety_message"
+              : k === "traffic"
+                ? "traffic_situation"
+                : "good_deed";
           const val = posterMap[k] || posterMap[cleanKey];
           if (val && (val.image_data || val.title)) {
             const idx = existingWidgets.findIndex(
               (w) =>
                 w.id === cleanKey ||
-                (k === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
-                (k === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation')) ||
-                (k === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
+                (k === "safety" &&
+                  (w.id === "safety" || w.id === "safety_message")) ||
+                (k === "traffic" &&
+                  (w.id === "traffic" || w.id === "traffic_situation")) ||
+                (k === "good_deed" &&
+                  (w.id === "good_deed" || w.id === "widget_good_deed")),
             );
             const item: DailyWidgetItem = {
               id: cleanKey,
               categoryName:
                 val.category_name ||
-                (k === 'safety'
-                  ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-                  : k === 'traffic'
-                  ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
-                  : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP'),
-              title: val.title || '',
-              imageUrl: val.image_data || '',
-              aspectRatioMode: (val.aspect_ratio as any) || 'auto',
+                (k === "safety"
+                  ? "MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN"
+                  : k === "traffic"
+                    ? "MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG"
+                    : "MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP"),
+              title: val.title || "",
+              imageUrl: val.image_data || "",
+              aspectRatioMode: (val.aspect_ratio as any) || "auto",
               updatedAt: val.updated_at,
             };
             if (idx >= 0) {
@@ -826,8 +991,9 @@ export function App() {
 
     // Helper: Process articles
     const processArticlesData = (articlesData: any[]) => {
-      const mappedArticles: Article[] = articlesData
-        .map((row: any) => sanitizeArticle(supabaseDb.mapRowToArticle(row)));
+      const mappedArticles: Article[] = articlesData.map((row: any) =>
+        sanitizeArticle(supabaseDb.mapRowToArticle(row)),
+      );
       setArticles(mappedArticles);
       safeCacheArticles(mappedArticles);
     };
@@ -836,18 +1002,23 @@ export function App() {
     const processDocumentsData = (docsData: any[]) => {
       const mappedDocs: DocumentItem[] = docsData.map((item: any) => ({
         id: Number(item.id),
-        code: item.code_number || item.code || '',
-        title: item.title || '',
-        category: item.category || 'Văn bản chỉ đạo',
-        issuer: item.issuer || 'Trung đoàn 95',
-        date: item.date || item.issue_date || (item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '28/08/2026'),
-        type: item.type || item.file_type || 'pdf',
+        code: item.code_number || item.code || "",
+        title: item.title || "",
+        category: item.category || "Văn bản chỉ đạo",
+        issuer: item.issuer || "Trung đoàn 95",
+        date:
+          item.date ||
+          item.issue_date ||
+          (item.created_at
+            ? new Date(item.created_at).toLocaleDateString("vi-VN")
+            : "28/08/2026"),
+        type: item.type || item.file_type || "pdf",
         description: item.description || undefined,
         fileName: item.file_name || item.fileName || undefined,
         fileSize: item.file_size || item.fileSize || undefined,
         fileUrl: item.file_url || item.fileUrl || undefined,
         downloads: Number(item.downloads || 0),
-        secretLevel: item.secret_level || item.secretLevel || 'normal',
+        secretLevel: item.secret_level || item.secretLevel || "normal",
       }));
       setDocuments(mappedDocs);
       safeCacheDocuments(mappedDocs);
@@ -859,220 +1030,277 @@ export function App() {
         const supabase = getSupabase();
         if (!supabase) return;
 
-      // 1.1 Tải cấu hình & Chuyên mục & Layout
-      supabase
-        .from('site_config')
-        .select('*')
-        .eq('id', 'default')
-        .maybeSingle()
-        .then(
-          ({ data, error }) => {
-            if (isMounted && !error && data) {
-              if (data.categories_config && Array.isArray(data.categories_config) && data.categories_config.length > 0) {
-                setCategories(data.categories_config);
+        // 1.1 Tải cấu hình & Chuyên mục & Layout
+        supabase
+          .from("site_config")
+          .select("*")
+          .eq("id", "default")
+          .maybeSingle()
+          .then(
+            ({ data, error }) => {
+              if (isMounted && !error && data) {
+                if (
+                  data.categories_config &&
+                  Array.isArray(data.categories_config) &&
+                  data.categories_config.length > 0
+                ) {
+                  setCategories(data.categories_config);
+                  try {
+                    localStorage.setItem(
+                      "cached_categories",
+                      JSON.stringify(data.categories_config),
+                    );
+                  } catch {}
+                }
+                processSiteConfigData(data);
                 try {
-                  localStorage.setItem('cached_categories', JSON.stringify(data.categories_config));
+                  localStorage.setItem(
+                    "cached_site_config",
+                    JSON.stringify(data),
+                  );
+                  localStorage.setItem(
+                    "site_config_cache",
+                    JSON.stringify(data),
+                  );
                 } catch {}
               }
-              processSiteConfigData(data);
-              try {
-                localStorage.setItem('cached_site_config', JSON.stringify(data));
-                localStorage.setItem('site_config_cache', JSON.stringify(data));
-              } catch {}
-            }
-          },
-          () => {}
-        );
+            },
+            () => {},
+          );
 
-      // 1.2 Tải bài viết trang chủ (Chỉ lấy các trường tóm tắt, TUYỆT ĐỐI không lấy 'content' để giảm 90% dung lượng)
-      supabase
-        .from('articles')
-        .select('id, title, summary, category, sub_category, author, author_role, image_url, views, published_at, is_featured')
-        .order('published_at', { ascending: false })
-        .limit(10)
-        .then(
-          ({ data, error }) => {
-            if (!isMounted) return;
-            if (!error && data && Array.isArray(data) && data.length > 0) {
-              processArticlesData(data);
-            } else {
-              // Fallback nếu schema chưa migrate sang tên cột mới
-              (supabase.from('articles') as any)
-                .select('id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at')
-                .order('created_at', { ascending: false })
-                .limit(10)
-                .then(
-                  ({ data: fbData }: any) => {
-                    if (isMounted && fbData && Array.isArray(fbData) && fbData.length > 0) {
-                      processArticlesData(fbData);
-                    }
-                  },
-                  () => {}
-                );
-            }
-          },
-          () => {}
-        );
+        // 1.2 Tải bài viết trang chủ (Chỉ lấy các trường tóm tắt, TUYỆT ĐỐI không lấy 'content' để giảm 90% dung lượng)
+        supabase
+          .from("articles")
+          .select(
+            "id, title, summary, category, sub_category, author, author_role, image_url, views, published_at, is_featured",
+          )
+          .order("published_at", { ascending: false })
+          .limit(10)
+          .then(
+            ({ data, error }) => {
+              if (!isMounted) return;
+              if (!error && data && Array.isArray(data) && data.length > 0) {
+                processArticlesData(data);
+              } else {
+                // Fallback nếu schema chưa migrate sang tên cột mới
+                (supabase.from("articles") as any)
+                  .select(
+                    "id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at",
+                  )
+                  .order("created_at", { ascending: false })
+                  .limit(10)
+                  .then(
+                    ({ data: fbData }: any) => {
+                      if (
+                        isMounted &&
+                        fbData &&
+                        Array.isArray(fbData) &&
+                        fbData.length > 0
+                      ) {
+                        processArticlesData(fbData);
+                      }
+                    },
+                    () => {},
+                  );
+              }
+            },
+            () => {},
+          );
 
-      // 1.3 Tải Posters Infographic
-      supabase
-        .from('daily_posters')
-        .select('*')
-        .then(
-          ({ data, error }) => {
-            if (isMounted && !error && data && Array.isArray(data) && data.length > 0) {
-              processDailyPostersData(data);
-            }
-          },
-          () => {}
-        );
+        // 1.3 Tải Posters Infographic
+        supabase
+          .from("daily_posters")
+          .select("*")
+          .then(
+            ({ data, error }) => {
+              if (
+                isMounted &&
+                !error &&
+                data &&
+                Array.isArray(data) &&
+                data.length > 0
+              ) {
+                processDailyPostersData(data);
+              }
+            },
+            () => {},
+          );
 
-      // 1.4 Tài liệu (Nạp độc lập - chỉ lấy mục trang chủ)
-      supabase
-        .from('documents')
-        .select('id, code, code_number, title, category, issuer, date, issue_date, type, file_type, file_url, downloads, created_at')
-        .order('created_at', { ascending: false })
-        .limit(8)
-        .then(
-          ({ data, error }) => {
-            if (isMounted && !error && data && Array.isArray(data) && data.length > 0) {
-              processDocumentsData(data);
-            }
-          },
-          () => {}
-        );
+        // 1.4 Tài liệu (Nạp độc lập - chỉ lấy mục trang chủ)
+        supabase
+          .from("documents")
+          .select(
+            "id, code, code_number, title, category, issuer, date, issue_date, type, file_type, file_url, downloads, created_at",
+          )
+          .order("created_at", { ascending: false })
+          .limit(8)
+          .then(
+            ({ data, error }) => {
+              if (
+                isMounted &&
+                !error &&
+                data &&
+                Array.isArray(data) &&
+                data.length > 0
+              ) {
+                processDocumentsData(data);
+              }
+            },
+            () => {},
+          );
 
-      // 1.5 Các bảng dữ liệu phụ (Chạy nền song song, không làm chậm giao diện chính)
-      supabase
-        .from('lectures')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(30)
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              setLectures(data as any);
-              try { localStorage.setItem('lectures_cache', JSON.stringify(data)); } catch {}
-            }
-          },
-          () => {}
-        );
+        // 1.5 Các bảng dữ liệu phụ (Chạy nền song song, không làm chậm giao diện chính)
+        supabase
+          .from("lectures")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(30)
+          .then(
+            ({ data }) => {
+              if (isMounted && data && Array.isArray(data) && data.length > 0) {
+                setLectures(data as any);
+                try {
+                  localStorage.setItem("lectures_cache", JSON.stringify(data));
+                } catch {}
+              }
+            },
+            () => {},
+          );
 
-      supabase
-        .from('uncle_ho_quotes')
-        .select('*')
-        .limit(366)
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              setUncleHoQuotes(data as any);
-              try { localStorage.setItem('uncle_ho_quotes_cache', JSON.stringify(data)); } catch {}
-            }
-          },
-          () => {}
-        );
+        supabase
+          .from("uncle_ho_quotes")
+          .select("*")
+          .limit(366)
+          .then(
+            ({ data }) => {
+              if (isMounted && data && Array.isArray(data) && data.length > 0) {
+                setUncleHoQuotes(data as any);
+                try {
+                  localStorage.setItem(
+                    "uncle_ho_quotes_cache",
+                    JSON.stringify(data),
+                  );
+                } catch {}
+              }
+            },
+            () => {},
+          );
 
-
-      supabase
-        .from('users')
-        .select('*')
-        .limit(50)
-        .then(
-          ({ data }) => {
-            if (isMounted && data && Array.isArray(data) && data.length > 0) {
-              setUsers(data as any);
-            }
-          },
-          () => {}
-        );
+        supabase
+          .from("users")
+          .select("*")
+          .limit(50)
+          .then(
+            ({ data }) => {
+              if (isMounted && data && Array.isArray(data) && data.length > 0) {
+                setUsers(data as any);
+              }
+            },
+            () => {},
+          );
       } catch (err) {
-        console.warn('Bỏ qua lỗi mạng trong fetchMasterData, tiếp tục render trang:', err);
+        console.warn(
+          "Bỏ qua lỗi mạng trong fetchMasterData, tiếp tục render trang:",
+          err,
+        );
       }
     };
 
     try {
       fetchMasterData();
     } catch (err) {
-      console.warn('Bỏ qua lỗi gọi fetchMasterData:', err);
+      console.warn("Bỏ qua lỗi gọi fetchMasterData:", err);
     }
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
     let unsub = () => {};
     try {
       unsub = cloudStorage.subscribeAll({
-      onArticlesChange: (freshArticles) => {
-        if (isMounted && freshArticles) {
-          setArticles(freshArticles.map(sanitizeArticle));
-        }
-      },
-      onArticleInsert: (newArt) => {
-        if (isMounted && newArt) {
-          const safeArt = sanitizeArticle(newArt);
-          setArticles((prev) => {
-            const next = [safeArt, ...prev.filter((a) => String(a.id) !== String(safeArt.id))];
-            return next;
-          });
-        }
-      },
-      onArticleUpdate: (updatedArt) => {
-        if (isMounted && updatedArt) {
-          const safeArt = sanitizeArticle(updatedArt);
-          setArticles((prev) => {
-            const next = prev.map((a) => (String(a.id) === String(safeArt.id) ? safeArt : a));
-            return next;
-          });
-        }
-      },
-      onArticleDelete: (deletedId) => {
-        if (isMounted && deletedId) {
-          setArticles((prev) => {
-            const next = prev.filter((a) => String(a.id) !== String(deletedId));
-            return next;
-          });
-        }
-      },
-      onDocumentsChange: (freshDocs) => {
-        if (isMounted && freshDocs) {
-          setDocuments(freshDocs);
-        }
-      },
-      onLecturesChange: (freshLectures) => {
-        if (isMounted && freshLectures) {
-          setLectures(freshLectures);
-        }
-      },
-      onSiteConfigChange: (freshConfig) => {
-        if (isMounted && freshConfig) {
-          setSiteConfig(freshConfig);
-        }
-      },
-      onUsersChange: (freshUsers) => {
-        if (isMounted && freshUsers && freshUsers.length > 0) {
-          setUsers(freshUsers);
-        }
-      },
-    });
+        onArticlesChange: (freshArticles) => {
+          if (isMounted && freshArticles) {
+            setArticles(freshArticles.map(sanitizeArticle));
+          }
+        },
+        onArticleInsert: (newArt) => {
+          if (isMounted && newArt) {
+            const safeArt = sanitizeArticle(newArt);
+            setArticles((prev) => {
+              const next = [
+                safeArt,
+                ...prev.filter((a) => String(a.id) !== String(safeArt.id)),
+              ];
+              return next;
+            });
+          }
+        },
+        onArticleUpdate: (updatedArt) => {
+          if (isMounted && updatedArt) {
+            const safeArt = sanitizeArticle(updatedArt);
+            setArticles((prev) => {
+              const next = prev.map((a) =>
+                String(a.id) === String(safeArt.id) ? safeArt : a,
+              );
+              return next;
+            });
+          }
+        },
+        onArticleDelete: (deletedId) => {
+          if (isMounted && deletedId) {
+            setArticles((prev) => {
+              const next = prev.filter(
+                (a) => String(a.id) !== String(deletedId),
+              );
+              return next;
+            });
+          }
+        },
+        onDocumentsChange: (freshDocs) => {
+          if (isMounted && freshDocs) {
+            setDocuments(freshDocs);
+          }
+        },
+        onLecturesChange: (freshLectures) => {
+          if (isMounted && freshLectures) {
+            setLectures(freshLectures);
+          }
+        },
+        onSiteConfigChange: (freshConfig) => {
+          if (isMounted && freshConfig) {
+            setSiteConfig(freshConfig);
+          }
+        },
+        onUsersChange: (freshUsers) => {
+          if (isMounted && freshUsers && freshUsers.length > 0) {
+            setUsers(freshUsers);
+          }
+        },
+      });
     } catch (err) {
-      console.warn('Bỏ qua lỗi subscription:', err);
+      console.warn("Bỏ qua lỗi subscription:", err);
     }
 
     // 4. Supabase Auth session checking & auto-listener
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (isMounted && session?.user) {
-        const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
-        setCurrentUser((prev) => (prev ? prev : adminUser));
-      }
-    }).catch(console.warn);
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (isMounted && session?.user) {
+          const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
+          setCurrentUser((prev) => (prev ? prev : adminUser));
+        }
+      })
+      .catch(console.warn);
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted) return;
-      if (session?.user) {
-        const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
-        setCurrentUser(adminUser);
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-      }
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
+          setCurrentUser(adminUser);
+        } else if (event === "SIGNED_OUT") {
+          setCurrentUser(null);
+        }
+      },
+    );
 
     return () => {
       isMounted = false;
@@ -1085,7 +1313,7 @@ export function App() {
 
   // Sync state to LocalStorage
   useEffect(() => {
-    safeStore.set('mangyang_site_config', siteConfig);
+    safeStore.set("mangyang_site_config", siteConfig);
   }, [siteConfig]);
 
   // Dynamic Global Font Scaling based on Admin configuration
@@ -1096,43 +1324,54 @@ export function App() {
     const bodyScale = (settings?.bodyScale ?? 100) / 100;
     const navWidgetScale = (settings?.navWidgetScale ?? 100) / 100;
 
-    document.documentElement.style.setProperty('--app-font-scale', globalScale.toString());
-    document.documentElement.style.setProperty('--heading-font-scale', headingScale.toString());
-    document.documentElement.style.setProperty('--body-font-scale', bodyScale.toString());
-    document.documentElement.style.setProperty('--nav-widget-scale', navWidgetScale.toString());
+    document.documentElement.style.setProperty(
+      "--app-font-scale",
+      globalScale.toString(),
+    );
+    document.documentElement.style.setProperty(
+      "--heading-font-scale",
+      headingScale.toString(),
+    );
+    document.documentElement.style.setProperty(
+      "--body-font-scale",
+      bodyScale.toString(),
+    );
+    document.documentElement.style.setProperty(
+      "--nav-widget-scale",
+      navWidgetScale.toString(),
+    );
   }, [siteConfig?.fontSettings, siteConfig?.font_settings]);
 
   useEffect(() => {
-    safeStore.set('mangyang_users', users);
+    safeStore.set("mangyang_users", users);
   }, [users]);
 
   useEffect(() => {
-    safeStore.set('mangyang_uncle_ho_quotes', uncleHoQuotes);
+    safeStore.set("mangyang_uncle_ho_quotes", uncleHoQuotes);
   }, [uncleHoQuotes]);
 
   useEffect(() => {
-    safeStore.set('mangyang_uncle_ho_settings', uncleHoSettings);
+    safeStore.set("mangyang_uncle_ho_settings", uncleHoSettings);
   }, [uncleHoSettings]);
 
   useEffect(() => {
-    safeStore.set('mangyang_articles', articles);
+    safeStore.set("mangyang_articles", articles);
   }, [articles]);
 
   useEffect(() => {
-    safeStore.set('mangyang_documents', documents);
+    safeStore.set("mangyang_documents", documents);
   }, [documents]);
 
   useEffect(() => {
-    safeStore.set('mangyang_lectures', lectures);
+    safeStore.set("mangyang_lectures", lectures);
   }, [lectures]);
 
-
   useEffect(() => {
-    safeStore.set('mangyang_custom_roles', roles);
+    safeStore.set("mangyang_custom_roles", roles);
   }, [roles]);
 
   useEffect(() => {
-    safeStore.set('mangyang_military_profiles', militaryProfiles);
+    safeStore.set("mangyang_military_profiles", militaryProfiles);
   }, [militaryProfiles]);
 
   // Real-time activity timer: Increment active minutes for current logged-in user every minute
@@ -1141,11 +1380,14 @@ export function App() {
 
     const interval = setInterval(() => {
       const now = new Date();
-      const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(
-        now.getMonth() + 1
-      ).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+      const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(
+        2,
+        "0",
+      )}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
+        now.getMinutes(),
+      ).padStart(2, "0")}`;
 
       // Update current user
       setCurrentUser((prev) => {
@@ -1168,22 +1410,23 @@ export function App() {
                 lastActiveAt: timeStr,
                 isOnline: true,
               }
-            : u
-        )
+            : u,
+        ),
       );
 
       // Update linked military profile
       setMilitaryProfiles((prev) =>
         prev.map((p) =>
-          p.userId === currentUser.id || p.username?.toLowerCase() === currentUser.username.toLowerCase()
+          p.userId === currentUser.id ||
+          p.username?.toLowerCase() === currentUser.username.toLowerCase()
             ? {
                 ...p,
                 totalActiveMinutes: (p.totalActiveMinutes || 0) + 1,
                 lastActiveAt: timeStr,
                 isOnline: true,
               }
-            : p
-        )
+            : p,
+        ),
       );
     }, 60000); // every 60 seconds
 
@@ -1191,48 +1434,90 @@ export function App() {
   }, [currentUser?.id, currentUser?.username]);
 
   // Derived Values
-  const pendingDraftsCount = articles.filter((a) => a.status === 'pending').length;
+  const pendingDraftsCount = articles.filter(
+    (a) => a.status === "pending",
+  ).length;
+
+  // Page Key Normalizer for Dedicated Libraries (Document & Lecture)
+  const normalizePageKey = (raw: string): PageView => {
+    const lower = (raw || "").toLowerCase().trim();
+    if (
+      lower === "doc" ||
+      lower === "documents" ||
+      lower === "van-ban" ||
+      lower === "vanban" ||
+      lower === "kho-van-ban" ||
+      lower === "kho-van-ban-chi-thi"
+    ) {
+      return "doc";
+    }
+    if (
+      lower === "lecture" ||
+      lower === "lectures" ||
+      lower === "bai-giang" ||
+      lower === "baigiang" ||
+      lower === "bai-giang-so" ||
+      lower === "kho-bai-giang"
+    ) {
+      return "lecture";
+    }
+    return raw as PageView;
+  };
 
   // Navigation Handlers
-  const handleSelectPage = (page: PageView) => {
+  const handleSelectPage = (rawPage: PageView) => {
+    const page = normalizePageKey(rawPage);
     // Access Control Guards
-    if (page === 'doc' && !currentUser?.canViewDoc && currentUser?.role !== 'admin') {
+    if (
+      page === "doc" &&
+      !currentUser?.canViewDoc &&
+      currentUser?.role !== "admin"
+    ) {
       setAccessDeniedModal({
         isOpen: true,
-        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP KHO VĂN BẢN QUÂN SỰ',
-        message: 'Khu vực lưu trữ văn kiện, chỉ thị mật nội bộ đơn vị. Đồng chí chưa được cấp quyền xem tài liệu. Vui lòng liên hệ Ban Biên tập để được cấp quyền!',
-        requiredRole: 'Cán bộ được cấp quyền hoặc Quản trị viên',
+        title: "BẠN CHƯA CÓ QUYỀN TRUY CẬP KHO VĂN BẢN QUÂN SỰ",
+        message:
+          "Khu vực lưu trữ văn kiện, chỉ thị mật nội bộ đơn vị. Đồng chí chưa được cấp quyền xem tài liệu. Vui lòng liên hệ Ban Biên tập để được cấp quyền!",
+        requiredRole: "Cán bộ được cấp quyền hoặc Quản trị viên",
       });
       return;
     }
-    if ((page === 'approvals' || page === 'users') && currentUser?.role !== 'admin') {
+    if (
+      (page === "approvals" || page === "users") &&
+      currentUser?.role !== "admin"
+    ) {
       setAccessDeniedModal({
         isOpen: true,
-        title: 'BẠN CHƯA CÓ QUYỀN TRUY CẬP KHU VỰC QUẢN TRỊ NÀY',
-        message: 'Khu vực phê duyệt tin bài và quản trị tài khoản quân nhân chỉ dành riêng cho Quản trị viên (Admin - Ban Biên tập Trung đoàn 95, Sư đoàn 2)!',
-        requiredRole: 'Quản trị viên (Admin)',
+        title: "BẠN CHƯA CÓ QUYỀN TRUY CẬP KHU VỰC QUẢN TRỊ NÀY",
+        message:
+          "Khu vực phê duyệt tin bài và quản trị tài khoản quân nhân chỉ dành riêng cho Quản trị viên (Admin - Ban Biên tập Trung đoàn 95, Sư đoàn 2)!",
+        requiredRole: "Quản trị viên (Admin)",
       });
       return;
     }
 
-    if (currentPage !== 'article_detail' && currentPage !== 'article-detail') {
+    if (currentPage !== "article_detail" && currentPage !== "article-detail") {
       setPreviousPage(currentPage);
     }
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSelectCategory = (categoryId: string, sub?: string) => {
-    setSelectedSubcategory(sub || 'all');
-    handleSelectPage(categoryId as PageView);
+    const page = normalizePageKey(categoryId);
+    setSelectedSubcategory(sub || "all");
+    handleSelectPage(page);
   };
 
   const handleOpenArticle = (article: Article) => {
     const sessionKey = `viewed_article_${article.id}`;
     let isNewView = false;
     try {
-      if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionKey)) {
-        sessionStorage.setItem(sessionKey, '1');
+      if (
+        typeof window !== "undefined" &&
+        !sessionStorage.getItem(sessionKey)
+      ) {
+        sessionStorage.setItem(sessionKey, "1");
         isNewView = true;
       }
     } catch {
@@ -1245,7 +1530,9 @@ export function App() {
 
     // Instant UI update
     setArticles((prev) =>
-      prev.map((a) => (String(a.id) === String(article.id) ? updatedArticle : a))
+      prev.map((a) =>
+        String(a.id) === String(article.id) ? updatedArticle : a,
+      ),
     );
 
     // Call Supabase increment in background
@@ -1253,23 +1540,28 @@ export function App() {
       cloudStorage.incrementViews(article.id, currentCount);
     }
 
-    if (currentPage !== 'article_detail' && currentPage !== 'article-detail') {
+    if (currentPage !== "article_detail" && currentPage !== "article-detail") {
       setPreviousPage(currentPage);
     }
     setSelectedArticle(updatedArticle);
-    setCurrentPage('article_detail');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setCurrentPage("article_detail");
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
     // TỐI ƯU ZERO DELAY: Nếu bài viết danh sách trang chủ chưa có content đầy đủ, nạp ngầm nhanh từ Supabase
-    if (!article.content || article.content === article.summary || article.content === article.excerpt || article.content.length < 60) {
+    if (
+      !article.content ||
+      article.content === article.summary ||
+      article.content === article.excerpt ||
+      article.content.length < 60
+    ) {
       const sb = getSupabase();
       if (sb) {
         (async () => {
           try {
             const { data } = await sb
-              .from('articles')
-              .select('id, content, images, embed_code')
-              .eq('id', article.id)
+              .from("articles")
+              .select("id, content, images, embed_code")
+              .eq("id", article.id)
               .maybeSingle();
 
             if (data && data.content) {
@@ -1278,10 +1570,14 @@ export function App() {
                   ? {
                       ...prev,
                       content: data.content,
-                      images: data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : prev.images,
+                      images: data.images
+                        ? typeof data.images === "string"
+                          ? JSON.parse(data.images)
+                          : data.images
+                        : prev.images,
                       embedCode: data.embed_code || prev.embedCode,
                     }
-                  : prev
+                  : prev,
               );
               setArticles((prev) =>
                 prev.map((a) =>
@@ -1289,11 +1585,15 @@ export function App() {
                     ? {
                         ...a,
                         content: data.content,
-                        images: data.images ? (typeof data.images === 'string' ? JSON.parse(data.images) : data.images) : a.images,
+                        images: data.images
+                          ? typeof data.images === "string"
+                            ? JSON.parse(data.images)
+                            : data.images
+                          : a.images,
                         embedCode: data.embed_code || a.embedCode,
                       }
-                    : a
-                )
+                    : a,
+                ),
               );
             }
           } catch {
@@ -1307,15 +1607,20 @@ export function App() {
   // Auth Handlers
   const handleLogin = (username: string, pass: string): boolean => {
     const user = users.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase() && u.password === pass
+      (u) =>
+        u.username.toLowerCase() === username.toLowerCase() &&
+        u.password === pass,
     );
     if (user) {
       const now = new Date();
-      const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(
-        now.getMonth() + 1
-      ).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+      const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(
+        2,
+        "0",
+      )}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
+        now.getMinutes(),
+      ).padStart(2, "0")}`;
 
       const updatedUser: User = {
         ...user,
@@ -1331,7 +1636,8 @@ export function App() {
       // Also update linked military profile
       setMilitaryProfiles((prev) =>
         prev.map((p) =>
-          p.userId === user.id || p.username?.toLowerCase() === username.toLowerCase()
+          p.userId === user.id ||
+          p.username?.toLowerCase() === username.toLowerCase()
             ? {
                 ...p,
                 isOnline: true,
@@ -1340,8 +1646,8 @@ export function App() {
                 userId: user.id,
                 username: user.username,
               }
-            : p
-        )
+            : p,
+        ),
       );
 
       return true;
@@ -1358,19 +1664,23 @@ export function App() {
     position?: string;
     rankUnit?: string;
   }): boolean => {
-    const exists = users.some((u) => u.username.toLowerCase() === data.username.toLowerCase());
+    const exists = users.some(
+      (u) => u.username.toLowerCase() === data.username.toLowerCase(),
+    );
     if (exists) return false;
 
     const rankUnitStr =
       data.rankUnit ||
-      (data.rank && data.position ? `${data.rank} - ${data.position}` : data.rank || data.position || 'Chiến sĩ');
+      (data.rank && data.position
+        ? `${data.rank} - ${data.position}`
+        : data.rank || data.position || "Chiến sĩ");
 
     const newUser: User = {
       id: Date.now(),
       fullName: data.fullName,
-      birthDate: data.birthDate || '',
-      rank: data.rank || '',
-      position: data.position || '',
+      birthDate: data.birthDate || "",
+      rank: data.rank || "",
+      position: data.position || "",
       rankUnit: rankUnitStr,
       username: data.username,
       password: data.password,
@@ -1381,7 +1691,7 @@ export function App() {
       canViewDoc: false,
       canUploadDoc: false,
       canViewCollaborativeEdits: false,
-      role: 'user',
+      role: "user",
     };
 
     setUsers((prev) => [...prev, newUser]);
@@ -1390,7 +1700,10 @@ export function App() {
     // If there is an unlinked soldier profile with matching name or username, link it automatically
     setMilitaryProfiles((prev) =>
       prev.map((p) => {
-        if (!p.userId && p.fullName.trim().toLowerCase() === data.fullName.trim().toLowerCase()) {
+        if (
+          !p.userId &&
+          p.fullName.trim().toLowerCase() === data.fullName.trim().toLowerCase()
+        ) {
           return {
             ...p,
             userId: newUser.id,
@@ -1398,7 +1711,7 @@ export function App() {
           };
         }
         return p;
-      })
+      }),
     );
 
     return true;
@@ -1408,36 +1721,46 @@ export function App() {
     try {
       await supabase.auth.signOut();
     } catch (err) {
-      console.warn('[App] Supabase signOut error:', err);
+      console.warn("[App] Supabase signOut error:", err);
     }
 
     if (currentUser) {
       const now = new Date();
-      const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(
-        now.getMonth() + 1
-      ).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+      const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(
+        2,
+        "0",
+      )}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
+        now.getMinutes(),
+      ).padStart(2, "0")}`;
 
       setUsers((prev) =>
         prev.map((u) =>
-          u.id === currentUser.id ? { ...u, isOnline: false, lastActiveAt: timeStr } : u
-        )
+          u.id === currentUser.id
+            ? { ...u, isOnline: false, lastActiveAt: timeStr }
+            : u,
+        ),
       );
 
       setMilitaryProfiles((prev) =>
         prev.map((p) =>
-          p.userId === currentUser.id || p.username?.toLowerCase() === currentUser.username.toLowerCase()
+          p.userId === currentUser.id ||
+          p.username?.toLowerCase() === currentUser.username.toLowerCase()
             ? { ...p, isOnline: false, lastActiveAt: timeStr }
-            : p
-        )
+            : p,
+        ),
       );
     }
 
     setCurrentUser(null);
-    showToast('info', 'Đã đăng xuất', 'Bạn đã đăng xuất khỏi hệ thống thành công.');
-    if (currentPage === 'approvals' || currentPage === 'users') {
-      setCurrentPage('home');
+    showToast(
+      "info",
+      "Đã đăng xuất",
+      "Bạn đã đăng xuất khỏi hệ thống thành công.",
+    );
+    if (currentPage === "approvals" || currentPage === "users") {
+      setCurrentPage("home");
     }
   };
 
@@ -1445,12 +1768,14 @@ export function App() {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, ...updated };
     setCurrentUser(updatedUser);
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+    setUsers((prev) =>
+      prev.map((u) => (u.id === currentUser.id ? updatedUser : u)),
+    );
     cloudStorage.saveUser(updatedUser);
 
     // Lưu vào user_profile_cache để khi F5 không bị mất
     try {
-      localStorage.setItem('user_profile_cache', JSON.stringify(updatedUser));
+      localStorage.setItem("user_profile_cache", JSON.stringify(updatedUser));
     } catch {
       // ignore
     }
@@ -1460,7 +1785,9 @@ export function App() {
       prev.map((p) => {
         if (
           p.userId === currentUser.id ||
-          (p.username && currentUser.username && p.username.toLowerCase() === currentUser.username.toLowerCase())
+          (p.username &&
+            currentUser.username &&
+            p.username.toLowerCase() === currentUser.username.toLowerCase())
         ) {
           return {
             ...p,
@@ -1472,14 +1799,14 @@ export function App() {
           };
         }
         return p;
-      })
+      }),
     );
   };
 
   // Military Profiles Handlers
   const handleSaveSoldierProfile = (
     profile: MilitaryProfile,
-    syncUser?: { createAccount?: boolean; selectedUserId?: number | null }
+    syncUser?: { createAccount?: boolean; selectedUserId?: number | null },
   ) => {
     let targetUserId = profile.userId;
     let targetUsername = profile.username;
@@ -1487,19 +1814,21 @@ export function App() {
     // Option 1: Auto create new user account
     if (syncUser?.createAccount) {
       const newUserId = Date.now();
-      const baseUsername = profile.militaryCode.toLowerCase().replace(/[^a-z0-9]/g, '') || `user_${newUserId}`;
+      const baseUsername =
+        profile.militaryCode.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+        `user_${newUserId}`;
       const newUser: User = {
         id: newUserId,
         username: baseUsername,
-        password: '123456',
+        password: "123456",
         fullName: profile.fullName,
-        birthDate: profile.birthDate || '',
+        birthDate: profile.birthDate || "",
         rank: profile.rank,
         position: profile.position,
         rankUnit: `${profile.rank} - ${profile.unit}`,
         militaryCode: profile.militaryCode,
         avatar: profile.avatar || MILITARY_FALLBACK_AVATAR,
-        role: 'user',
+        role: "user",
         totalActiveMinutes: profile.totalActiveMinutes || 0,
         sessionCount: profile.sessionCount || 0,
         isOnline: false,
@@ -1557,7 +1886,7 @@ export function App() {
             return updatedUser;
           }
           return u;
-        })
+        }),
       );
     }
   };
@@ -1567,7 +1896,9 @@ export function App() {
     setMilitaryProfiles((prev) => prev.filter((p) => p.id !== profileId));
     if (target?.userId) {
       setUsers((prev) =>
-        prev.map((u) => (u.id === target.userId ? { ...u, militaryCode: undefined } : u))
+        prev.map((u) =>
+          u.id === target.userId ? { ...u, militaryCode: undefined } : u,
+        ),
       );
     }
   };
@@ -1579,7 +1910,7 @@ export function App() {
       defaultPassword: string;
       defaultRole: string;
       overwriteExisting: boolean;
-    }
+    },
   ) => {
     let newUsersToAdd: User[] = [];
 
@@ -1591,19 +1922,21 @@ export function App() {
 
       if (options.autoCreateAccounts) {
         const userId = Date.now() + Math.floor(Math.random() * 100000);
-        createdUsername = newP.militaryCode.toLowerCase().replace(/[^a-z0-9]/g, '') || `qn_${userId}`;
+        createdUsername =
+          newP.militaryCode.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+          `qn_${userId}`;
         const newUser: User = {
           id: userId,
           username: createdUsername,
-          password: options.defaultPassword || '123456',
+          password: options.defaultPassword || "123456",
           fullName: newP.fullName,
-          birthDate: newP.birthDate || '',
+          birthDate: newP.birthDate || "",
           rank: newP.rank,
           position: newP.position,
           rankUnit: `${newP.rank} - ${newP.unit}`,
           militaryCode: newP.militaryCode,
           avatar: newP.avatar || MILITARY_FALLBACK_AVATAR,
-          role: options.defaultRole || 'user',
+          role: options.defaultRole || "user",
           totalActiveMinutes: 0,
           sessionCount: 0,
           isOnline: false,
@@ -1622,7 +1955,7 @@ export function App() {
       };
 
       const existingIdx = finalProfiles.findIndex(
-        (p) => p.militaryCode.toLowerCase() === newP.militaryCode.toLowerCase()
+        (p) => p.militaryCode.toLowerCase() === newP.militaryCode.toLowerCase(),
       );
 
       if (existingIdx >= 0 && options.overwriteExisting) {
@@ -1653,10 +1986,13 @@ export function App() {
       role: string;
       militaryCode: string;
       profileId: number;
-    }>
+    }>,
   ) => {
     const createdUsers: User[] = [];
-    const profileIdToUserIdMap = new Map<number, { userId: number; username: string }>();
+    const profileIdToUserIdMap = new Map<
+      number,
+      { userId: number; username: string }
+    >();
 
     newUsersList.forEach((acc) => {
       const newUserId = Date.now() + Math.floor(Math.random() * 1000000);
@@ -1670,7 +2006,7 @@ export function App() {
       const newUser: User = {
         id: newUserId,
         username: acc.username,
-        password: acc.password || '123456',
+        password: acc.password || "123456",
         fullName: acc.fullName,
         rankUnit: acc.rankUnit,
         militaryCode: acc.militaryCode,
@@ -1683,7 +2019,10 @@ export function App() {
       };
 
       createdUsers.push(newUser);
-      profileIdToUserIdMap.set(acc.profileId, { userId: newUserId, username: acc.username });
+      profileIdToUserIdMap.set(acc.profileId, {
+        userId: newUserId,
+        username: acc.username,
+      });
     });
 
     setUsers((prev) => [...createdUsers, ...prev]);
@@ -1700,7 +2039,7 @@ export function App() {
           };
         }
         return p;
-      })
+      }),
     );
   };
 
@@ -1708,12 +2047,12 @@ export function App() {
   const handleTogglePermission = async (
     userId: number,
     field:
-      | 'canViewDoc'
-      | 'canUploadDoc'
-      | 'canUploadDocs'
-      | 'canViewSecretDocs'
-      | 'canViewCollaborativeEdits',
-    checked: boolean
+      | "canViewDoc"
+      | "canUploadDoc"
+      | "canUploadDocs"
+      | "canViewSecretDocs"
+      | "canViewCollaborativeEdits",
+    checked: boolean,
   ) => {
     let targetUser: User | null = null;
     setUsers((prev) =>
@@ -1727,28 +2066,32 @@ export function App() {
           return updated;
         }
         return u;
-      })
+      }),
     );
     if (targetUser) {
       const res = await cloudStorage.saveUser(targetUser);
       if (!res.success) {
-        showToast('error', 'Lỗi lưu phân quyền', res.error);
+        showToast("error", "Lỗi lưu phân quyền", res.error);
       }
     }
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
     setUsers((prev) =>
-      prev.map((u) => (u.id === updatedUser.id ? updatedUser : u))
+      prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)),
     );
     if (currentUser && currentUser.id === updatedUser.id) {
       setCurrentUser(updatedUser);
     }
     const res = await cloudStorage.saveUser(updatedUser);
     if (res.success) {
-      showToast('success', 'Đã cập nhật hồ sơ quân nhân', `Thông tin đồng chí ${updatedUser.fullName} đã được lưu vào Cơ sở dữ liệu.`);
+      showToast(
+        "success",
+        "Đã cập nhật hồ sơ quân nhân",
+        `Thông tin đồng chí ${updatedUser.fullName} đã được lưu vào Cơ sở dữ liệu.`,
+      );
     } else {
-      showToast('error', 'Lỗi lưu thông tin quân nhân', res.error);
+      showToast("error", "Lỗi lưu thông tin quân nhân", res.error);
     }
   };
 
@@ -1761,7 +2104,7 @@ export function App() {
             ...u,
             role: newRole,
             // When promoted to admin, automatically grant all functional privileges
-            ...(newRole === 'admin'
+            ...(newRole === "admin"
               ? {
                   canViewDoc: true,
                   canUploadDoc: true,
@@ -1778,14 +2121,18 @@ export function App() {
           return updated;
         }
         return u;
-      })
+      }),
     );
     if (targetUser) {
       const res = await cloudStorage.saveUser(targetUser);
       if (res.success) {
-        showToast('success', 'Đã cập nhật vai trò', `Phân quyền người dùng đã được cập nhật thành công.`);
+        showToast(
+          "success",
+          "Đã cập nhật vai trò",
+          `Phân quyền người dùng đã được cập nhật thành công.`,
+        );
       } else {
-        showToast('error', 'Lỗi cập nhật vai trò', res.error);
+        showToast("error", "Lỗi cập nhật vai trò", res.error);
       }
     }
   };
@@ -1803,14 +2150,18 @@ export function App() {
           return updated;
         }
         return u;
-      })
+      }),
     );
     if (targetUser) {
       const res = await cloudStorage.saveUser(targetUser);
       if (res.success) {
-        showToast('success', 'Đã đổi mật khẩu', 'Mật khẩu tài khoản đã được cập nhật.');
+        showToast(
+          "success",
+          "Đã đổi mật khẩu",
+          "Mật khẩu tài khoản đã được cập nhật.",
+        );
       } else {
-        showToast('error', 'Lỗi đổi mật khẩu', res.error);
+        showToast("error", "Lỗi đổi mật khẩu", res.error);
       }
     }
   };
@@ -1819,20 +2170,32 @@ export function App() {
     setUsers((prev) => [newUser, ...prev]);
     const res = await cloudStorage.saveUser(newUser);
     if (res.success) {
-      showToast('success', 'Đã tạo tài khoản quân nhân mới', `Tài khoản ${newUser.username} (${newUser.fullName}) đã sẵn sàng hoạt động.`);
+      showToast(
+        "success",
+        "Đã tạo tài khoản quân nhân mới",
+        `Tài khoản ${newUser.username} (${newUser.fullName}) đã sẵn sàng hoạt động.`,
+      );
     } else {
-      showToast('error', 'Lỗi tạo tài khoản', res.error);
+      showToast("error", "Lỗi tạo tài khoản", res.error);
     }
   };
 
   const handleDeleteUser = async (userId: number) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa tài khoản quân nhân này khỏi hệ thống?')) {
+    if (
+      confirm(
+        "Đồng chí có chắc chắn muốn xóa tài khoản quân nhân này khỏi hệ thống?",
+      )
+    ) {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       const res = await cloudStorage.deleteUser(userId);
       if (res.success) {
-        showToast('info', 'Đã xóa tài khoản', 'Tài khoản quân nhân đã được xóa khỏi Cơ sở dữ liệu.');
+        showToast(
+          "info",
+          "Đã xóa tài khoản",
+          "Tài khoản quân nhân đã được xóa khỏi Cơ sở dữ liệu.",
+        );
       } else {
-        showToast('error', 'Lỗi xóa tài khoản', res.error);
+        showToast("error", "Lỗi xóa tài khoản", res.error);
       }
     }
   };
@@ -1853,12 +2216,12 @@ export function App() {
   const handleDeleteRole = (roleId: string) => {
     setRoles((prev) => prev.filter((r) => r.id !== roleId));
     setUsers((prev) =>
-      prev.map((u) => (u.role === roleId ? { ...u, role: 'user' } : u))
+      prev.map((u) => (u.role === roleId ? { ...u, role: "user" } : u)),
     );
   };
 
   // Article Actions
-  const handleOpenPostModal = (section: SectionType = 'ctd') => {
+  const handleOpenPostModal = (section: SectionType = "ctd") => {
     setPostModal({
       isOpen: true,
       section,
@@ -1879,38 +2242,48 @@ export function App() {
     category: string;
     author: string;
     image: string;
-    images?: import('./types').ArticleImage[];
+    images?: import("./types").ArticleImage[];
     excerpt: string;
     content: string;
     embedCode?: string;
     sectionKey: SectionType;
-    status?: 'approved' | 'pending';
+    status?: "approved" | "pending";
   }): Promise<boolean> => {
     try {
-      const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'commander' || currentUser?.role === 'editor';
+      const isAdmin =
+        currentUser?.role === "admin" ||
+        currentUser?.role === "commander" ||
+        currentUser?.role === "editor";
       const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
-        now.getMonth() + 1
-      ).padStart(2, '0')}/${now.getFullYear()}`;
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}/${now.getFullYear()}`;
 
       const newArt: Article = {
         id: Date.now(),
         title: data.title.trim(),
-        category: data.category || 'Tin tức hoạt động',
-        author: data.author.trim() || (currentUser ? `${currentUser.fullName} (${currentUser.rankUnit || currentUser.rank || 'Đơn vị'})` : 'Cán bộ - Chiến sĩ'),
+        category: data.category || "Tin tức hoạt động",
+        author:
+          data.author.trim() ||
+          (currentUser
+            ? `${currentUser.fullName} (${currentUser.rankUnit || currentUser.rank || "Đơn vị"})`
+            : "Cán bộ - Chiến sĩ"),
         date: dateStr,
-        image: data.image || '',
+        image: data.image || "",
         images: data.images && data.images.length > 0 ? data.images : undefined,
         excerpt: data.excerpt.trim(),
         content: data.content.trim(),
         embedCode: data.embedCode?.trim() || undefined,
-        status: data.status || 'approved',
+        status: data.status || "approved",
         views: 1,
-        sectionKey: data.sectionKey || 'ctd',
+        sectionKey: data.sectionKey || "ctd",
       };
 
       // Immediately update local state so the UI reflects the post instantly
-      setArticles((prev) => [newArt, ...prev.filter((a) => String(a.id) !== String(newArt.id))]);
+      setArticles((prev) => [
+        newArt,
+        ...prev.filter((a) => String(a.id) !== String(newArt.id)),
+      ]);
 
       // Save to Cloud Firestore & Supabase & Local persistent cache
       const res = await cloudStorage.saveArticle(newArt);
@@ -1921,42 +2294,46 @@ export function App() {
           if (fresh && fresh.length > 0) setArticles(fresh);
         });
 
-        if (newArt.status === 'approved') {
+        if (newArt.status === "approved") {
           showToast(
-            'success',
-            'Xuất bản tin bài thành công!',
-            'Bài viết đã được lưu trực tiếp vào Cơ sở dữ liệu và hiển thị trực tuyến.'
+            "success",
+            "Xuất bản tin bài thành công!",
+            "Bài viết đã được lưu trực tiếp vào Cơ sở dữ liệu và hiển thị trực tuyến.",
           );
         } else {
           showToast(
-            'info',
-            'Đã gửi dự thảo tin bài',
-            'Dự thảo đã được lưu vào hệ thống và chuyển đến Ban Biên tập để chờ phê duyệt.'
+            "info",
+            "Đã gửi dự thảo tin bài",
+            "Dự thảo đã được lưu vào hệ thống và chuyển đến Ban Biên tập để chờ phê duyệt.",
           );
         }
         return true;
       } else {
-        console.error('cloudStorage.saveArticle error:', res.error);
+        console.error("cloudStorage.saveArticle error:", res.error);
         showToast(
-          'error',
-          'Lỗi lưu bài viết vào Cơ sở dữ liệu',
-          res.error || 'Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.'
+          "error",
+          "Lỗi lưu bài viết vào Cơ sở dữ liệu",
+          res.error ||
+            "Vui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.",
         );
         return false;
       }
     } catch (err: any) {
-      console.error('Unhandled error in handlePostArticle:', err);
+      console.error("Unhandled error in handlePostArticle:", err);
       showToast(
-        'error',
-        'Có lỗi xảy ra khi tạo bài viết',
-        err?.message || 'Không thể hoàn tất việc đăng bài. Vui lòng kiểm tra lại thông tin.'
+        "error",
+        "Có lỗi xảy ra khi tạo bài viết",
+        err?.message ||
+          "Không thể hoàn tất việc đăng bài. Vui lòng kiểm tra lại thông tin.",
       );
       return false;
     }
   };
 
   const handleUpdateArticle = async (updated: Article): Promise<boolean> => {
-    setArticles((prev) => prev.map((a) => (String(a.id) === String(updated.id) ? updated : a)));
+    setArticles((prev) =>
+      prev.map((a) => (String(a.id) === String(updated.id) ? updated : a)),
+    );
 
     if (selectedArticle && String(selectedArticle.id) === String(updated.id)) {
       setSelectedArticle(updated);
@@ -1965,16 +2342,17 @@ export function App() {
     const res = await cloudStorage.saveArticle(updated);
     if (res.success) {
       showToast(
-        'success',
-        'Cập nhật bài viết thành công!',
-        'Nội dung và hình ảnh bài viết đã được cập nhật trực tiếp lên Cơ sở dữ liệu.'
+        "success",
+        "Cập nhật bài viết thành công!",
+        "Nội dung và hình ảnh bài viết đã được cập nhật trực tiếp lên Cơ sở dữ liệu.",
       );
       return true;
     } else {
       showToast(
-        'error',
-        'Lỗi cập nhật bài viết',
-        res.error || 'Không thể lưu thay đổi lên Cơ sở dữ liệu. Vui lòng thử lại.'
+        "error",
+        "Lỗi cập nhật bài viết",
+        res.error ||
+          "Không thể lưu thay đổi lên Cơ sở dữ liệu. Vui lòng thử lại.",
       );
       return false;
     }
@@ -1985,55 +2363,63 @@ export function App() {
     setArticles((prev) =>
       prev.map((a) => {
         if (String(a.id) === String(articleId)) {
-          updatedArticle = { ...a, status: 'approved' as const };
+          updatedArticle = { ...a, status: "approved" as const };
           return updatedArticle;
         }
         return a;
-      })
+      }),
     );
 
     if (updatedArticle) {
       const res = await cloudStorage.saveArticle(updatedArticle);
       if (res.success) {
         showToast(
-          'success',
-          'Phê duyệt tin bài thành công!',
-          'Bài viết đã được xuất bản công khai cho toàn thể cán bộ, chiến sĩ theo dõi.'
+          "success",
+          "Phê duyệt tin bài thành công!",
+          "Bài viết đã được xuất bản công khai cho toàn thể cán bộ, chiến sĩ theo dõi.",
         );
       } else {
-        showToast('error', 'Lỗi phê duyệt bài viết', res.error);
+        showToast("error", "Lỗi phê duyệt bài viết", res.error);
       }
     }
   };
 
   const handleRejectArticle = async (articleId: number) => {
-    if (confirm('Từ chối và gỡ bỏ dự thảo bài viết này khỏi hệ thống?')) {
-      setArticles((prev) => prev.filter((a) => String(a.id) !== String(articleId)));
+    if (confirm("Từ chối và gỡ bỏ dự thảo bài viết này khỏi hệ thống?")) {
+      setArticles((prev) =>
+        prev.filter((a) => String(a.id) !== String(articleId)),
+      );
       const res = await cloudStorage.deleteArticle(articleId);
       if (res.success) {
-        showToast('info', 'Đã từ chối dự thảo', 'Dự thảo tin bài đã được xóa khỏi danh sách chờ duyệt.');
+        showToast(
+          "info",
+          "Đã từ chối dự thảo",
+          "Dự thảo tin bài đã được xóa khỏi danh sách chờ duyệt.",
+        );
       } else {
-        showToast('error', 'Lỗi gỡ bỏ dự thảo', res.error);
+        showToast("error", "Lỗi gỡ bỏ dự thảo", res.error);
       }
     }
   };
 
   const handleDeleteArticle = async (articleId: number): Promise<boolean> => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa bài viết này vĩnh viễn?')) {
-      setArticles((prev) => prev.filter((a) => String(a.id) !== String(articleId)));
+    if (confirm("Đồng chí có chắc chắn muốn xóa bài viết này vĩnh viễn?")) {
+      setArticles((prev) =>
+        prev.filter((a) => String(a.id) !== String(articleId)),
+      );
       if (selectedArticle && String(selectedArticle.id) === String(articleId)) {
-        setCurrentPage('home');
+        setCurrentPage("home");
       }
       const res = await cloudStorage.deleteArticle(articleId);
       if (res.success) {
         showToast(
-          'success',
-          'Đã xóa bài viết thành công',
-          'Bài viết đã được gỡ bỏ hoàn toàn khỏi Cơ sở dữ liệu.'
+          "success",
+          "Đã xóa bài viết thành công",
+          "Bài viết đã được gỡ bỏ hoàn toàn khỏi Cơ sở dữ liệu.",
         );
         return true;
       } else {
-        showToast('error', 'Lỗi xóa bài viết', res.error);
+        showToast("error", "Lỗi xóa bài viết", res.error);
         return false;
       }
     }
@@ -2041,7 +2427,7 @@ export function App() {
   };
 
   // Document Actions
-  const handleAddDoc = async (doc: Omit<DocumentItem, 'id'>) => {
+  const handleAddDoc = async (doc: Omit<DocumentItem, "id">) => {
     const newDoc: DocumentItem = {
       id: Date.now(),
       ...doc,
@@ -2050,35 +2436,51 @@ export function App() {
     const res = await cloudStorage.saveDocument(newDoc);
     if (res.success) {
       showToast(
-        'success',
-        'Đã lưu văn bản vào Kho lưu trữ!',
-        `Văn bản [${newDoc.code}] "${newDoc.title}" đã được lưu trữ vĩnh viễn vào Cơ sở dữ liệu.`
+        "success",
+        "Đã lưu văn bản vào Kho lưu trữ!",
+        `Văn bản [${newDoc.code}] "${newDoc.title}" đã được lưu trữ vĩnh viễn vào Cơ sở dữ liệu.`,
       );
     } else {
-      showToast('error', 'Lỗi lưu văn bản', res.error || 'Vui lòng kiểm tra lại kết nối mạng.');
+      showToast(
+        "error",
+        "Lỗi lưu văn bản",
+        res.error || "Vui lòng kiểm tra lại kết nối mạng.",
+      );
     }
   };
 
   const handleDeleteDoc = async (id: number) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa văn bản này khỏi kho lưu trữ?')) {
+    if (
+      confirm("Đồng chí có chắc chắn muốn xóa văn bản này khỏi kho lưu trữ?")
+    ) {
       const targetDoc = documents.find((d) => d.id === id);
       setDocuments((prev) => prev.filter((d) => d.id !== id));
       const res = await cloudStorage.deleteDocument(id);
       if (res.success) {
-        showToast('info', 'Đã xóa văn bản', `Đã xóa văn bản [${targetDoc?.code || id}] khỏi hệ thống.`);
+        showToast(
+          "info",
+          "Đã xóa văn bản",
+          `Đã xóa văn bản [${targetDoc?.code || id}] khỏi hệ thống.`,
+        );
       } else {
-        showToast('error', 'Lỗi xóa văn bản', res.error);
+        showToast("error", "Lỗi xóa văn bản", res.error);
       }
     }
   };
 
   const handleUpdateDoc = async (updated: DocumentItem) => {
-    setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === updated.id ? updated : d)),
+    );
     const res = await cloudStorage.saveDocument(updated);
     if (res.success) {
-      showToast('success', 'Đã cập nhật văn bản', `Thông tin văn bản [${updated.code}] đã được lưu thay đổi.`);
+      showToast(
+        "success",
+        "Đã cập nhật văn bản",
+        `Thông tin văn bản [${updated.code}] đã được lưu thay đổi.`,
+      );
     } else {
-      showToast('error', 'Lỗi cập nhật văn bản', res.error);
+      showToast("error", "Lỗi cập nhật văn bản", res.error);
     }
   };
 
@@ -2097,7 +2499,7 @@ export function App() {
     });
   };
 
-  const handleAddLecture = async (lecture: Omit<LectureItem, 'id'>) => {
+  const handleAddLecture = async (lecture: Omit<LectureItem, "id">) => {
     const newLec: LectureItem = {
       id: Date.now(),
       ...lecture,
@@ -2106,24 +2508,34 @@ export function App() {
     const res = await cloudStorage.saveLecture(newLec);
     if (res.success) {
       showToast(
-        'success',
-        'Đã thêm bài giảng điện tử!',
-        `Bài giảng "${newLec.title}" đã được lưu trữ vào Thư viện giáo án số.`
+        "success",
+        "Đã thêm bài giảng điện tử!",
+        `Bài giảng "${newLec.title}" đã được lưu trữ vào Thư viện giáo án số.`,
       );
     } else {
-      showToast('error', 'Lỗi lưu bài giảng', res.error || 'Vui lòng kiểm tra lại kết nối.');
+      showToast(
+        "error",
+        "Lỗi lưu bài giảng",
+        res.error || "Vui lòng kiểm tra lại kết nối.",
+      );
     }
   };
 
   const handleDeleteLecture = async (id: number) => {
-    if (confirm('Đồng chí có chắc chắn muốn xóa bài giảng này khỏi thư viện?')) {
+    if (
+      confirm("Đồng chí có chắc chắn muốn xóa bài giảng này khỏi thư viện?")
+    ) {
       const target = lectures.find((l) => l.id === id);
       setLectures((prev) => prev.filter((l) => l.id !== id));
       const res = await cloudStorage.deleteLecture(id);
       if (res.success) {
-        showToast('info', 'Đã xóa bài giảng', `Đã xóa bài giảng "${target?.title || id}" khỏi thư viện.`);
+        showToast(
+          "info",
+          "Đã xóa bài giảng",
+          `Đã xóa bài giảng "${target?.title || id}" khỏi thư viện.`,
+        );
       } else {
-        showToast('error', 'Lỗi xóa bài giảng', res.error);
+        showToast("error", "Lỗi xóa bài giảng", res.error);
       }
     }
   };
@@ -2132,15 +2544,21 @@ export function App() {
     setLectures((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
     const res = await cloudStorage.saveLecture(updated);
     if (res.success) {
-      showToast('success', 'Đã cập nhật bài giảng', `Thông tin bài giảng "${updated.title}" đã được cập nhật.`);
+      showToast(
+        "success",
+        "Đã cập nhật bài giảng",
+        `Thông tin bài giảng "${updated.title}" đã được cập nhật.`,
+      );
     } else {
-      showToast('error', 'Lỗi cập nhật bài giảng', res.error);
+      showToast("error", "Lỗi cập nhật bài giảng", res.error);
     }
   };
 
   // Home Layout Settings Handler
-  const handleSaveLayoutSettings = async (newLayout: import('./types').HomeLayoutSettings) => {
-    const normalizedLayout: import('./types').HomeLayoutSettings = {
+  const handleSaveLayoutSettings = async (
+    newLayout: import("./types").HomeLayoutSettings,
+  ) => {
+    const normalizedLayout: import("./types").HomeLayoutSettings = {
       ...newLayout,
       sidebarWidgets: normalizeWidgetsList(newLayout.sidebarWidgets),
     };
@@ -2151,10 +2569,10 @@ export function App() {
       sidebarWidgets: normalizedLayout.sidebarWidgets,
     };
     setSiteConfig(updated);
-    safeStore.set('mangyang_site_config', updated);
+    safeStore.set("mangyang_site_config", updated);
     try {
-      localStorage.setItem('site_config_cache', JSON.stringify(updated));
-      localStorage.setItem('mangyang_site_config', JSON.stringify(updated));
+      localStorage.setItem("site_config_cache", JSON.stringify(updated));
+      localStorage.setItem("mangyang_site_config", JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -2162,25 +2580,25 @@ export function App() {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from('site_config').upsert(
+        await supabase.from("site_config").upsert(
           {
-            id: 'default',
+            id: "default",
             home_layout: normalizedLayout,
             layout_settings: normalizedLayout,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         );
       } catch (err) {
-        console.error('[App] Supabase error saving home_layout:', err);
+        console.error("[App] Supabase error saving home_layout:", err);
       }
     }
 
     await handleSaveCustomizer(updated);
     showToast(
-      'success',
-      'Đã lưu bố cục Trang chủ',
-      'Cấu hình bố cục hiển thị đã được đồng bộ lên Cơ sở dữ liệu và áp dụng toàn hệ thống.'
+      "success",
+      "Đã lưu bố cục Trang chủ",
+      "Cấu hình bố cục hiển thị đã được đồng bộ lên Cơ sở dữ liệu và áp dụng toàn hệ thống.",
     );
   };
 
@@ -2188,26 +2606,30 @@ export function App() {
 
   const handleSaveDocCategories = async (newCats: string[]) => {
     const currentCategoriesList =
-      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      (categories && Array.isArray(categories) && categories.length > 0
+        ? categories
+        : null) ||
       siteConfig?.categories_config ||
       defaultCategoriesConfig;
 
-    const updatedCategoriesConfig = (currentCategoriesList || []).map((cat: any) => {
-      if (
-        cat.id === 'doc' ||
-        cat.targetPage === 'doc' ||
-        cat.name === 'Văn bản' ||
-        cat.navName === 'Văn bản' ||
-        cat.shortLabel === 'Văn bản'
-      ) {
-        return {
-          ...cat,
-          subcategories: newCats,
-          categories: newCats,
-        };
-      }
-      return cat;
-    });
+    const updatedCategoriesConfig = (currentCategoriesList || []).map(
+      (cat: any) => {
+        if (
+          cat.id === "doc" ||
+          cat.targetPage === "doc" ||
+          cat.name === "Văn bản" ||
+          cat.navName === "Văn bản" ||
+          cat.shortLabel === "Văn bản"
+        ) {
+          return {
+            ...cat,
+            subcategories: newCats,
+            categories: newCats,
+          };
+        }
+        return cat;
+      },
+    );
 
     const updated: SiteConfig = {
       ...siteConfig,
@@ -2225,12 +2647,18 @@ export function App() {
 
     await handleSaveCategories(updatedCategoriesConfig);
     await handleSaveCustomizer(updated);
-    showToast('success', 'Đã lưu danh mục văn bản', 'Danh mục văn bản đã được lưu và đồng bộ lên Cơ sở dữ liệu.');
+    showToast(
+      "success",
+      "Đã lưu danh mục văn bản",
+      "Danh mục văn bản đã được lưu và đồng bộ lên Cơ sở dữ liệu.",
+    );
   };
 
   const handleRenameDocCategory = (oldCat: string, newCat: string) => {
     setDocuments((prev) => {
-      const updated = prev.map((d) => (d.category === oldCat ? { ...d, category: newCat } : d));
+      const updated = prev.map((d) =>
+        d.category === oldCat ? { ...d, category: newCat } : d,
+      );
       updated.forEach((d) => {
         if (d.category === newCat) {
           cloudStorage.saveDocument(d);
@@ -2240,9 +2668,14 @@ export function App() {
     });
   };
 
-  const handleDeleteDocCategory = (catToDelete: string, fallbackCat: string) => {
+  const handleDeleteDocCategory = (
+    catToDelete: string,
+    fallbackCat: string,
+  ) => {
     setDocuments((prev) => {
-      const updated = prev.map((d) => (d.category === catToDelete ? { ...d, category: fallbackCat } : d));
+      const updated = prev.map((d) =>
+        d.category === catToDelete ? { ...d, category: fallbackCat } : d,
+      );
       updated.forEach((d) => {
         if (d.category === fallbackCat) {
           cloudStorage.saveDocument(d);
@@ -2255,20 +2688,30 @@ export function App() {
   // Customizer Handler with Category Renaming Cascade
   const handleSaveCustomizer = async (
     newConfig: SiteConfig,
-    categoryRenames?: { sectionKey: SectionType; oldName: string; newName: string }[]
+    categoryRenames?: {
+      sectionKey: SectionType;
+      oldName: string;
+      newName: string;
+    }[],
   ) => {
     // 1. Cập nhật tức thì lên State và LocalStorage (Optimistic UI)
     setSiteConfig(newConfig);
-    if (newConfig.categories_config && Array.isArray(newConfig.categories_config)) {
+    if (
+      newConfig.categories_config &&
+      Array.isArray(newConfig.categories_config)
+    ) {
       setCategories(newConfig.categories_config);
       try {
-        localStorage.setItem('cached_categories', JSON.stringify(newConfig.categories_config));
+        localStorage.setItem(
+          "cached_categories",
+          JSON.stringify(newConfig.categories_config),
+        );
       } catch {}
     }
-    safeStore.set('mangyang_site_config', newConfig);
+    safeStore.set("mangyang_site_config", newConfig);
     try {
-      localStorage.setItem('site_config_cache', JSON.stringify(newConfig));
-      localStorage.setItem('mangyang_site_config', JSON.stringify(newConfig));
+      localStorage.setItem("site_config_cache", JSON.stringify(newConfig));
+      localStorage.setItem("mangyang_site_config", JSON.stringify(newConfig));
     } catch {
       // ignore
     }
@@ -2280,19 +2723,22 @@ export function App() {
 
     if (supabase) {
       try {
-        const { error: cfgErr } = await supabase.from('site_config').upsert(
+        const { error: cfgErr } = await supabase.from("site_config").upsert(
           {
-            id: 'default',
+            id: "default",
             title: newConfig.title,
             subtitle: newConfig.subtitle,
             marquee_text: newConfig.ticker || newConfig.marquee_text,
             marquee_mode: newConfig.marquee_mode || newConfig.tickerMode,
             marquee_days: newConfig.marquee_days ?? newConfig.tickerDays,
             marquee_speed: newConfig.marquee_speed || newConfig.tickerSpeed,
-            announcements: newConfig.announcements || newConfig.tickerCustomList,
+            announcements:
+              newConfig.announcements || newConfig.tickerCustomList,
             theme_color: newConfig.colorRed,
-            unit_name: newConfig.footerUnitName || newConfig.site_info?.unit_name,
-            military_utilities: newConfig.quickActionCards || newConfig.military_utilities,
+            unit_name:
+              newConfig.footerUnitName || newConfig.site_info?.unit_name,
+            military_utilities:
+              newConfig.quickActionCards || newConfig.military_utilities,
             site_info: newConfig.site_info,
             footer_config: newConfig.footer_config,
             home_layout: newConfig.layoutSettings,
@@ -2303,14 +2749,14 @@ export function App() {
             daily_widgets: newConfig.dailyWidgets,
             updated_at: nowIso,
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         );
         if (cfgErr) {
-          console.error('[App] Supabase site_config upsert error:', cfgErr);
+          console.error("[App] Supabase site_config upsert error:", cfgErr);
           saveSuccess = false;
         }
       } catch (e) {
-        console.warn('handleSaveCustomizer caught error:', e);
+        console.warn("handleSaveCustomizer caught error:", e);
         saveSuccess = false;
       }
     }
@@ -2318,17 +2764,22 @@ export function App() {
     try {
       await cloudStorage.saveSiteConfig(newConfig);
     } catch (e) {
-      console.warn('cloudStorage.saveSiteConfig error:', e);
+      console.warn("cloudStorage.saveSiteConfig error:", e);
     }
 
-    showToast('success', '✅ Đã lưu cấu hình thành công!', 'Cấu hình giao diện đã được đồng bộ lên Cơ sở dữ liệu.');
+    showToast(
+      "success",
+      "✅ Đã lưu cấu hình thành công!",
+      "Cấu hình giao diện đã được đồng bộ lên Cơ sở dữ liệu.",
+    );
 
     if (categoryRenames && categoryRenames.length > 0) {
       setArticles((prevArticles) => {
         let changed = false;
         const updatedArticles = prevArticles.map((art) => {
           const rename = categoryRenames.find(
-            (r) => r.sectionKey === art.sectionKey && r.oldName === art.category
+            (r) =>
+              r.sectionKey === art.sectionKey && r.oldName === art.category,
           );
           if (rename) {
             changed = true;
@@ -2343,10 +2794,12 @@ export function App() {
           const rename = categoryRenames.find(
             (r) =>
               r.sectionKey === selectedArticle.sectionKey &&
-              r.oldName === selectedArticle.category
+              r.oldName === selectedArticle.category,
           );
           if (rename) {
-            setSelectedArticle((prev) => (prev ? { ...prev, category: rename.newName } : null));
+            setSelectedArticle((prev) =>
+              prev ? { ...prev, category: rename.newName } : null,
+            );
           }
         }
 
@@ -2363,7 +2816,11 @@ export function App() {
     };
     setSiteConfig(updatedConfig);
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Nội dung thông báo đã được lưu thành công.');
+    showToast(
+      "success",
+      "✅ Đã lưu thành công lên máy chủ!",
+      "Nội dung thông báo đã được lưu thành công.",
+    );
   };
 
   // Quick Action Cards Save Handler
@@ -2376,28 +2833,32 @@ export function App() {
       quick_links: cards,
     };
     setSiteConfig(updatedConfig);
-    safeStore.set('mangyang_site_config', updatedConfig);
+    safeStore.set("mangyang_site_config", updatedConfig);
 
     const nowIso = new Date().toISOString();
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from('site_config').upsert(
+        await supabase.from("site_config").upsert(
           {
-            id: 'default',
+            id: "default",
             military_utilities: cards,
             quick_links: cards,
             updated_at: nowIso,
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         );
       } catch (err) {
-        console.error('[App] Supabase error saving quick actions:', err);
+        console.error("[App] Supabase error saving quick actions:", err);
       }
     }
 
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Danh sách Tiện ích quân nhân đã được cập nhật.');
+    showToast(
+      "success",
+      "✅ Đã lưu thành công lên máy chủ!",
+      "Danh sách Tiện ích quân nhân đã được cập nhật.",
+    );
   };
 
   // Daily Widgets & Posters Save Handler (2-layer sync: Supabase + LocalStorage Cache)
@@ -2410,34 +2871,41 @@ export function App() {
       daily_posters: widgets,
     };
     setSiteConfig(updatedConfig);
-    safeStore.set('mangyang_site_config', updatedConfig);
+    safeStore.set("mangyang_site_config", updatedConfig);
 
     // Update LocalStorage cache immediately
     try {
-      const cachedRaw = localStorage.getItem('daily_posters_cache') || localStorage.getItem('daily_posters');
+      const cachedRaw =
+        localStorage.getItem("daily_posters_cache") ||
+        localStorage.getItem("daily_posters");
       const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
       widgets.forEach((w) => {
-        const k = (w.id || '').replace(/^widget_/, '');
-        const normKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
+        const k = (w.id || "").replace(/^widget_/, "");
+        const normKey =
+          k === "safety_message"
+            ? "safety"
+            : k === "traffic_situation"
+              ? "traffic"
+              : k;
         if (w.imageUrl) {
           const entry = {
             id: normKey,
             image_data: w.imageUrl,
-            aspect_ratio: w.aspectRatioMode || 'auto',
+            aspect_ratio: w.aspectRatioMode || "auto",
             category_name: w.categoryName,
             title: w.title,
             updated_at: new Date().toISOString(),
           };
           cacheMap[normKey] = entry;
           cacheMap[w.id] = entry;
-          if (normKey === 'safety') cacheMap['safety_message'] = entry;
-          if (normKey === 'traffic') cacheMap['traffic_situation'] = entry;
+          if (normKey === "safety") cacheMap["safety_message"] = entry;
+          if (normKey === "traffic") cacheMap["traffic_situation"] = entry;
         }
       });
-      localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
-      localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+      localStorage.setItem("daily_posters", JSON.stringify(cacheMap));
+      localStorage.setItem("daily_posters_cache", JSON.stringify(cacheMap));
     } catch (e) {
-      console.warn('Error caching daily posters:', e);
+      console.warn("Error caching daily posters:", e);
     }
 
     // Save siteConfig directly to Supabase
@@ -2450,31 +2918,49 @@ export function App() {
         const nowIso = new Date().toISOString();
         for (const w of widgets) {
           if (w.imageUrl) {
-            const k = (w.id || '').replace(/^widget_/, '');
-            const standardKey = k === 'safety_message' ? 'safety' : k === 'traffic_situation' ? 'traffic' : k;
-            const { error: upsertErr } = await supabase.from('daily_posters').upsert(
-              {
-                id: standardKey,
-                title: w.title || w.categoryName || '',
-                image_data: w.imageUrl,
-                aspect_ratio: w.aspectRatioMode || 'auto',
-                category_name: w.categoryName || '',
-                content: w.title || '',
-                updated_at: nowIso,
-              },
-              { onConflict: 'id' }
-            );
+            const k = (w.id || "").replace(/^widget_/, "");
+            const standardKey =
+              k === "safety_message"
+                ? "safety"
+                : k === "traffic_situation"
+                  ? "traffic"
+                  : k;
+            const { error: upsertErr } = await supabase
+              .from("daily_posters")
+              .upsert(
+                {
+                  id: standardKey,
+                  title: w.title || w.categoryName || "",
+                  image_data: w.imageUrl,
+                  aspect_ratio: w.aspectRatioMode || "auto",
+                  category_name: w.categoryName || "",
+                  content: w.title || "",
+                  updated_at: nowIso,
+                },
+                { onConflict: "id" },
+              );
             if (upsertErr) {
-              console.error('[App] Supabase daily_posters upsert error for', standardKey, upsertErr);
+              console.error(
+                "[App] Supabase daily_posters upsert error for",
+                standardKey,
+                upsertErr,
+              );
             }
           }
         }
       } catch (e) {
-        console.error('[App] Error saving poster rows to Supabase daily_posters:', e);
+        console.error(
+          "[App] Error saving poster rows to Supabase daily_posters:",
+          e,
+        );
       }
     }
 
-    showToast('success', '✅ Đã lưu thành công lên máy chủ!', 'Poster 4 chuyên mục hàng ngày đã được đồng bộ cho tất cả người dùng.');
+    showToast(
+      "success",
+      "✅ Đã lưu thành công lên máy chủ!",
+      "Poster 4 chuyên mục hàng ngày đã được đồng bộ cho tất cả người dùng.",
+    );
   };
 
   // Spotlight Article Select Handler
@@ -2488,7 +2974,9 @@ export function App() {
   };
 
   // Home Category Columns Save Handler (LƯU VÀ CẬP NHẬT TRỰC TIẾP LÊN SUPABASE)
-  const handleSaveHomeCategoryColumns = async (columns: HomeCategoryColumn[]) => {
+  const handleSaveHomeCategoryColumns = async (
+    columns: HomeCategoryColumn[],
+  ) => {
     // 1. Cập nhật tức thì vào State của Trang chủ để hiển thị ngay mà không cần F5
     const updatedConfig: SiteConfig = {
       ...siteConfig,
@@ -2497,56 +2985,65 @@ export function App() {
     };
     setSiteConfig(updatedConfig);
     try {
-      localStorage.setItem('cached_home_layout', JSON.stringify(columns));
-      localStorage.setItem('cached_home_category_columns', JSON.stringify(columns));
-      localStorage.setItem('cached_site_config', JSON.stringify(updatedConfig));
-      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      localStorage.setItem("cached_home_layout", JSON.stringify(columns));
+      localStorage.setItem(
+        "cached_home_category_columns",
+        JSON.stringify(columns),
+      );
+      localStorage.setItem("cached_site_config", JSON.stringify(updatedConfig));
+      localStorage.setItem("site_config_cache", JSON.stringify(updatedConfig));
     } catch {}
 
     // 2. Lưu trực tiếp lên Supabase
     try {
       const client = supabase || getSupabase();
       if (client) {
-        let { error } = await client
-          .from('site_config')
-          .upsert(
-            {
-              id: 'default',
-              home_layout: columns,
-              home_category_columns: columns,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
+        let { error } = await client.from("site_config").upsert(
+          {
+            id: "default",
+            home_layout: columns,
+            home_category_columns: columns,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" },
+        );
 
         if (error) {
           // Retry chỉ với home_layout nếu cột home_category_columns chưa tồn tại
-          await client
-            .from('site_config')
-            .upsert(
-              {
-                id: 'default',
-                home_layout: columns,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'id' }
-            );
+          await client.from("site_config").upsert(
+            {
+              id: "default",
+              home_layout: columns,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" },
+          );
         }
       }
     } catch (err) {
-      console.error('[App] Error saving home_layout to Supabase:', err);
+      console.error("[App] Error saving home_layout to Supabase:", err);
     }
 
     await cloudStorage.saveSiteConfig(updatedConfig);
-    showToast('success', 'Đã lưu cấu hình chuyên mục', 'Cột hiển thị tin bài trang chủ đã được lưu và đồng bộ thành công.');
+    showToast(
+      "success",
+      "Đã lưu cấu hình chuyên mục",
+      "Cột hiển thị tin bài trang chủ đã được lưu và đồng bộ thành công.",
+    );
   };
 
   // Master Categories & Tabbar Save Handler (BẮT BUỘC ĐẨY LÊN SUPABASE)
-  const handleSaveCategories = async (updatedCategories: any[], silent = false) => {
+  const handleSaveCategories = async (
+    updatedCategories: any[],
+    silent = false,
+  ) => {
     // 1. Cập nhật giao diện tức thì
     setCategories(updatedCategories);
     try {
-      localStorage.setItem('cached_categories', JSON.stringify(updatedCategories));
+      localStorage.setItem(
+        "cached_categories",
+        JSON.stringify(updatedCategories),
+      );
     } catch {}
 
     setSiteConfig((prev) => {
@@ -2559,8 +3056,8 @@ export function App() {
         navTabs: updatedCategories,
       };
       try {
-        localStorage.setItem('cached_site_config', JSON.stringify(updated));
-        localStorage.setItem('site_config_cache', JSON.stringify(updated));
+        localStorage.setItem("cached_site_config", JSON.stringify(updated));
+        localStorage.setItem("site_config_cache", JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -2569,54 +3066,59 @@ export function App() {
     try {
       const client = supabase || getSupabase();
       if (!client) {
-        if (!silent) alert('Lỗi lưu Supabase: Không tìm thấy kết nối CSDL');
+        if (!silent) alert("Lỗi lưu Supabase: Không tìm thấy kết nối CSDL");
         return;
       }
 
-      const { error } = await client
-        .from('site_config')
-        .upsert(
-          {
-            id: 'default',
-            categories_config: updatedCategories,
-            navigation_tabs: updatedCategories,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
+      const { error } = await client.from("site_config").upsert(
+        {
+          id: "default",
+          categories_config: updatedCategories,
+          navigation_tabs: updatedCategories,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      );
 
       if (error) {
-        console.error('Lỗi Supabase:', error);
-        if (!silent) alert('Lỗi lưu Supabase: ' + error.message);
+        console.error("Lỗi Supabase:", error);
+        if (!silent) alert("Lỗi lưu Supabase: " + error.message);
         return;
       }
 
       if (!silent) {
-        alert('✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!');
+        alert("✅ ĐÃ LƯU TIỂU MỤC VÀO CƠ SỞ DỮ LIỆU THÀNH CÔNG!");
       }
     } catch (err: any) {
-      if (!silent) alert('Lỗi lưu Supabase: ' + err.message);
+      if (!silent) alert("Lỗi lưu Supabase: " + err.message);
     }
   };
 
   // Section Categories Handlers (CTĐ, Huấn luyện, Bác Hồ & Chuyên mục mở rộng)
-  const handleSaveSectionCategories = async (sectionKey: SectionType, newCats: string[]) => {
+  const handleSaveSectionCategories = async (
+    sectionKey: SectionType,
+    newCats: string[],
+  ) => {
     const currentCategoriesList =
-      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      (categories && Array.isArray(categories) && categories.length > 0
+        ? categories
+        : null) ||
       siteConfig?.categories_config ||
       (siteConfig as any)?.categoriesConfig ||
       (siteConfig as any)?.categories ||
       defaultCategoriesConfig;
 
     let updatedCategoriesConfig: any[] = [];
-    const found = Array.isArray(currentCategoriesList) && currentCategoriesList.some(
-      (cat: any) =>
-        cat.id === sectionKey ||
-        cat.targetPage === sectionKey ||
-        cat.name === sectionKey ||
-        cat.navName === sectionKey ||
-        cat.shortLabel === sectionKey
-    );
+    const found =
+      Array.isArray(currentCategoriesList) &&
+      currentCategoriesList.some(
+        (cat: any) =>
+          cat.id === sectionKey ||
+          cat.targetPage === sectionKey ||
+          cat.name === sectionKey ||
+          cat.navName === sectionKey ||
+          cat.shortLabel === sectionKey,
+      );
 
     if (found) {
       updatedCategoriesConfig = currentCategoriesList.map((cat: any) => {
@@ -2664,9 +3166,12 @@ export function App() {
     };
 
     try {
-      localStorage.setItem('cached_site_config', JSON.stringify(updatedConfig));
-      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
-      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+      localStorage.setItem("cached_site_config", JSON.stringify(updatedConfig));
+      localStorage.setItem("site_config_cache", JSON.stringify(updatedConfig));
+      localStorage.setItem(
+        "mangyang_site_config",
+        JSON.stringify(updatedConfig),
+      );
     } catch {}
 
     // Ghi lên Supabase database & đồng bộ
@@ -2674,12 +3179,16 @@ export function App() {
     await handleSaveCustomizer(updatedConfig);
   };
 
-  const handleRenameSectionCategory = (sectionKey: SectionType, oldCat: string, newCat: string) => {
+  const handleRenameSectionCategory = (
+    sectionKey: SectionType,
+    oldCat: string,
+    newCat: string,
+  ) => {
     setArticles((prev) => {
       const updated = prev.map((art) =>
         art.sectionKey === sectionKey && art.category === oldCat
           ? { ...art, category: newCat }
-          : art
+          : art,
       );
       updated.forEach((art) => {
         if (art.sectionKey === sectionKey && art.category === newCat) {
@@ -2693,13 +3202,13 @@ export function App() {
   const handleDeleteSectionCategory = (
     sectionKey: SectionType,
     catToDelete: string,
-    fallbackCat: string
+    fallbackCat: string,
   ) => {
     setArticles((prev) => {
       const updated = prev.map((art) =>
         art.sectionKey === sectionKey && art.category === catToDelete
           ? { ...art, category: fallbackCat }
-          : art
+          : art,
       );
       updated.forEach((art) => {
         if (art.sectionKey === sectionKey && art.category === fallbackCat) {
@@ -2713,26 +3222,30 @@ export function App() {
   // Lecture Categories Handlers
   const handleSaveLectureCategories = async (newCats: string[]) => {
     const currentCategoriesList =
-      (categories && Array.isArray(categories) && categories.length > 0 ? categories : null) ||
+      (categories && Array.isArray(categories) && categories.length > 0
+        ? categories
+        : null) ||
       siteConfig?.categories_config ||
       defaultCategoriesConfig;
 
-    const updatedCategoriesConfig = (currentCategoriesList || []).map((cat: any) => {
-      if (
-        cat.id === 'lecture' ||
-        cat.targetPage === 'lecture' ||
-        cat.name === 'Bài giảng số' ||
-        cat.navName === 'Bài giảng số' ||
-        cat.shortLabel === 'Bài giảng số'
-      ) {
-        return {
-          ...cat,
-          subcategories: newCats,
-          categories: newCats,
-        };
-      }
-      return cat;
-    });
+    const updatedCategoriesConfig = (currentCategoriesList || []).map(
+      (cat: any) => {
+        if (
+          cat.id === "lecture" ||
+          cat.targetPage === "lecture" ||
+          cat.name === "Bài giảng số" ||
+          cat.navName === "Bài giảng số" ||
+          cat.shortLabel === "Bài giảng số"
+        ) {
+          return {
+            ...cat,
+            subcategories: newCats,
+            categories: newCats,
+          };
+        }
+        return cat;
+      },
+    );
 
     const updatedConfig: SiteConfig = {
       ...siteConfig,
@@ -2750,12 +3263,18 @@ export function App() {
 
     await handleSaveCategories(updatedCategoriesConfig);
     await handleSaveCustomizer(updatedConfig);
-    showToast('success', 'Đã lưu danh mục bài giảng số', 'Danh mục bài giảng số đã được đồng bộ lên Cơ sở dữ liệu.');
+    showToast(
+      "success",
+      "Đã lưu danh mục bài giảng số",
+      "Danh mục bài giảng số đã được đồng bộ lên Cơ sở dữ liệu.",
+    );
   };
 
   const handleRenameLectureCategory = (oldCat: string, newCat: string) => {
     setLectures((prev) => {
-      const updated = prev.map((l) => (l.category === oldCat ? { ...l, category: newCat } : l));
+      const updated = prev.map((l) =>
+        l.category === oldCat ? { ...l, category: newCat } : l,
+      );
       updated.forEach((l) => {
         if (l.category === newCat) {
           cloudStorage.saveLecture(l);
@@ -2765,9 +3284,14 @@ export function App() {
     });
   };
 
-  const handleDeleteLectureCategory = (catToDelete: string, fallbackCat: string) => {
+  const handleDeleteLectureCategory = (
+    catToDelete: string,
+    fallbackCat: string,
+  ) => {
     setLectures((prev) => {
-      const updated = prev.map((l) => (l.category === catToDelete ? { ...l, category: fallbackCat } : l));
+      const updated = prev.map((l) =>
+        l.category === catToDelete ? { ...l, category: fallbackCat } : l,
+      );
       updated.forEach((l) => {
         if (l.category === fallbackCat) {
           cloudStorage.saveLecture(l);
@@ -2792,20 +3316,22 @@ export function App() {
 
     // Cache to localStorage
     try {
-      localStorage.setItem('uncle_ho_images', JSON.stringify(imgs));
-      localStorage.setItem('mangyang_uncle_ho_images', JSON.stringify(imgs));
-      const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
+      localStorage.setItem("uncle_ho_images", JSON.stringify(imgs));
+      localStorage.setItem("mangyang_uncle_ho_images", JSON.stringify(imgs));
+      const cachedRaw =
+        localStorage.getItem("daily_posters") ||
+        localStorage.getItem("daily_posters_cache");
       const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
-      cacheMap['uncle_ho'] = {
-        id: 'uncle_ho',
-        title: newSettings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
-        image_data: imgs[0] || '',
-        aspect_ratio: 'auto',
+      cacheMap["uncle_ho"] = {
+        id: "uncle_ho",
+        title: newSettings.bannerTitle || "LỜI BÁC DẠY NGÀY NÀY NĂM XƯA",
+        image_data: imgs[0] || "",
+        aspect_ratio: "auto",
         extra_data: { images: imgs, bannerTitle: newSettings.bannerTitle },
         updated_at: nowIso,
       };
-      localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
-      localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+      localStorage.setItem("daily_posters", JSON.stringify(cacheMap));
+      localStorage.setItem("daily_posters_cache", JSON.stringify(cacheMap));
     } catch {
       // ignore
     }
@@ -2814,20 +3340,23 @@ export function App() {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const { error: pErr } = await supabase.from('daily_posters').upsert(
+        const { error: pErr } = await supabase.from("daily_posters").upsert(
           {
-            id: 'uncle_ho',
-            title: newSettings.bannerTitle || 'LỜI BÁC DẠY NGÀY NÀY NĂM XƯA',
-            image_data: imgs[0] || '',
-            aspect_ratio: 'auto',
-            content: 'Album ảnh và Lời Bác Hồ dạy',
+            id: "uncle_ho",
+            title: newSettings.bannerTitle || "LỜI BÁC DẠY NGÀY NÀY NĂM XƯA",
+            image_data: imgs[0] || "",
+            aspect_ratio: "auto",
+            content: "Album ảnh và Lời Bác Hồ dạy",
             extra_data: { images: imgs, bannerTitle: newSettings.bannerTitle },
             updated_at: nowIso,
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         );
         if (pErr) {
-          console.error('[App] Supabase daily_posters upsert uncle_ho error:', pErr);
+          console.error(
+            "[App] Supabase daily_posters upsert uncle_ho error:",
+            pErr,
+          );
         }
 
         // Direct upsert to site_config
@@ -2836,67 +3365,73 @@ export function App() {
           uncleHoSettings: newSettings,
           uncle_ho_images: imgs,
         };
-        const { error: cErr } = await supabase.from('site_config').upsert(
+        const { error: cErr } = await supabase.from("site_config").upsert(
           {
-            id: 'default',
+            id: "default",
             updated_at: nowIso,
           },
-          { onConflict: 'id' }
+          { onConflict: "id" },
         );
         if (cErr) {
-          console.error('[App] Supabase site_config upsert error:', cErr);
+          console.error("[App] Supabase site_config upsert error:", cErr);
         }
       } catch (dbErr) {
-        console.error('[App] Supabase direct save error:', dbErr);
+        console.error("[App] Supabase direct save error:", dbErr);
       }
     }
 
-    showToast('success', 'Đã lưu thành công lên máy chủ hệ thống!', 'Album ảnh và cấu hình Lời Bác dạy đã được đồng bộ.');
+    showToast(
+      "success",
+      "Đã lưu thành công lên máy chủ hệ thống!",
+      "Album ảnh và cấu hình Lời Bác dạy đã được đồng bộ.",
+    );
   };
 
-  const approvedArticles = articles.filter((a) => !a.status || a.status === 'approved' || a.status !== 'pending');
+  const approvedArticles = articles.filter(
+    (a) => !a.status || a.status === "approved" || a.status !== "pending",
+  );
 
   const defaultHomeAnnouncements: HomeAnnouncement[] = [];
 
   const defaultQuickActionCards: QuickActionCard[] = [
     {
-      id: 'card-exam',
-      title: 'CUỘC THI TRỰC TUYẾN',
-      subtitle: 'Tìm hiểu Nghị quyết Đại hội Đảng',
-      iconName: 'exam',
-      type: 'external',
-      externalUrl: 'https://thitructuyen.quandoi.vn',
+      id: "card-exam",
+      title: "CUỘC THI TRỰC TUYẾN",
+      subtitle: "Tìm hiểu Nghị quyết Đại hội Đảng",
+      iconName: "exam",
+      type: "external",
+      externalUrl: "https://thitructuyen.quandoi.vn",
       openNewTab: true,
-      bgGradient: 'from-red-700 via-red-800 to-rose-900',
-      borderColor: 'border-red-500/30',
-      textColor: 'text-yellow-300',
-      heightSize: 'md',
+      bgGradient: "from-red-700 via-red-800 to-rose-900",
+      borderColor: "border-red-500/30",
+      textColor: "text-yellow-300",
+      heightSize: "md",
       enabled: true,
     },
     {
-      id: 'card-doc',
-      title: 'TRA CỨU VĂN BẢN QUÂN SỰ',
-      subtitle: 'Hệ thống chỉ thị & quy định',
-      iconName: 'doc',
-      type: 'internal',
-      targetPage: 'doc',
-      bgGradient: 'from-blue-800 via-blue-900 to-indigo-950',
-      borderColor: 'border-blue-500/30',
-      textColor: 'text-cyan-200',
-      heightSize: 'md',
+      id: "card-doc",
+      title: "TRA CỨU VĂN BẢN QUÂN SỰ",
+      subtitle: "Hệ thống chỉ thị & quy định",
+      iconName: "doc",
+      type: "internal",
+      targetPage: "doc",
+      bgGradient: "from-blue-800 via-blue-900 to-indigo-950",
+      borderColor: "border-blue-500/30",
+      textColor: "text-cyan-200",
+      heightSize: "md",
       enabled: true,
     },
     {
-      id: 'card-lecture',
-      title: 'BÀI GIẢNG ĐIỆN TỬ',
-      subtitle: 'Giáo án & Video huấn luyện',
-      iconName: 'video',
-      type: 'internal',
-      targetPage: 'lecture',
-      bgGradient: 'from-emerald-900 via-teal-900 to-slate-900',
-      borderColor: 'border-emerald-500/30',
-      textColor: 'text-emerald-200',
-      heightSize: 'md',
+      id: "card-lecture",
+      title: "BÀI GIẢNG ĐIỆN TỬ",
+      subtitle: "Giáo án & Video huấn luyện",
+      iconName: "video",
+      type: "internal",
+      targetPage: "lecture",
+      bgGradient: "from-emerald-900 via-teal-900 to-slate-900",
+      borderColor: "border-emerald-500/30",
+      textColor: "text-emerald-200",
+      heightSize: "md",
       enabled: true,
     },
   ];
@@ -2914,7 +3449,7 @@ export function App() {
         onOpenAuth={(tab) => setAuthModal({ isOpen: true, tab })}
         onOpenProfile={() => setProfileModalOpen(true)}
         onLogout={handleLogout}
-        onGoHome={() => handleSelectCategory('home', 'all')}
+        onGoHome={() => handleSelectCategory("home", "all")}
         onSelectPage={handleSelectPage}
         onSelectCategory={handleSelectCategory}
         onOpenCustomizer={() => setCustomizerModalOpen(true)}
@@ -2945,7 +3480,7 @@ export function App() {
         articles={articles}
         primaryRedColor={siteConfig.colorRed}
         onOpenArticle={handleOpenArticle}
-        onTickerClick={() => handleSelectCategory('home', 'all')}
+        onTickerClick={() => handleSelectCategory("home", "all")}
       />
 
       {/* 4. Main Body Container */}
@@ -2953,7 +3488,7 @@ export function App() {
         <div className="w-full">
           {/* Main Content Area */}
           <div className="w-full min-w-0">
-            {currentPage === 'home' && (
+            {currentPage === "home" && (
               <HomeView
                 articles={articles}
                 documents={documents}
@@ -2971,7 +3506,9 @@ export function App() {
                 onDeleteArticle={handleDeleteArticle}
                 onOpenUncleHoManager={() => setUncleHoManagerOpen(true)}
                 onSaveUncleHoQuotes={handleSaveUncleHoQuotes}
-                onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
+                onOpenAnnouncementManager={() =>
+                  setAnnouncementManagerOpen(true)
+                }
                 onSaveQuickActions={handleSaveQuickActions}
                 onSaveDailyWidgets={handleSaveDailyWidgets}
                 onSaveHomeCategoryColumns={handleSaveHomeCategoryColumns}
@@ -2984,14 +3521,27 @@ export function App() {
               />
             )}
 
-            {(currentPage === 'ctd' ||
-              currentPage === 'hl' ||
-              currentPage === 'bac' ||
-              currentPage.startsWith('cat-') ||
-              (Array.isArray(siteConfig.categories_config) &&
-                siteConfig.categories_config.some(
-                  (c: any) => c.id === currentPage || c.targetPage === currentPage
-                ))) && (
+            {currentPage !== "doc" &&
+              currentPage !== "lecture" &&
+              currentPage !== "documents" &&
+              currentPage !== "lectures" &&
+              currentPage !== "van-ban" &&
+              currentPage !== "vanban" &&
+              currentPage !== "bai-giang" &&
+              currentPage !== "baigiang" &&
+              (currentPage === "ctd" ||
+                currentPage === "hl" ||
+                currentPage === "bac" ||
+                currentPage.startsWith("cat-") ||
+                (Array.isArray(siteConfig.categories_config) &&
+                  siteConfig.categories_config.some(
+                    (c: any) =>
+                      c.id !== "doc" &&
+                      c.id !== "lecture" &&
+                      c.targetPage !== "doc" &&
+                      c.targetPage !== "lecture" &&
+                      (c.id === currentPage || c.targetPage === currentPage),
+                  ))) && (
               <CategoryView
                 sectionKey={currentPage as any}
                 categoryId={currentPage}
@@ -3007,19 +3557,30 @@ export function App() {
                 onEditArticle={handleOpenEditArticleModal}
                 onDeleteArticle={handleDeleteArticle}
                 onSelectSection={handleSelectCategory}
-                onGoHome={() => handleSelectCategory('home', 'all')}
-                onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
+                onGoHome={() => handleSelectCategory("home", "all")}
+                onOpenTabIntroModal={(tabKey) =>
+                  setTabIntroModal({ isOpen: true, tabKey })
+                }
                 onSaveCategories={handleSaveCategories}
                 onRenameCategory={(oldCat, newCat) =>
-                  handleRenameSectionCategory(currentPage as any, oldCat, newCat)
+                  handleRenameSectionCategory(
+                    currentPage as any,
+                    oldCat,
+                    newCat,
+                  )
                 }
                 onDeleteCategory={(catToDelete, fallbackCat) =>
-                  handleDeleteSectionCategory(currentPage as any, catToDelete, fallbackCat)
+                  handleDeleteSectionCategory(
+                    currentPage as any,
+                    catToDelete,
+                    fallbackCat,
+                  )
                 }
               />
             )}
 
-            {(currentPage === 'article_detail' || currentPage === 'article-detail') &&
+            {(currentPage === "article_detail" ||
+              currentPage === "article-detail") &&
               selectedArticle && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
                   {/* LEFT COLUMN: 1 fraction (1/4) */}
@@ -3037,12 +3598,16 @@ export function App() {
 
                     {/* Bottom Block: Thông báo & Sự kiện */}
                     <HomeAnnouncementsWidget
-                      announcements={siteConfig.homeAnnouncements || defaultHomeAnnouncements}
+                      announcements={
+                        siteConfig.homeAnnouncements || defaultHomeAnnouncements
+                      }
                       currentUser={currentUser}
                       articles={approvedArticles}
                       isLoading={isLoadingData}
                       onOpenArticle={handleOpenArticle}
-                      onOpenAnnouncementManager={() => setAnnouncementManagerOpen(true)}
+                      onOpenAnnouncementManager={() =>
+                        setAnnouncementManagerOpen(true)
+                      }
                     />
                   </div>
 
@@ -3053,8 +3618,8 @@ export function App() {
                       allArticles={articles}
                       currentUser={currentUser}
                       siteConfig={siteConfig}
-                      onBack={() => handleSelectPage(previousPage || 'home')}
-                      onGoHome={() => handleSelectPage('home')}
+                      onBack={() => handleSelectPage(previousPage || "home")}
+                      onGoHome={() => handleSelectPage("home")}
                       onOpenArticle={handleOpenArticle}
                       onSelectSection={handleSelectPage}
                       onEditArticle={handleOpenEditArticleModal}
@@ -3081,31 +3646,48 @@ export function App() {
                       }
                       currentUser={currentUser}
                       onSelectSection={handleSelectPage}
-                      onOpenQuickActionManager={() => setIsQuickActionModalOpen(true)}
+                      onOpenQuickActionManager={() =>
+                        setIsQuickActionModalOpen(true)
+                      }
                     />
                   </div>
                 </div>
               )}
 
-            {currentPage === 'doc' && (
-              <DocumentArchiveView
+            {(currentPage === "doc" ||
+              currentPage === "documents" ||
+              currentPage === "van-ban" ||
+              currentPage === "vanban") && (
+              <DocumentLibraryView
                 documents={documents}
                 currentUser={currentUser}
                 siteConfig={siteConfig}
-                onOpenAuth={() => setAuthModal({ isOpen: true, tab: 'login' })}
-                onOpenAddDocModal={() => setAddDocModalOpen(true)}
+                onOpenAuth={() => setAuthModal({ isOpen: true, tab: "login" })}
+                onOpenAddDocModal={() => {
+                  setDocToEdit(null);
+                  setAddDocModalOpen(true);
+                }}
+                onEditDoc={(doc) => {
+                  setDocToEdit(doc);
+                  setAddDocModalOpen(true);
+                }}
                 onDeleteDoc={handleDeleteDoc}
                 onUpdateDoc={handleUpdateDoc}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
+                onGoHome={() => handleSelectPage("home")}
                 onSaveCategories={handleSaveDocCategories}
                 onRenameCategory={handleRenameDocCategory}
                 onDeleteCategory={handleDeleteDocCategory}
-                onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
+                onOpenTabIntroModal={(tabKey) =>
+                  setTabIntroModal({ isOpen: true, tabKey })
+                }
               />
             )}
 
-            {currentPage === 'lecture' && (
+            {(currentPage === "lecture" ||
+              currentPage === "lectures" ||
+              currentPage === "bai-giang" ||
+              currentPage === "baigiang") && (
               <LectureLibraryView
                 lectures={lectures}
                 currentUser={currentUser}
@@ -3115,26 +3697,28 @@ export function App() {
                 onDeleteLecture={handleDeleteLecture}
                 onUpdateLecture={handleUpdateLecture}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
-                onOpenTabIntroModal={(tabKey) => setTabIntroModal({ isOpen: true, tabKey })}
+                onGoHome={() => handleSelectPage("home")}
+                onOpenTabIntroModal={(tabKey) =>
+                  setTabIntroModal({ isOpen: true, tabKey })
+                }
                 onSaveCategories={handleSaveLectureCategories}
                 onRenameCategory={handleRenameLectureCategory}
                 onDeleteCategory={handleDeleteLectureCategory}
               />
             )}
 
-            {currentPage === 'approvals' && (
+            {currentPage === "approvals" && (
               <ApprovalsView
-                pendingArticles={articles.filter((a) => a.status === 'pending')}
+                pendingArticles={articles.filter((a) => a.status === "pending")}
                 onOpenArticle={handleOpenArticle}
                 onApproveArticle={handleApproveArticle}
                 onRejectArticle={handleRejectArticle}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
+                onGoHome={() => handleSelectPage("home")}
               />
             )}
 
-            {currentPage === 'users' && (
+            {currentPage === "users" && (
               <UserManagementView
                 users={users}
                 currentUser={currentUser}
@@ -3153,7 +3737,7 @@ export function App() {
                 onCreateUser={handleCreateUser}
                 onDeleteUser={handleDeleteUser}
                 onSelectSection={handleSelectPage}
-                onGoHome={() => handleSelectPage('home')}
+                onGoHome={() => handleSelectPage("home")}
               />
             )}
           </div>
@@ -3171,7 +3755,7 @@ export function App() {
       {/* 6. Modals (Suspense Code-Splitting) */}
       <LoginModal
         isOpen={authModal.isOpen}
-        onClose={() => setAuthModal({ isOpen: false, tab: 'login' })}
+        onClose={() => setAuthModal({ isOpen: false, tab: "login" })}
         onSuccess={(user) => {
           setCurrentUser(user);
         }}
@@ -3208,7 +3792,13 @@ export function App() {
             currentUser={currentUser}
             siteConfig={siteConfig}
             categories={categories}
-            onClose={() => setPostModal({ isOpen: false, section: 'ctd', articleToEdit: null })}
+            onClose={() =>
+              setPostModal({
+                isOpen: false,
+                section: "ctd",
+                articleToEdit: null,
+              })
+            }
             onSubmitArticle={handlePostArticle}
             onUpdateArticle={handleUpdateArticle}
             onDeleteArticle={handleDeleteArticle}
@@ -3218,8 +3808,13 @@ export function App() {
         {addDocModalOpen && (
           <AddDocModal
             isOpen={addDocModalOpen}
-            onClose={() => setAddDocModalOpen(false)}
+            editingDoc={docToEdit}
+            onClose={() => {
+              setAddDocModalOpen(false);
+              setDocToEdit(null);
+            }}
             onAddDoc={handleAddDoc}
+            onUpdateDoc={handleUpdateDoc}
           />
         )}
 
@@ -3228,7 +3823,9 @@ export function App() {
             isOpen={lectureModal.isOpen}
             currentUser={currentUser}
             lectureToEdit={lectureModal.lectureToEdit}
-            onClose={() => setLectureModal({ isOpen: false, lectureToEdit: null })}
+            onClose={() =>
+              setLectureModal({ isOpen: false, lectureToEdit: null })
+            }
             onAddLecture={handleAddLecture}
             onUpdateLecture={handleUpdateLecture}
           />
@@ -3259,7 +3856,7 @@ export function App() {
             isOpen={tabIntroModal.isOpen}
             initialTab={tabIntroModal.tabKey}
             siteConfig={siteConfig}
-            onClose={() => setTabIntroModal({ isOpen: false, tabKey: 'doc' })}
+            onClose={() => setTabIntroModal({ isOpen: false, tabKey: "doc" })}
             onSaveSiteConfig={handleSaveCustomizer}
             onSave={handleSaveCategories}
           />
@@ -3319,11 +3916,11 @@ export function App() {
             onClose={() => setAccessDeniedModal({ isOpen: false })}
             onOpenLogin={() => {
               setAccessDeniedModal({ isOpen: false });
-              setAuthModal({ isOpen: true, tab: 'login' });
+              setAuthModal({ isOpen: true, tab: "login" });
             }}
             onGoHome={() => {
               setAccessDeniedModal({ isOpen: false });
-              setCurrentPage('home');
+              setCurrentPage("home");
             }}
           />
         )}
