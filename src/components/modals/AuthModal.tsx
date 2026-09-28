@@ -20,7 +20,9 @@ interface AuthModalProps {
   isOpen: boolean;
   initialTab?: 'login' | 'register';
   onClose: () => void;
-  onLogin: (usernameOrEmail: string, password: string) => boolean | Promise<boolean>;
+  setCurrentUser?: (user: any) => void;
+  onSuccess?: (user: any) => void;
+  onLogin?: (usernameOrEmail: string, password: string) => boolean | Promise<boolean>;
   onRegister?: (data: {
     username: string;
     password: string;
@@ -30,14 +32,18 @@ interface AuthModalProps {
     rank?: string;
     position?: string;
   }) => boolean | Promise<boolean>;
+  showToast?: (type: 'success' | 'error' | 'warning' | 'info', title: string, message?: string) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   initialTab = 'login',
   onClose,
+  setCurrentUser,
+  onSuccess,
   onLogin,
   onRegister,
+  showToast,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
@@ -76,45 +82,69 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setLoginError(null);
 
-    const identifier = loginUser.trim();
-    const password = loginPass;
+    const loginUsername = loginUser.trim();
+    const loginPassword = loginPass;
 
-    if (!identifier || !password) {
-      setLoginError('Vui lòng nhập đầy đủ Email/Tên tài khoản và Mật khẩu!');
+    if (!loginUsername || !loginPassword) {
+      setLoginError('Vui lòng nhập đầy đủ Tên tài khoản và Mật khẩu!');
       return;
     }
 
     setIsLoggingIn(true);
 
     try {
-      // 1. Try Supabase Auth if input looks like an email or direct call
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: identifier,
-        password: password,
-      });
+      // 1. Kiểm tra tài khoản trực tiếp từ bảng users trên Supabase
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', loginUsername.trim())
+        .eq('password', loginPassword)
+        .maybeSingle();
 
-      if (!error && data?.user) {
-        setLoginUser('');
-        setLoginPass('');
-        setLoginError(null);
-        onClose();
+      if (error || !user) {
+        alert('❌ Sai tên tài khoản hoặc mật khẩu!');
+        setLoginError('Sai tên tài khoản hoặc mật khẩu!');
         setIsLoggingIn(false);
         return;
       }
 
-      // 2. Call onLogin prop (which also attempts fallback authentication)
-      const success = await Promise.resolve(onLogin(identifier, password));
-      if (success) {
-        setLoginUser('');
-        setLoginPass('');
-        setLoginError(null);
-        onClose();
-      } else {
-        setLoginError('Email hoặc mật khẩu không chính xác!');
+      // Chuẩn hóa dữ liệu người dùng
+      const mappedUser = {
+        id: user.id,
+        username: user.username,
+        fullName: user.full_name || user.fullName || user.username,
+        full_name: user.full_name || user.fullName || user.username,
+        rankUnit: user.rank_unit || user.rankUnit || 'Trung đoàn 95',
+        rank_unit: user.rank_unit || user.rankUnit || 'Trung đoàn 95',
+        role: user.role || 'user',
+        avatar: user.avatar || '',
+        canViewDoc: user.can_view_doc ?? true,
+        canUploadDoc: user.can_upload_doc ?? false,
+        canJoinPartyMeeting: user.can_join_party_meeting ?? false,
+        ...user,
+      };
+
+      if (setCurrentUser) {
+        setCurrentUser(mappedUser);
       }
-    } catch (err) {
-      console.warn('[AuthModal] login error:', err);
-      setLoginError('Email hoặc mật khẩu không chính xác!');
+      localStorage.setItem('current_user', JSON.stringify(mappedUser));
+      alert(`✅ Đăng nhập thành công! Chào mừng đồng chí ${user.full_name || user.username}`);
+
+      if (onSuccess) {
+        onSuccess(mappedUser);
+      }
+      if (onLogin) {
+        await Promise.resolve(onLogin(loginUsername, loginPassword));
+      }
+
+      setLoginUser('');
+      setLoginPass('');
+      setLoginError(null);
+      onClose();
+    } catch (err: any) {
+      console.error('[AuthModal] Login error:', err);
+      alert('❌ Sai tên tài khoản hoặc mật khẩu!');
+      setLoginError('Sai tên tài khoản hoặc mật khẩu!');
     } finally {
       setIsLoggingIn(false);
     }
@@ -125,33 +155,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setRegisterError(null);
     setRegisterSuccess(null);
 
-    const fullName = regFullName.trim();
-    const unit = regUnit.trim();
-    const username = regUsername.trim();
-    const password = regPassword;
-    const confirmPass = regConfirmPassword;
+    const formData = {
+      fullName: regFullName.trim(),
+      rankUnit: regUnit.trim(),
+      username: regUsername.trim(),
+      password: regPassword,
+    };
 
-    if (!fullName) {
+    if (!formData.fullName) {
       setRegisterError('Vui lòng nhập Họ và tên!');
       return;
     }
-    if (!unit) {
+    if (!formData.rankUnit) {
       setRegisterError('Vui lòng nhập Đơn vị / Bộ phận!');
       return;
     }
-    if (!username) {
-      setRegisterError('Vui lòng nhập Email hoặc Tên tài khoản!');
+    if (!formData.username) {
+      setRegisterError('Vui lòng nhập Tên tài khoản!');
       return;
     }
-    if (!password) {
+    if (!formData.password) {
       setRegisterError('Vui lòng nhập Mật khẩu!');
       return;
     }
-    if (password.length < 6) {
+    if (formData.password.length < 6) {
       setRegisterError('Mật khẩu phải có tối thiểu 6 ký tự!');
       return;
     }
-    if (password !== confirmPass) {
+    if (formData.password !== regConfirmPassword) {
       setRegisterError('Xác nhận mật khẩu không trùng khớp!');
       return;
     }
@@ -159,40 +190,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsRegistering(true);
 
     try {
-      if (onRegister) {
-        const success = await Promise.resolve(
-          onRegister({
-            fullName,
-            rankUnit: unit,
-            username,
-            password,
-          })
-        );
+      // 1. Thực hiện insert trực tiếp vào bảng users trên Supabase (Bỏ qua trường id để Supabase tự sinh int8)
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          username: formData.username.trim(),
+          password: formData.password,
+          full_name: formData.fullName || 'Cán bộ chiến sĩ',
+          rank_unit: formData.rankUnit || 'Trung đoàn 95',
+          role: 'user',
+        }]);
 
-        if (!success) {
-          setRegisterError('Tên tài khoản hoặc Email này đã tồn tại trên hệ thống!');
-          setIsRegistering(false);
-          return;
-        }
-
-        // Auto login immediately
-        setRegisterSuccess('Đăng ký tài khoản thành công!');
-        setTimeout(async () => {
-          await Promise.resolve(onLogin(username, password));
-          setRegFullName('');
-          setRegUnit('');
-          setRegUsername('');
-          setRegPassword('');
-          setRegConfirmPassword('');
-          setRegisterError(null);
-          setRegisterSuccess(null);
-          onClose();
-        }, 800);
-      } else {
-        setRegisterError('Chức năng đăng ký tạm thời không khả dụng.');
+      if (error) {
+        alert('❌ Đăng ký thất bại: ' + error.message);
+        setRegisterError('Đăng ký thất bại: ' + error.message);
+        setIsRegistering(false);
+        return;
       }
+
+      // CHỈ ĐƯỢC báo thành công khi Supabase trả về error === null
+      alert('✅ Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
+      setRegisterSuccess('Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
+
+      // Chuyển sang form đăng nhập và điền sẵn username
+      setActiveTab('login');
+      setLoginUser(formData.username);
+      setLoginPass('');
+      setRegFullName('');
+      setRegUnit('');
+      setRegUsername('');
+      setRegPassword('');
+      setRegConfirmPassword('');
     } catch (err: any) {
-      console.error('[AuthModal] Register error:', err);
+      console.error('[AuthModal] Register exception:', err);
+      alert('❌ Đăng ký thất bại: ' + (err?.message || 'Lỗi kết nối'));
       setRegisterError(err?.message || 'Có lỗi xảy ra khi tạo tài khoản!');
     } finally {
       setIsRegistering(false);

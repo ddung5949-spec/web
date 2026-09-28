@@ -172,7 +172,10 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
     const autoFileName = fileName.trim() || `${cleanCode}_${type}.${type}`;
     const autoFileSize = fileSize.trim() || '1.8 MB';
 
+    const safeIssuer = issuer.trim() || 'Trung đoàn 95';
+
     if (editingDoc && onUpdateDoc) {
+      const currentDownloads = editingDoc.downloads ?? (editingDoc as any).download_count ?? 0;
       onUpdateDoc({
         ...editingDoc,
         code: code.trim(),
@@ -181,11 +184,13 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         sub_category: category,
         subCategory: category,
         description: description.trim() || undefined,
-        issuer: issuer.trim(),
+        issuer: safeIssuer,
         type,
         fileName: autoFileName,
         fileSize: autoFileSize,
         fileUrl: fileUrl.trim() || editingDoc.fileUrl || undefined,
+        downloads: currentDownloads,
+        download_count: currentDownloads,
         secretLevel,
       });
     } else {
@@ -201,13 +206,14 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         sub_category: category,
         subCategory: category,
         description: description.trim() || undefined,
-        issuer: issuer.trim(),
+        issuer: safeIssuer,
         date: dateStr,
         type,
         fileName: autoFileName,
         fileSize: autoFileSize,
         fileUrl: fileUrl.trim() || undefined,
         downloads: 0,
+        download_count: 0,
         secretLevel,
       });
     }

@@ -84,19 +84,25 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   // Normalize id (e.g. 'widget_safety_message' -> 'safety_message')
   const cleanId = widgetId.replace(/^widget_/, '');
 
-  // Standardized posterKey: 'safety' | 'traffic' | 'good_deed'
+  const isTraffic =
+    cleanId === 'traffic_situation' ||
+    cleanId === 'traffic' ||
+    cleanId === 'tinh-huong-giao-thong' ||
+    cleanId === 'tinh_huong_giao_thong';
+
+  // Standardized posterKey: 'safety' | 'tinh-huong-giao-thong' | 'good_deed'
   const posterKey =
     cleanId === 'safety_message' || cleanId === 'safety'
       ? 'safety'
-      : cleanId === 'traffic_situation' || cleanId === 'traffic'
-      ? 'traffic'
+      : isTraffic
+      ? 'tinh-huong-giao-thong'
       : 'good_deed';
 
   // Find default fallback
   const defaultCategoryTitle =
     posterKey === 'safety'
       ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-      : posterKey === 'traffic'
+      : isTraffic
       ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
       : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP';
 
@@ -118,7 +124,11 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
     const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
     if (cachedRaw) {
       const cacheMap = JSON.parse(cachedRaw);
-      const found = cacheMap[posterKey] || cacheMap[cleanId] || cacheMap[widgetId];
+      const found =
+        cacheMap[posterKey] ||
+        (isTraffic ? (cacheMap['tinh-huong-giao-thong'] || cacheMap['traffic'] || cacheMap['traffic_situation']) : null) ||
+        cacheMap[cleanId] ||
+        cacheMap[widgetId];
       if (found) {
         cachedImg = found.image_data || found.imageUrl || found.image || '';
         cachedRatio = found.aspect_ratio || found.aspectRatio || found.aspectRatioMode || 'auto';
@@ -146,6 +156,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
   if ((!customItem || !customItem.imageUrl) && dailyPosters && typeof dailyPosters === 'object') {
     const fromMap =
       dailyPosters[posterKey] ||
+      (isTraffic ? (dailyPosters['tinh-huong-giao-thong'] || dailyPosters['traffic'] || dailyPosters['traffic_situation']) : null) ||
       dailyPosters[cleanId] ||
       dailyPosters[widgetId];
     if (fromMap && (fromMap.image_data || fromMap.imageUrl || fromMap.image || fromMap.title)) {
@@ -169,7 +180,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           w.id === cleanId ||
           w.id === widgetId ||
           (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'widget_safety_message' || w.id === 'safety')) ||
-          (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation' || w.id === 'traffic')) ||
+          (isTraffic && (w.id === 'traffic_situation' || w.id === 'widget_traffic_situation' || w.id === 'traffic' || w.id === 'tinh-huong-giao-thong')) ||
           (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
       );
       if (matched) {
@@ -341,10 +352,10 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       const supabase = getSupabase();
       if (supabase) {
         try {
-          const posterId = posterKey; // 'safety' | 'traffic' | 'good_deed'
+          const targetId = isTraffic ? 'tinh-huong-giao-thong' : posterKey;
           const { error: upsertErr } = await supabase.from('daily_posters').upsert(
             {
-              id: posterId,
+              id: targetId,
               title: finalTitle,
               category_name: finalCat,
               image_url: finalUrl,
@@ -362,6 +373,38 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
             toast.error('Lỗi lưu CSDL', upsertErr.message || 'Không thể lưu lên Supabase');
             throw new Error(upsertErr.message);
           }
+
+          if (isTraffic) {
+            // Đồng bộ các ID tương thích
+            try {
+              await supabase.from('daily_posters').upsert([
+                {
+                  id: 'traffic',
+                  title: finalTitle,
+                  category_name: finalCat,
+                  image_url: finalUrl,
+                  image_data: finalUrl,
+                  aspect_ratio: formAspectRatio,
+                  content: finalTitle || '',
+                  extra_data: { category_name: finalCat },
+                  updated_at: nowIso,
+                },
+                {
+                  id: 'traffic_situation',
+                  title: finalTitle,
+                  category_name: finalCat,
+                  image_url: finalUrl,
+                  image_data: finalUrl,
+                  aspect_ratio: formAspectRatio,
+                  content: finalTitle || '',
+                  extra_data: { category_name: finalCat },
+                  updated_at: nowIso,
+                }
+              ], { onConflict: 'id' });
+            } catch {
+              // ignore
+            }
+          }
         } catch (dbErr: any) {
           console.error('[DailyPosterWidget] Supabase error:', dbErr);
           toast.error('Lỗi lưu CSDL', dbErr?.message || 'Lỗi khi đồng bộ lên Supabase');
@@ -375,8 +418,9 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       try {
         const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
+        const targetId = isTraffic ? 'tinh-huong-giao-thong' : posterKey;
         const cacheEntry = {
-          id: posterKey,
+          id: targetId,
           title: finalTitle,
           category_name: finalCat,
           image_url: finalUrl,
@@ -386,12 +430,26 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           extra_data: { category_name: finalCat },
           updated_at: nowIso,
         };
-        cacheMap[posterKey] = cacheEntry;
+        cacheMap[targetId] = cacheEntry;
         cacheMap[cleanId] = cacheEntry;
         if (posterKey === 'safety') cacheMap['safety_message'] = cacheEntry;
-        if (posterKey === 'traffic') cacheMap['traffic_situation'] = cacheEntry;
+        if (isTraffic) {
+          cacheMap['tinh-huong-giao-thong'] = cacheEntry;
+          cacheMap['traffic'] = cacheEntry;
+          cacheMap['traffic_situation'] = cacheEntry;
+        }
         localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
         localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+
+        // Bắn sự kiện cập nhật tức thì cho các Component ngoài trang chủ
+        window.dispatchEvent(
+          new CustomEvent('daily_posters_updated', {
+            detail: {
+              id: targetId,
+              poster: cacheEntry,
+            },
+          })
+        );
       } catch (cacheErr) {
         console.warn('[DailyPosterWidget] Local cache save error:', cacheErr);
       }
@@ -405,7 +463,7 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           w.id === cleanId ||
           w.id === widgetId ||
           (posterKey === 'safety' && (w.id === 'safety_message' || w.id === 'safety')) ||
-          (posterKey === 'traffic' && (w.id === 'traffic_situation' || w.id === 'traffic')) ||
+          (isTraffic && (w.id === 'traffic_situation' || w.id === 'traffic' || w.id === 'tinh-huong-giao-thong')) ||
           (posterKey === 'good_deed' && w.id === 'good_deed')
       );
 

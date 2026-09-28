@@ -92,7 +92,49 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsLoggingIn(true);
 
     try {
-      // Thử đăng nhập với chuỗi trực tiếp
+      // 1. Kiểm tra tài khoản trực tiếp từ bảng users trên Supabase
+      const { data: dbUser, error: dbError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', identifier)
+        .eq('password', password)
+        .maybeSingle();
+
+      if (!dbError && dbUser) {
+        const loggedUser: UserType = {
+          id: dbUser.id,
+          username: dbUser.username,
+          fullName: dbUser.full_name || dbUser.fullName || dbUser.username,
+          rankUnit: dbUser.rank_unit || dbUser.rankUnit || 'Trung đoàn 95',
+          role: dbUser.role || 'user',
+          avatar: dbUser.avatar || '',
+          canViewDoc: dbUser.can_view_doc ?? true,
+          canUploadDoc: dbUser.can_upload_doc ?? false,
+          canJoinPartyMeeting: dbUser.can_join_party_meeting ?? false,
+        };
+
+        localStorage.setItem('current_user', JSON.stringify(loggedUser));
+        if (showToast) {
+          showToast(
+            'success',
+            'Đăng nhập thành công',
+            `Chào mừng ${loggedUser.fullName}!`
+          );
+        }
+
+        if (onSuccess) {
+          onSuccess(loggedUser);
+        }
+
+        setLoginEmail('');
+        setLoginPassword('');
+        setLoginError(null);
+        onClose();
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // 2. Thử đăng nhập với chuỗi trực tiếp
       const emailToAuth = formatAuthEmail(identifier);
       let { data, error } = await supabase.auth.signInWithPassword({
         email: emailToAuth,
@@ -190,64 +232,32 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsRegistering(true);
 
     try {
-      const emailToSignUp = formatAuthEmail(emailRaw);
-
-      const { data, error } = await supabase.auth.signUp({
-        email: emailToSignUp,
-        password: password,
-        options: {
-          data: {
-            full_name: fullName,
-            unit: unit,
-            role: 'admin',
-          },
-        },
-      });
+      // 1. Thêm vào bảng users trên Supabase (Bỏ qua trường id để Supabase tự sinh int8)
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          username: emailRaw,
+          password: password,
+          full_name: fullName || 'Cán bộ chiến sĩ',
+          rank_unit: unit || 'Trung đoàn 95',
+          role: 'user',
+        }]);
 
       if (error) {
-        console.warn('[LoginModal] Supabase SignUp Error:', error.message);
-        setRegError(error.message || 'Không thể tạo tài khoản, vui lòng thử lại!');
+        console.warn('[LoginModal] Supabase users insert error:', error.message);
+        alert('❌ Đăng ký thất bại: ' + error.message);
+        setRegError('Đăng ký thất bại: ' + error.message);
         setIsRegistering(false);
         return;
       }
 
-      setRegSuccess('Đăng ký hồ sơ thành công! Đang tự động đăng nhập...');
-
-      // Tự động đăng nhập sau khi tạo thành công
-      setTimeout(async () => {
-        try {
-          const loginResult = await supabase.auth.signInWithPassword({
-            email: emailToSignUp,
-            password: password,
-          });
-
-          if (loginResult.data?.user) {
-            const loggedUser = supabaseAuth.mapSupabaseUserToAdmin(loginResult.data.user);
-            if (onSuccess) {
-              onSuccess(loggedUser);
-            }
-            if (showToast) {
-              showToast(
-                'success',
-                'Đăng ký & Đăng nhập thành công',
-                `Chào mừng đồng chí ${fullName}!`
-              );
-            }
-          }
-        } catch {
-          // ignore
-        }
-
-        // Reset form
-        setRegFullName('');
-        setRegUnit('');
-        setRegEmail('');
-        setRegPassword('');
-        setRegConfirmPassword('');
-        setRegError(null);
-        setRegSuccess(null);
-        onClose();
-      }, 1000);
+      alert('✅ Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
+      setRegSuccess('Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
+      setActiveTab('login');
+      setLoginEmail(emailRaw);
+      setLoginPassword('');
+      setIsRegistering(false);
+      return;
     } catch (err: any) {
       console.error('[LoginModal] Register Exception:', err);
       setRegError(err?.message || 'Có lỗi xảy ra khi tạo tài khoản!');

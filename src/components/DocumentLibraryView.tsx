@@ -117,11 +117,13 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
   };
 
   const handleDownloadDoc = (doc: DocumentItem) => {
-    const updatedDownloads = (doc.downloads || 0) + 1;
+    const currentDownloads = (doc.downloads ?? (doc as any).download_count ?? 0) as number;
+    const updatedDownloads = currentDownloads + 1;
     if (onUpdateDoc) {
       onUpdateDoc({
         ...doc,
         downloads: updatedDownloads,
+        download_count: updatedDownloads,
       });
     }
 

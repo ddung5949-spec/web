@@ -169,13 +169,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
           const map: Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }> = {};
           data.forEach((row: any) => {
             const rawId = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+            const isTraffic =
+              rawId === 'tinh-huong-giao-thong' ||
+              rawId === 'tinh_huong_giao_thong' ||
+              rawId === 'traffic_situation' ||
+              rawId === 'traffic';
+
             const normKey =
               rawId === 'uncle_ho' || rawId === 'uncleHo' || rawId === 'bac_ho'
                 ? 'uncle_ho'
                 : rawId === 'safety_message' || rawId === 'safety'
                 ? 'safety'
-                : rawId === 'traffic_situation' || rawId === 'traffic'
-                ? 'traffic'
+                : isTraffic
+                ? 'tinh-huong-giao-thong'
                 : rawId === 'good_deed'
                 ? 'good_deed'
                 : rawId;
@@ -193,7 +199,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
               map[normKey] = entry;
               map[rawId] = entry;
               if (normKey === 'safety') map['safety_message'] = entry;
-              if (normKey === 'traffic') map['traffic_situation'] = entry;
+              if (isTraffic) {
+                map['tinh-huong-giao-thong'] = entry;
+                map['traffic'] = entry;
+                map['traffic_situation'] = entry;
+              }
             }
           });
           if (isMounted) {
@@ -222,8 +232,30 @@ export const HomeView: React.FC<HomeViewProps> = ({
       }
     };
     fetchDailyPosters();
+
+    const handlePosterUpdated = (e: any) => {
+      const p = e?.detail?.poster;
+      const id = e?.detail?.id;
+      if (p && isMounted) {
+        setDailyPosters((prev) => {
+          const next = { ...prev, [id]: p };
+          if (id === 'tinh-huong-giao-thong' || id === 'traffic' || id === 'traffic_situation') {
+            next['tinh-huong-giao-thong'] = p;
+            next['traffic'] = p;
+            next['traffic_situation'] = p;
+          } else if (id === 'safety' || id === 'safety_message') {
+            next['safety'] = p;
+            next['safety_message'] = p;
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('daily_posters_updated', handlePosterUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('daily_posters_updated', handlePosterUpdated);
     };
   }, []);
 
@@ -235,12 +267,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     Object.entries(effectiveDailyPosters).forEach(([id, poster]) => {
       const cleanId = id.replace(/^widget_/, '');
-      const posterKey = cleanId === 'safety_message' ? 'safety' : cleanId === 'traffic_situation' ? 'traffic' : cleanId;
-      const targetId = posterKey === 'safety' ? 'safety_message' : posterKey === 'traffic' ? 'traffic_situation' : 'good_deed';
+      const isTraffic =
+        cleanId === 'tinh-huong-giao-thong' ||
+        cleanId === 'tinh_huong_giao_thong' ||
+        cleanId === 'traffic_situation' ||
+        cleanId === 'traffic';
+
+      const posterKey = cleanId === 'safety_message' ? 'safety' : isTraffic ? 'tinh-huong-giao-thong' : cleanId;
+      const targetId = posterKey === 'safety' ? 'safety_message' : isTraffic ? 'traffic_situation' : 'good_deed';
       const defaultCategory =
         targetId === 'safety_message'
           ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
-          : targetId === 'traffic_situation'
+          : isTraffic
           ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
           : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP';
 
@@ -249,7 +287,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           w.id === targetId ||
           w.id === id ||
           (posterKey === 'safety' && (w.id === 'safety' || w.id === 'safety_message')) ||
-          (posterKey === 'traffic' && (w.id === 'traffic' || w.id === 'traffic_situation')) ||
+          (isTraffic && (w.id === 'traffic' || w.id === 'traffic_situation' || w.id === 'tinh-huong-giao-thong')) ||
           (posterKey === 'good_deed' && (w.id === 'good_deed' || w.id === 'widget_good_deed'))
       );
 

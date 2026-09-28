@@ -51,6 +51,7 @@ import { Footer } from "./components/Footer";
 
 // Modals - Code-Split using React.lazy & Suspense for fast initial bundle
 import { LoginModal } from "./components/LoginModal";
+import { AuthModal } from "./components/modals/AuthModal";
 const ProfileModal = React.lazy(() =>
   import("./components/modals/ProfileModal").then((m) => ({
     default: m.ProfileModal,
@@ -297,7 +298,15 @@ export function App() {
     safeStore.get("mangyang_users", defaultUsers),
   );
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem("current_user");
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
 
   // Helper đảm bảo mọi bài viết luôn có category là string chuẩn, ngăn ngừa lỗi Objects are not valid as a React child
   const sanitizeArticle = (art: any): Article => {
@@ -535,6 +544,15 @@ export function App() {
       if (session?.user) {
         setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
       } else {
+        try {
+          const stored = localStorage.getItem("current_user");
+          if (stored) {
+            setCurrentUser(JSON.parse(stored));
+            return;
+          }
+        } catch {
+          // ignore
+        }
         setCurrentUser(null);
       }
     });
@@ -542,10 +560,11 @@ export function App() {
     // 2. Lắng nghe sự kiện Đăng nhập / Đăng xuất
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
-      } else {
+      } else if (event === "SIGNED_OUT") {
+        localStorage.removeItem("current_user");
         setCurrentUser(null);
       }
     });
@@ -1835,6 +1854,7 @@ export function App() {
     }
 
     setCurrentUser(null);
+    localStorage.removeItem("current_user");
     showToast(
       "info",
       "Đã đăng xuất",
@@ -2509,12 +2529,16 @@ export function App() {
 
   // Document Actions
   const handleAddDoc = async (doc: Omit<DocumentItem, "id">) => {
+    const downloadsVal = Number(doc.downloads ?? (doc as any).download_count ?? 0);
     const newDoc: DocumentItem = {
       id: Date.now(),
       ...doc,
       category: "VĂN BẢN - CHỈ THỊ",
       sub_category: doc.sub_category || doc.subCategory || doc.category || "",
       subCategory: doc.sub_category || doc.subCategory || doc.category || "",
+      issuer: doc.issuer?.trim() || "Trung đoàn 95",
+      downloads: downloadsVal,
+      download_count: downloadsVal,
     };
     setDocuments((prev) => [newDoc, ...prev]);
     const res = await cloudStorage.saveDocument(newDoc);
@@ -2553,11 +2577,15 @@ export function App() {
   };
 
   const handleUpdateDoc = async (updated: DocumentItem) => {
+    const downloadsVal = Number(updated.downloads ?? (updated as any).download_count ?? 0);
     const docWithCategory: DocumentItem = {
       ...updated,
       category: "VĂN BẢN - CHỈ THỊ",
       sub_category: updated.sub_category || updated.subCategory || updated.category || "",
       subCategory: updated.sub_category || updated.subCategory || updated.category || "",
+      issuer: updated.issuer?.trim() || "Trung đoàn 95",
+      downloads: downloadsVal,
+      download_count: downloadsVal,
     };
     setDocuments((prev) =>
       prev.map((d) => (d.id === docWithCategory.id ? docWithCategory : d)),
@@ -2982,11 +3010,17 @@ export function App() {
       const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
       widgets.forEach((w) => {
         const k = (w.id || "").replace(/^widget_/, "");
+        const isTraffic =
+          k === "traffic_situation" ||
+          k === "traffic" ||
+          k === "tinh-huong-giao-thong" ||
+          k === "tinh_huong_giao_thong";
+
         const normKey =
           k === "safety_message"
             ? "safety"
-            : k === "traffic_situation"
-              ? "traffic"
+            : isTraffic
+              ? "tinh-huong-giao-thong"
               : k;
         if (w.imageUrl) {
           const entry = {
@@ -3000,7 +3034,11 @@ export function App() {
           cacheMap[normKey] = entry;
           cacheMap[w.id] = entry;
           if (normKey === "safety") cacheMap["safety_message"] = entry;
-          if (normKey === "traffic") cacheMap["traffic_situation"] = entry;
+          if (isTraffic) {
+            cacheMap["traffic_situation"] = entry;
+            cacheMap["traffic"] = entry;
+            cacheMap["tinh-huong-giao-thong"] = entry;
+          }
         }
       });
       localStorage.setItem("daily_posters", JSON.stringify(cacheMap));
@@ -3020,11 +3058,17 @@ export function App() {
         for (const w of widgets) {
           if (w.imageUrl) {
             const k = (w.id || "").replace(/^widget_/, "");
+            const isTraffic =
+              k === "traffic_situation" ||
+              k === "traffic" ||
+              k === "tinh-huong-giao-thong" ||
+              k === "tinh_huong_giao_thong";
+
             const standardKey =
               k === "safety_message"
                 ? "safety"
-                : k === "traffic_situation"
-                  ? "traffic"
+                : isTraffic
+                  ? "tinh-huong-giao-thong"
                   : k;
             const { error: upsertErr } = await supabase
               .from("daily_posters")
@@ -3040,6 +3084,34 @@ export function App() {
                 },
                 { onConflict: "id" },
               );
+            if (isTraffic) {
+              try {
+                await supabase
+                  .from("daily_posters")
+                  .upsert([
+                    {
+                      id: "traffic",
+                      title: w.title || w.categoryName || "",
+                      image_data: w.imageUrl,
+                      aspect_ratio: w.aspectRatioMode || "auto",
+                      category_name: w.categoryName || "",
+                      content: w.title || "",
+                      updated_at: nowIso,
+                    },
+                    {
+                      id: "traffic_situation",
+                      title: w.title || w.categoryName || "",
+                      image_data: w.imageUrl,
+                      aspect_ratio: w.aspectRatioMode || "auto",
+                      category_name: w.categoryName || "",
+                      content: w.title || "",
+                      updated_at: nowIso,
+                    }
+                  ], { onConflict: "id" });
+              } catch {
+                // ignore
+              }
+            }
             if (upsertErr) {
               console.error(
                 "[App] Supabase daily_posters upsert error for",
@@ -3901,9 +3973,11 @@ export function App() {
       />
 
       {/* 6. Modals (Suspense Code-Splitting) */}
-      <LoginModal
+      <AuthModal
         isOpen={authModal.isOpen}
+        initialTab={authModal.tab}
         onClose={() => setAuthModal({ isOpen: false, tab: "login" })}
+        setCurrentUser={setCurrentUser}
         onSuccess={(user) => {
           setCurrentUser(user);
         }}

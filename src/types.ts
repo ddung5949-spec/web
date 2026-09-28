@@ -70,6 +70,9 @@ export interface User {
   canUploadDocs?: boolean;
   canViewSecretDocs?: boolean;
   canViewCollaborativeEdits?: boolean;
+  canJoinPartyMeeting?: boolean;
+  can_join_party_meeting?: boolean;
+  [key: string]: any;
 }
 
 export type SectionType = 'ctd' | 'hl' | 'bac' | string;
@@ -122,6 +125,7 @@ export interface DocumentItem {
   fileName?: string;
   fileSize?: string;
   downloads?: number;
+  download_count?: number;
   fileUrl?: string;
   secretLevel?: 'normal' | 'mat' | 'toi_mat';
 }
