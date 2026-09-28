@@ -82,59 +82,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setLoginError(null);
 
-    const loginUsername = loginUser.trim();
-    const loginPassword = loginPass;
+    const inputEmail = loginUser.trim();
+    const inputPassword = loginPass;
 
-    if (!loginUsername || !loginPassword) {
-      setLoginError('Vui lòng nhập đầy đủ Tên tài khoản và Mật khẩu!');
+    if (!inputEmail || !inputPassword) {
+      setLoginError('Vui lòng nhập đầy đủ Email và Mật khẩu!');
       return;
     }
 
     setIsLoggingIn(true);
 
     try {
-      // 1. Kiểm tra tài khoản trực tiếp từ bảng users trên Supabase
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', loginUsername.trim())
-        .eq('password', loginPassword)
-        .maybeSingle();
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: inputEmail,
+        password: inputPassword,
+      });
 
-      if (error || !user) {
-        alert('❌ Sai tên tài khoản hoặc mật khẩu!');
-        setLoginError('Sai tên tài khoản hoặc mật khẩu!');
+      if (authError || !authData?.user) {
+        alert('❌ Sai email hoặc mật khẩu: ' + (authError?.message || 'Đăng nhập không thành công!'));
+        setLoginError(authError?.message || 'Sai email hoặc mật khẩu!');
         setIsLoggingIn(false);
         return;
       }
 
-      // Chuẩn hóa dữ liệu người dùng
-      const mappedUser = {
-        id: user.id,
-        username: user.username,
-        fullName: user.full_name || user.fullName || user.username,
-        full_name: user.full_name || user.fullName || user.username,
-        rankUnit: user.rank_unit || user.rankUnit || 'Trung đoàn 95',
-        rank_unit: user.rank_unit || user.rankUnit || 'Trung đoàn 95',
-        role: user.role || 'user',
-        avatar: user.avatar || '',
-        canViewDoc: user.can_view_doc ?? true,
-        canUploadDoc: user.can_upload_doc ?? false,
-        canJoinPartyMeeting: user.can_join_party_meeting ?? false,
-        ...user,
+      // Truy vấn thông tin profile:
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      // Nhận diện quyền Admin: nếu authData.user.email === 'ddung5949@gmail.com' HOẶC profile?.role === 'admin'
+      const fullUserData = {
+        id: authData.user.id,
+        email: authData.user.email,
+        full_name: profile?.full_name || 'Trung Dũng',
+        fullName: profile?.full_name || 'Trung Dũng',
+        avatar_url: profile?.avatar_url || '',
+        avatar: profile?.avatar_url || '',
+        role: (authData.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin') ? 'admin' : 'user',
+        unit: profile?.unit || 'Trung đoàn 95',
+        rankUnit: profile?.unit || 'Trung đoàn 95',
+        rank: profile?.rank || '',
+        position: profile?.position || '',
+        canViewDoc: true,
+        canUploadDoc: (authData.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin'),
       };
 
       if (setCurrentUser) {
-        setCurrentUser(mappedUser);
+        setCurrentUser(fullUserData);
       }
-      localStorage.setItem('current_user', JSON.stringify(mappedUser));
-      alert(`✅ Đăng nhập thành công! Chào mừng đồng chí ${user.full_name || user.username}`);
+      localStorage.setItem('current_user', JSON.stringify(fullUserData));
+      alert(`✅ Đăng nhập thành công! Chào mừng đồng chí ${fullUserData.full_name}`);
 
       if (onSuccess) {
-        onSuccess(mappedUser);
+        onSuccess(fullUserData);
       }
       if (onLogin) {
-        await Promise.resolve(onLogin(loginUsername, loginPassword));
+        await Promise.resolve(onLogin(inputEmail, inputPassword));
       }
 
       setLoginUser('');
@@ -143,8 +148,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error('[AuthModal] Login error:', err);
-      alert('❌ Sai tên tài khoản hoặc mật khẩu!');
-      setLoginError('Sai tên tài khoản hoặc mật khẩu!');
+      alert('❌ Sai email hoặc mật khẩu: ' + (err?.message || 'Lỗi xác thực'));
+      setLoginError(err?.message || 'Sai email hoặc mật khẩu!');
     } finally {
       setIsLoggingIn(false);
     }
@@ -158,7 +163,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const formData = {
       fullName: regFullName.trim(),
       rankUnit: regUnit.trim(),
-      username: regUsername.trim(),
+      email: regUsername.trim(),
       password: regPassword,
     };
 
@@ -170,8 +175,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setRegisterError('Vui lòng nhập Đơn vị / Bộ phận!');
       return;
     }
-    if (!formData.username) {
-      setRegisterError('Vui lòng nhập Tên tài khoản!');
+    if (!formData.email) {
+      setRegisterError('Vui lòng nhập Email đăng ký!');
       return;
     }
     if (!formData.password) {
@@ -190,31 +195,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsRegistering(true);
 
     try {
-      // 1. Thực hiện insert trực tiếp vào bảng users trên Supabase (Bỏ qua trường id để Supabase tự sinh int8)
-      const { data, error } = await supabase
-        .from('users')
-        .insert([{
-          username: formData.username.trim(),
-          password: formData.password,
-          full_name: formData.fullName || 'Cán bộ chiến sĩ',
-          rank_unit: formData.rankUnit || 'Trung đoàn 95',
-          role: 'user',
-        }]);
+      const regEmail = formData.email.includes('@') ? formData.email : `${formData.email}@gmail.com`;
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: regEmail,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            unit: formData.rankUnit,
+          },
+        },
+      });
 
-      if (error) {
-        alert('❌ Đăng ký thất bại: ' + error.message);
-        setRegisterError('Đăng ký thất bại: ' + error.message);
+      if (authError) {
+        alert('❌ Đăng ký thất bại: ' + authError.message);
+        setRegisterError('Đăng ký thất bại: ' + authError.message);
         setIsRegistering(false);
         return;
       }
 
-      // CHỈ ĐƯỢC báo thành công khi Supabase trả về error === null
+      if (authData?.user) {
+        await supabase.from('profiles').upsert([{
+          id: authData.user.id,
+          email: authData.user.email || regEmail,
+          full_name: formData.fullName || 'Cán bộ chiến sĩ',
+          unit: formData.rankUnit || 'Trung đoàn 95',
+          role: (regEmail === 'ddung5949@gmail.com') ? 'admin' : 'user',
+          updated_at: new Date().toISOString(),
+        }]);
+      }
+
       alert('✅ Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
       setRegisterSuccess('Đăng ký tài khoản thành công! Đồng chí có thể đăng nhập ngay.');
 
-      // Chuyển sang form đăng nhập và điền sẵn username
       setActiveTab('login');
-      setLoginUser(formData.username);
+      setLoginUser(regEmail);
       setLoginPass('');
       setRegFullName('');
       setRegUnit('');
@@ -299,17 +314,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-gray-500" />
-                  <span>Email hoặc tên tài khoản (*):</span>
+                  <span>Email đăng nhập (*):</span>
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   id="login-username-input"
                   value={loginUser}
                   onChange={(e) => {
                     setLoginUser(e.target.value);
                     if (loginError) setLoginError(null);
                   }}
-                  placeholder="Nhập email hoặc tên tài khoản..."
+                  placeholder="Nhập email (ví dụ: ddung5949@gmail.com)..."
                   className="w-full text-xs p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-hidden transition-all"
                   required
                   disabled={isLoggingIn}
@@ -435,21 +450,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Email / Tên tài khoản */}
+              {/* Email đăng ký */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-gray-500" />
-                  <span>Email / Tên tài khoản (*):</span>
+                  <span>Email đăng ký tài khoản (*):</span>
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   id="register-username-input"
                   value={regUsername}
                   onChange={(e) => {
                     setRegUsername(e.target.value);
                     if (registerError) setRegisterError(null);
                   }}
-                  placeholder="Nhập email hoặc tên tài khoản..."
+                  placeholder="Nhập địa chỉ email (ví dụ: ddung5949@gmail.com)..."
                   className="w-full text-xs p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-hidden transition-all"
                   required
                   disabled={isRegistering}

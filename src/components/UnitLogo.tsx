@@ -1,13 +1,23 @@
 import React from 'react';
 
-interface UnitLogoProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'hero';
+export type LogoEffectType = 'none' | 'glow' | 'shine' | '3d_shadow' | 'scale' | 'all';
+export type LogoSizePreset = 'small' | 'standard' | 'prominent' | 'large' | 'xlarge';
+
+export interface UnitLogoProps {
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'hero' | LogoSizePreset;
   customSizePx?: number;
   className?: string;
   withGlow?: boolean;
   withRotatingBeam?: boolean;
-  logoType?: 'official_vector' | 'custom_image';
+  with3DShadow?: boolean;
+  withHoverScale?: boolean;
+  logoType?: 'default' | 'custom' | 'official_vector' | 'custom_image';
+  logo_type?: 'default' | 'custom' | 'official_vector' | 'custom_image';
   customLogoUrl?: string;
+  logo_url?: string;
+  logoEffect?: LogoEffectType;
+  logo_effect?: LogoEffectType;
+  logo_size?: LogoSizePreset | number;
   slogan?: string;
   establishedDate?: string;
   onClick?: () => void;
@@ -17,47 +27,129 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
   size = 'md',
   customSizePx,
   className = '',
-  withGlow = true,
-  withRotatingBeam = true,
-  logoType = 'official_vector',
+  withGlow,
+  withRotatingBeam,
+  with3DShadow,
+  withHoverScale = true,
+  logoType,
+  logo_type,
   customLogoUrl,
+  logo_url,
+  logoEffect,
+  logo_effect,
+  logo_size,
   slogan = 'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG',
   establishedDate = '23/8/1945',
   onClick,
 }) => {
-  // Size mapping in Tailwind classes
-  const sizeClasses = {
-    xs: 'w-7 h-7',
-    sm: 'w-9 h-9',
-    md: 'w-11 h-11 sm:w-12 sm:h-12',
-    lg: 'w-14 h-14 sm:w-16 sm:h-16',
-    xl: 'w-20 h-20 sm:w-24 sm:h-24',
-    '2xl': 'w-28 h-28 sm:w-36 sm:h-36',
-    hero: 'w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56',
-  };
+  // Determine effective type: 'custom' if logo_type or logoType says custom/custom_image
+  const resolvedType = logo_type || logoType || 'official_vector';
+  const resolvedUrl = (logo_url || customLogoUrl || '').trim();
+  const isCustomImage =
+    (resolvedType === 'custom' || resolvedType === 'custom_image') &&
+    resolvedUrl !== '';
 
-  const isCustomImage = logoType === 'custom_image' && Boolean(customLogoUrl && customLogoUrl.trim() !== '');
+  // Determine effective effect
+  const effect = logo_effect || logoEffect || 'all';
+  const effectiveGlow =
+    withGlow !== undefined
+      ? withGlow
+      : effect === 'all' || effect === 'glow';
+  const effectiveBeam =
+    withRotatingBeam !== undefined
+      ? withRotatingBeam
+      : effect === 'all' || effect === 'shine';
+  const effective3DShadow =
+    with3DShadow !== undefined
+      ? with3DShadow
+      : effect === 'all' || effect === '3d_shadow';
+  const effectiveHoverScale =
+    withHoverScale !== undefined
+      ? withHoverScale
+      : effect === 'all' || effect === 'scale';
+
+  // Determine pixel size
+  let calculatedPx = customSizePx;
+  const rawSize = logo_size || size;
+  if (!calculatedPx) {
+    if (typeof rawSize === 'number') {
+      calculatedPx = rawSize;
+    } else {
+      switch (rawSize) {
+        case 'small':
+          calculatedPx = 36;
+          break;
+        case 'standard':
+          calculatedPx = 48;
+          break;
+        case 'prominent':
+          calculatedPx = 60;
+          break;
+        case 'large':
+          calculatedPx = 76;
+          break;
+        case 'xlarge':
+          calculatedPx = 90;
+          break;
+        case 'xs':
+          calculatedPx = 28;
+          break;
+        case 'sm':
+          calculatedPx = 36;
+          break;
+        case 'md':
+          calculatedPx = 48;
+          break;
+        case 'lg':
+          calculatedPx = 60;
+          break;
+        case 'xl':
+          calculatedPx = 80;
+          break;
+        case '2xl':
+          calculatedPx = 112;
+          break;
+        case 'hero':
+          calculatedPx = 192;
+          break;
+        default:
+          calculatedPx = 48;
+      }
+    }
+  }
 
   const customStyle: React.CSSProperties = {
     isolation: 'isolate',
-    ...(customSizePx ? { width: `${customSizePx}px`, height: `${customSizePx}px` } : {}),
+    width: `${calculatedPx}px`,
+    height: `${calculatedPx}px`,
+    minWidth: `${calculatedPx}px`,
+    minHeight: `${calculatedPx}px`,
   };
+
+  const [imageError, setImageError] = React.useState(false);
+
+  // Reset image error if URL changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [resolvedUrl]);
 
   return (
     <div
       onClick={onClick}
-      className={`relative inline-flex items-center justify-center rounded-full shrink-0 select-none ${
-        customSizePx ? '' : sizeClasses[size]
-      } ${className} ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+      className={`relative inline-flex items-center justify-center rounded-full shrink-0 select-none ${className} ${
+        onClick ? 'cursor-pointer' : ''
+      } ${effectiveHoverScale ? 'hover:scale-105 transition-transform duration-300' : ''} ${
+        effective3DShadow ? 'drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]' : ''
+      }`}
       style={customStyle}
     >
       {/* 1. Ambient Pulsing Glow behind the logo */}
-      {withGlow && (
+      {effectiveGlow && (
         <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-red-500 opacity-70 blur-xs animate-pulse pointer-events-none" />
       )}
 
       {/* 2. Rotating Glowing Light Beam running around the circular border */}
-      {withRotatingBeam && (
+      {effectiveBeam && (
         <div
           className="absolute -inset-[3px] rounded-full overflow-hidden pointer-events-none"
           style={{
@@ -79,7 +171,7 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
       )}
 
       {/* 3. Secondary fast laser beam spark */}
-      {withRotatingBeam && (
+      {effectiveBeam && (
         <div
           className="absolute -inset-[2px] rounded-full pointer-events-none"
           style={{
@@ -90,15 +182,15 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
       )}
 
       {/* 4. Display Logo: Either Custom Image or High-Precision Vector SVG */}
-      {isCustomImage ? (
+      {isCustomImage && !imageError ? (
         <div className="w-full h-full rounded-full overflow-hidden border-2 border-amber-400 bg-black/40 relative z-10 shadow-inner flex items-center justify-center">
           <img
-            src={customLogoUrl}
+            src={resolvedUrl}
             alt="Logo Đơn vị"
             className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback to default if custom image fails to load
-              (e.target as HTMLElement).style.display = 'none';
+            onError={() => {
+              // Fallback to official vector if custom image fails to load
+              setImageError(true);
             }}
           />
         </div>

@@ -54,7 +54,7 @@ import {
   SiteConfig,
 } from '../../types';
 import { defaultCategoriesConfig, defaultDailyWidgets, defaultNavTabs, defaultSiteConfig } from '../../data/initialData';
-import { UnitLogo } from '../UnitLogo';
+import { UnitLogo, LogoEffectType, LogoSizePreset } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
 import { getSupabase } from '../../utils/supabase';

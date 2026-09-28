@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { LectureItem, User } from '../../types';
 import { toast } from '../Toast';
+import { supabase } from '../../utils/supabase';
 
 interface AddLectureModalProps {
   isOpen: boolean;
@@ -159,7 +160,7 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !author.trim()) {
       toast.warning('Thiếu thông tin bắt buộc', 'Vui lòng điền đầy đủ Tên bài giảng và Giáo viên biên soạn (*)!');
@@ -178,7 +179,7 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         ? `${finalCode.replace(/[^a-zA-Z0-9_-]/g, '_')}_${cleanTitle.slice(0, 30)}.xlsx`
         : `${finalCode.replace(/[^a-zA-Z0-9_-]/g, '_')}_${cleanTitle.slice(0, 30)}.pdf`);
 
-    const finalFileSize = fileSize.trim() || '10.5 MB';
+    const finalFileSize = fileSize.trim() || '5.0 MB';
 
     if (isEditing && lectureToEdit && onUpdateLecture) {
       onUpdateLecture({
@@ -197,6 +198,28 @@ export const AddLectureModal: React.FC<AddLectureModalProps> = ({
         fileUrl: fileUrl.trim() || lectureToEdit.fileUrl || '',
       });
     } else {
+      const { error } = await supabase.from('lectures').insert([{
+        id: crypto.randomUUID(),
+        title: cleanTitle,
+        category: 'BÀI GIẢNG SỐ',
+        sub_category: category || 'Giáo án Chính trị',
+        instructor: author.trim() || 'Giáo viên đơn vị',
+        author: author.trim() || 'Trung đoàn 95',
+        target: target.trim() || 'Toàn thể cán bộ, chiến sĩ',
+        file_name: finalFileName,
+        file_url: fileUrl.trim() || '#',
+        file_type: (fileType || 'PPTX').toUpperCase(),
+        file_size: finalFileSize,
+        downloads: 0,
+        download_count: 0,
+        published_at: new Date().toISOString()
+      }]);
+
+      if (error) {
+        alert('Lỗi: ' + error.message);
+        return;
+      }
+
       const today = new Date();
       const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(
         today.getMonth() + 1

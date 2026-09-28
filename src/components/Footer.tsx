@@ -3,6 +3,7 @@ import { Sliders } from 'lucide-react';
 import { PageView, SiteConfig, User } from '../types';
 import { BackToTop } from './BackToTop';
 import { FooterManagerModal } from './modals/FooterManagerModal';
+import { UnitLogo } from './UnitLogo';
 
 interface FooterProps {
   siteConfig: SiteConfig;
@@ -56,10 +57,30 @@ export const Footer: React.FC<FooterProps> = ({
     siteConfig?.slogan ||
     'ĐOÀN KẾT - KIÊN CƯỜNG - THẦN TỐC - TÁO BẠO - QUYẾT THẮNG';
 
-  const logoSrc =
-    siteConfig?.logo_url ||
-    siteConfig?.customLogoUrl ||
-    '/logo.png';
+  // Calculate Header and Footer balanced Logo dimensions
+  let headerLogoSize = 48;
+  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize || siteConfig?.logoSizePx;
+  if (typeof rawHeaderSize === 'number') {
+    headerLogoSize = rawHeaderSize;
+  } else if (rawHeaderSize === 'small') {
+    headerLogoSize = 36;
+  } else if (rawHeaderSize === 'standard') {
+    headerLogoSize = 48;
+  } else if (rawHeaderSize === 'prominent') {
+    headerLogoSize = 60;
+  } else if (rawHeaderSize === 'large') {
+    headerLogoSize = 76;
+  } else if (rawHeaderSize === 'xlarge') {
+    headerLogoSize = 90;
+  }
+
+  const footerLogoPx =
+    siteConfig?.footerLogoSizePx ||
+    Math.max(28, Math.min(Math.round(headerLogoSize * 0.85), 52));
+
+  const showFooterLogo =
+    siteConfig?.footer_config?.toggles?.show_logo ??
+    (siteConfig?.footerShowLogo !== false);
 
   const showBackToTop =
     siteConfig?.footer_config?.toggles?.show_back_to_top ??
@@ -107,16 +128,23 @@ export const Footer: React.FC<FooterProps> = ({
 
           {/* Hàng nội dung chính: Logo đơn vị chính thức + Tên cổng thông tin & Đơn vị (1 hàng ngang, flex-wrap) */}
           <div className="flex items-center justify-center gap-2 sm:gap-2.5 text-center flex-wrap px-1 max-w-full">
-            {/* Ảnh Logo đơn vị chính thức lấy từ Header */}
-            <img
-              src={logoSrc}
-              alt="Logo Đơn vị"
-              className="w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow shrink-0"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src =
-                  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="46" fill="%23B91C1C" stroke="%23FBBF24" stroke-width="5"/%3E%3Cpolygon points="50,14 61,38 86,38 66,54 74,78 50,63 26,78 34,54 14,38 39,38" fill="%23FBBF24"/%3E%3C/svg%3E';
-              }}
-            />
+            {/* Logo đơn vị đồng bộ hoàn toàn với Header */}
+            {showFooterLogo && (
+              <UnitLogo
+                customSizePx={footerLogoPx}
+                logo_type={siteConfig?.logo_type || siteConfig?.logoType}
+                logoType={siteConfig?.logo_type || siteConfig?.logoType}
+                logo_url={siteConfig?.logo_url || siteConfig?.customLogoUrl}
+                customLogoUrl={siteConfig?.logo_url || siteConfig?.customLogoUrl}
+                logo_effect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+                logoEffect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+                withGlow={siteConfig?.enableLogoGlow}
+                withRotatingBeam={siteConfig?.enableLogoBeam}
+                slogan={siteConfig?.slogan}
+                establishedDate={siteConfig?.establishedDate}
+                className="shrink-0"
+              />
+            )}
 
             <p
               className="font-bold text-[10px] sm:text-xs uppercase tracking-wide leading-tight text-center break-words"

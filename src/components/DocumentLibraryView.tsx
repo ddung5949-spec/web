@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronRight,
   Download,
@@ -14,16 +14,20 @@ import {
   Home,
   Layers,
   Lock,
+  PlusCircle,
   Presentation,
+  Save,
   Search,
   Shield,
   ShieldAlert,
   Trash2,
+  UploadCloud,
   User,
   X,
 } from "lucide-react";
 import { DocumentItem, PageView, SiteConfig, User as UserType } from "../types";
 import { CategoryManagerModal } from "./modals/CategoryManagerModal";
+import { supabase } from "../utils/supabase";
 
 interface DocumentLibraryViewProps {
   documents: DocumentItem[];
@@ -55,7 +59,7 @@ const DEFAULT_DOC_CATEGORIES = [
 ];
 
 export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
-  documents,
+  documents: initialDocuments,
   currentUser,
   siteConfig,
   selectedSubcategory = "all",
@@ -79,13 +83,112 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
     (isAdmin || currentUser.canUploadDoc || currentUser.role === "editor")
   );
 
+  const [documents, setDocuments] = useState<any[]>(initialDocuments || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFileType, setSelectedFileType] = useState<string>("all");
   const [localCategory, setLocalCategory] = useState<string>(
     selectedSubcategory || "all"
   );
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+
+  // Modal tải lên văn bản mới
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isSubmittingDoc, setIsSubmittingDoc] = useState(false);
+  const [formData, setFormData] = useState({
+    documentNumber: "",
+    title: "",
+    subCategory: "Nghị quyết - Chỉ thị",
+    issuingBody: "Trung đoàn 95",
+    signer: "Chỉ huy đơn vị",
+    fileName: "van-ban.pdf",
+    fileUrl: "#",
+    fileType: "PDF",
+    fileSize: "1.5 MB",
+  });
+
+  // Tải danh sách văn bản vĩnh viễn từ Supabase
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('published_at', { ascending: false });
+      if (data && data.length > 0) {
+        setDocuments(data);
+      } else if (initialDocuments && initialDocuments.length > 0) {
+        setDocuments(initialDocuments);
+      }
+    } catch (err) {
+      console.warn("fetchDocuments error:", err);
+      if (initialDocuments) setDocuments(initialDocuments);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  // Lưu văn bản trực tiếp vào Supabase
+  const handleSaveDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title.trim()) {
+      alert("Vui lòng nhập trích yếu văn bản!");
+      return;
+    }
+
+    setIsSubmittingDoc(true);
+    const docNumber = formData.documentNumber.trim() || 'Số: ...';
+    const issuer = formData.issuingBody.trim() || 'Trung đoàn 95';
+
+    try {
+      const { error } = await supabase.from('documents').insert([{
+        id: crypto.randomUUID(),
+        document_number: docNumber,
+        code: docNumber,
+        title: formData.title.trim(),
+        category: 'VĂN BẢN - CHỈ THỊ',
+        sub_category: formData.subCategory || 'Nghị quyết - Chỉ thị',
+        issuing_body: issuer,
+        issuer: issuer,
+        signer: formData.signer || 'Chỉ huy đơn vị',
+        file_name: formData.fileName || 'van-ban.pdf',
+        file_url: formData.fileUrl || '#',
+        file_type: formData.fileType || 'PDF',
+        type: (formData.fileType || 'PDF').toLowerCase(),
+        file_size: formData.fileSize || '1.5 MB',
+        downloads: 0,
+        download_count: 0,
+        published_at: new Date().toISOString(),
+        date: new Date().toISOString().slice(0, 10),
+      }]);
+
+      if (error) {
+        alert('Lỗi: ' + error.message);
+        setIsSubmittingDoc(false);
+        return;
+      }
+
+      alert('✅ Lưu văn bản thành công!');
+      setIsUploadModalOpen(false);
+      setFormData({
+        documentNumber: "",
+        title: "",
+        subCategory: "Nghị quyết - Chỉ thị",
+        issuingBody: "Trung đoàn 95",
+        signer: "Chỉ huy đơn vị",
+        fileName: "van-ban.pdf",
+        fileUrl: "#",
+        fileType: "PDF",
+        fileSize: "1.5 MB",
+      });
+      await fetchDocuments();
+    } catch (err: any) {
+      alert('Lỗi: ' + (err?.message || 'Không thể lưu văn bản'));
+    } finally {
+      setIsSubmittingDoc(false);
+    }
+  };
 
   const handleBack = onBackHome || onGoHome;
 
@@ -605,7 +708,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {/* Số / Ký hiệu */}
                           <span className="font-mono text-[11px] font-black text-emerald-950 bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 rounded shadow-2xs">
-                            {doc.code}
+                            {doc.document_number || doc.code}
                           </span>
 
                           {/* Mật badge */}
@@ -618,13 +721,13 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
 
                           {/* Category Badge */}
                           <span className="inline-block bg-teal-50 text-teal-800 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border border-teal-200">
-                            {(doc as any).sub_category || doc.category || "Văn bản"}
+                            {doc.sub_category || doc.subCategory || doc.category || "Văn bản"}
                           </span>
                         </div>
 
                         {/* Format Badge */}
                         <div className="flex items-center gap-1.5">
-                          {getFormatBadge(doc.type, doc.fileSize || "1.8 MB")}
+                          {getFormatBadge(doc.file_type || doc.type, doc.file_size || doc.fileSize || "1.5 MB")}
                         </div>
                       </div>
 
@@ -644,14 +747,14 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                       </p>
 
                       {/* Tệp đính kèm */}
-                      {doc.fileName && (
+                      {(doc.file_name || doc.fileName) && (
                         <div className="bg-gray-50 p-2 rounded-md border border-gray-200/80 flex items-center gap-2 text-[11px] text-gray-700">
-                          {getFormatIcon(doc.type)}
+                          {getFormatIcon(doc.file_type || doc.type)}
                           <span className="font-semibold truncate flex-1">
-                            {doc.fileName}
+                            {doc.file_name || doc.fileName}
                           </span>
                           <span className="text-[10px] text-gray-400 shrink-0">
-                            {doc.downloads || 0} lượt tải
+                            {doc.downloads ?? doc.download_count ?? 0} lượt tải
                           </span>
                         </div>
                       )}
@@ -661,8 +764,8 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                     <div className="bg-gray-50/80 p-3 px-4 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600">
                       <div className="flex items-center gap-1.5 font-medium truncate max-w-[180px]">
                         <User className="w-3.5 h-3.5 text-teal-800 shrink-0" />
-                        <span className="truncate" title={doc.issuer}>
-                          Ban hành: <strong>{doc.issuer}</strong>
+                        <span className="truncate" title={doc.issuing_body || doc.issuer}>
+                          Ban hành: <strong>{doc.issuing_body || doc.issuer || "Trung đoàn 95"}</strong>
                         </span>
                       </div>
 
@@ -861,6 +964,177 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
             if (onDeleteCategory) onDeleteCategory(catToDelete, fallbackCat);
           }}
         />
+      )}
+
+      {/* Upload Document Modal */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-green-950 text-white p-3.5 px-5 flex items-center justify-between border-b-2 border-amber-400">
+              <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                <FileText className="w-4 h-4 text-amber-300" />
+                <span>TẢI LÊN VĂN BẢN & CHỈ THỊ MỚI</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleSaveDocument} className="p-5 sm:p-6 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Số / Ký hiệu văn bản (*):
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.documentNumber}
+                    onChange={(e) => setFormData({ ...formData, documentNumber: e.target.value })}
+                    placeholder="Ví dụ: 01/TB-e95, 95/CT-ĐU..."
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nhóm danh mục:
+                  </label>
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden bg-white"
+                  >
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Trích yếu / Tiêu đề văn bản (*):
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Nhập trích yếu, nội dung tóm tắt của văn bản..."
+                  className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Cơ quan ban hành (*):
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.issuingBody}
+                    onChange={(e) => setFormData({ ...formData, issuingBody: e.target.value })}
+                    placeholder="Ví dụ: Trung đoàn 95, Ban Chính trị..."
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Người ký / Chức vụ:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.signer}
+                    onChange={(e) => setFormData({ ...formData, signer: e.target.value })}
+                    placeholder="Ví dụ: Chỉ huy đơn vị, Trung đoàn trưởng..."
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Tên tệp đính kèm:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fileName}
+                    onChange={(e) => setFormData({ ...formData, fileName: e.target.value })}
+                    placeholder="van-ban.pdf"
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Định dạng:
+                  </label>
+                  <select
+                    value={formData.fileType}
+                    onChange={(e) => setFormData({ ...formData, fileType: e.target.value })}
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden bg-white"
+                  >
+                    <option value="PDF">PDF</option>
+                    <option value="DOCX">Word (DOCX)</option>
+                    <option value="XLSX">Excel (XLSX)</option>
+                    <option value="PPTX">PowerPoint (PPTX)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Dung lượng:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fileSize}
+                    onChange={(e) => setFormData({ ...formData, fileSize: e.target.value })}
+                    placeholder="1.5 MB"
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Đường dẫn tệp / URL tải:
+                </label>
+                <input
+                  type="text"
+                  value={formData.fileUrl}
+                  onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
+                  placeholder="https://... hoặc #"
+                  className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                  disabled={isSubmittingDoc}
+                >
+                  HỦY BỎ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDoc}
+                  className="px-5 py-2 rounded-lg text-xs font-extrabold bg-teal-800 hover:bg-teal-900 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isSubmittingDoc ? "ĐANG LƯU..." : "LƯU VĂN BẢN VÀO KHO"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

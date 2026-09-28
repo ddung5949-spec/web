@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { DocumentItem } from '../../types';
 import { toast } from '../Toast';
+import { supabase } from '../../utils/supabase';
 
 interface AddDocModalProps {
   isOpen: boolean;
@@ -161,7 +162,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || !title.trim() || !issuer.trim()) {
       toast.warning('Thiếu thông tin bắt buộc', 'Vui lòng điền đầy đủ các trường thông tin bắt buộc (*)!');
@@ -170,8 +171,7 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
 
     const cleanCode = code.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
     const autoFileName = fileName.trim() || `${cleanCode}_${type}.${type}`;
-    const autoFileSize = fileSize.trim() || '1.8 MB';
-
+    const autoFileSize = fileSize.trim() || '1.5 MB';
     const safeIssuer = issuer.trim() || 'Trung đoàn 95';
 
     if (editingDoc && onUpdateDoc) {
@@ -194,6 +194,31 @@ export const AddDocModal: React.FC<AddDocModalProps> = ({
         secretLevel,
       });
     } else {
+      const { error } = await supabase.from('documents').insert([{
+        id: crypto.randomUUID(),
+        document_number: code.trim() || 'Số: ...',
+        code: code.trim() || 'Số: ...',
+        title: title.trim(),
+        category: 'VĂN BẢN - CHỈ THỊ',
+        sub_category: category || 'Nghị quyết - Chỉ thị',
+        issuing_body: safeIssuer,
+        issuer: safeIssuer,
+        signer: 'Chỉ huy đơn vị',
+        file_name: autoFileName,
+        file_url: fileUrl.trim() || '#',
+        file_type: type.toUpperCase(),
+        type: type.toLowerCase(),
+        file_size: autoFileSize,
+        downloads: 0,
+        download_count: 0,
+        published_at: new Date().toISOString()
+      }]);
+
+      if (error) {
+        alert('Lỗi: ' + error.message);
+        return;
+      }
+
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(
         now.getMonth() + 1

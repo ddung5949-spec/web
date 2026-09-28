@@ -214,11 +214,16 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <UnitLogo
               size="md"
+              logo_type={siteConfig.logo_type || siteConfig.logoType}
+              logoType={siteConfig.logo_type || siteConfig.logoType}
+              logo_url={siteConfig.logo_url || siteConfig.customLogoUrl}
+              customLogoUrl={siteConfig.logo_url || siteConfig.customLogoUrl}
+              logo_size={siteConfig.logo_size || siteConfig.logoSize || siteConfig.logoSizePx}
               customSizePx={siteConfig.logoSizePx}
-              withGlow={siteConfig.enableLogoGlow !== false}
-              withRotatingBeam={siteConfig.enableLogoBeam !== false}
-              logoType={siteConfig.logoType}
-              customLogoUrl={siteConfig.customLogoUrl}
+              logo_effect={siteConfig.logo_effect || siteConfig.logoEffect}
+              logoEffect={siteConfig.logo_effect || siteConfig.logoEffect}
+              withGlow={siteConfig.enableLogoGlow}
+              withRotatingBeam={siteConfig.enableLogoBeam}
               slogan={siteConfig.slogan}
               establishedDate={siteConfig.establishedDate}
             />

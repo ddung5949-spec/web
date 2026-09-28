@@ -379,11 +379,16 @@ export interface SiteConfig {
   colorGreen: string;
   fontSettings?: FontSettings;
   font_settings?: FontSettings;
-  logoType?: 'official_vector' | 'custom_image';
+  logoType?: 'default' | 'custom' | 'official_vector' | 'custom_image';
+  logo_type?: 'default' | 'custom' | 'official_vector' | 'custom_image';
   customLogoUrl?: string;
   logo_url?: string;
   enableLogoBeam?: boolean;
   enableLogoGlow?: boolean;
+  logo_effect?: 'none' | 'glow' | 'shine' | '3d_shadow' | 'scale' | 'all';
+  logoEffect?: 'none' | 'glow' | 'shine' | '3d_shadow' | 'scale' | 'all';
+  logo_size?: 'small' | 'standard' | 'prominent' | 'large' | 'xlarge' | number;
+  logoSize?: 'small' | 'standard' | 'prominent' | 'large' | 'xlarge' | number;
   logoSizePx?: number;
   footerLogoSizePx?: number;
   establishedDate?: string;

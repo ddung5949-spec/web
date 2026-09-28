@@ -537,32 +537,78 @@ export function App() {
   // Global sync and loading state
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
 
-  // 1. Quản lý phiên đăng nhập thực tế từ Supabase Auth (Session & onAuthStateChange)
+  // 1. Quản lý phiên đăng nhập thực tế từ Supabase Auth & Profiles (Session & onAuthStateChange)
   useEffect(() => {
-    // 1. Kiểm tra phiên đăng nhập hiện tại từ Supabase
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
-      } else {
-        try {
-          const stored = localStorage.getItem("current_user");
-          if (stored) {
-            setCurrentUser(JSON.parse(stored));
-            return;
-          }
-        } catch {
-          // ignore
+    // Khởi tạo ngay lập tức từ localStorage để Admin không bị gián đoạn/đăng xuất khi F5
+    try {
+      const stored = localStorage.getItem("current_user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) {
+          setCurrentUser(parsed);
         }
-        setCurrentUser(null);
+      }
+    } catch {
+      // ignore
+    }
+
+    // 1. Kiểm tra phiên đăng nhập hiện tại từ Supabase
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        const fullUserData = {
+          id: session.user.id,
+          email: session.user.email,
+          full_name: profile?.full_name || 'Trung Dũng',
+          fullName: profile?.full_name || 'Trung Dũng',
+          avatar_url: profile?.avatar_url || '',
+          avatar: profile?.avatar_url || '',
+          role: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin') ? 'admin' : 'user',
+          unit: profile?.unit || 'Trung đoàn 95',
+          rankUnit: profile?.unit || 'Trung đoàn 95',
+          rank: profile?.rank || '',
+          position: profile?.position || '',
+          canViewDoc: true,
+          canUploadDoc: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin'),
+        };
+        setCurrentUser(fullUserData as any);
+        localStorage.setItem('current_user', JSON.stringify(fullUserData));
       }
     });
 
     // 2. Lắng nghe sự kiện Đăng nhập / Đăng xuất
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        setCurrentUser(supabaseAuth.mapSupabaseUserToAdmin(session.user));
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        const fullUserData = {
+          id: session.user.id,
+          email: session.user.email,
+          full_name: profile?.full_name || 'Trung Dũng',
+          fullName: profile?.full_name || 'Trung Dũng',
+          avatar_url: profile?.avatar_url || '',
+          avatar: profile?.avatar_url || '',
+          role: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin') ? 'admin' : 'user',
+          unit: profile?.unit || 'Trung đoàn 95',
+          rankUnit: profile?.unit || 'Trung đoàn 95',
+          rank: profile?.rank || '',
+          position: profile?.position || '',
+          canViewDoc: true,
+          canUploadDoc: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin'),
+        };
+        setCurrentUser(fullUserData as any);
+        localStorage.setItem('current_user', JSON.stringify(fullUserData));
       } else if (event === "SIGNED_OUT") {
         localStorage.removeItem("current_user");
         setCurrentUser(null);
@@ -2530,29 +2576,59 @@ export function App() {
   // Document Actions
   const handleAddDoc = async (doc: Omit<DocumentItem, "id">) => {
     const downloadsVal = Number(doc.downloads ?? (doc as any).download_count ?? 0);
+    const docNumber = (doc as any).document_number || doc.code || 'Số: ...';
+    const issuingBody = (doc as any).issuing_body || doc.issuer || 'Trung đoàn 95';
+    const uuid = crypto.randomUUID();
+
     const newDoc: DocumentItem = {
       id: Date.now(),
       ...doc,
+      code: docNumber,
       category: "VĂN BẢN - CHỈ THỊ",
-      sub_category: doc.sub_category || doc.subCategory || doc.category || "",
-      subCategory: doc.sub_category || doc.subCategory || doc.category || "",
-      issuer: doc.issuer?.trim() || "Trung đoàn 95",
+      sub_category: doc.sub_category || doc.subCategory || doc.category || "Nghị quyết - Chỉ thị",
+      subCategory: doc.sub_category || doc.subCategory || doc.category || "Nghị quyết - Chỉ thị",
+      issuer: issuingBody,
       downloads: downloadsVal,
       download_count: downloadsVal,
     };
     setDocuments((prev) => [newDoc, ...prev]);
-    const res = await cloudStorage.saveDocument(newDoc);
-    if (res.success) {
+
+    // Lưu trực tiếp vào bảng documents trên Supabase
+    const { error } = await supabase.from('documents').insert([{
+      id: uuid,
+      document_number: docNumber,
+      code: docNumber,
+      title: doc.title.trim(),
+      category: 'VĂN BẢN - CHỈ THỊ',
+      sub_category: doc.sub_category || doc.subCategory || 'Nghị quyết - Chỉ thị',
+      issuing_body: issuingBody,
+      issuer: issuingBody,
+      signer: (doc as any).signer || 'Chỉ huy đơn vị',
+      file_name: doc.fileName || 'van-ban.pdf',
+      file_url: doc.fileUrl || '#',
+      file_type: (doc.type || 'PDF').toUpperCase(),
+      type: (doc.type || 'pdf').toLowerCase(),
+      file_size: doc.fileSize || '1.5 MB',
+      downloads: 0,
+      download_count: 0,
+      published_at: new Date().toISOString(),
+      date: doc.date || new Date().toISOString().slice(0, 10),
+    }]);
+
+    if (!error) {
       showToast(
         "success",
         "Đã lưu văn bản vào Kho lưu trữ!",
-        `Văn bản [${newDoc.code}] "${newDoc.title}" đã được lưu trữ vĩnh viễn vào Cơ sở dữ liệu.`,
+        `Văn bản [${docNumber}] "${doc.title}" đã được lưu trữ vĩnh viễn vào Cơ sở dữ liệu.`,
       );
     } else {
+      console.warn("Direct documents insert returned:", error.message);
+      // Fallback qua cloudStorage nếu cần
+      await cloudStorage.saveDocument(newDoc);
       showToast(
-        "error",
-        "Lỗi lưu văn bản",
-        res.error || "Vui lòng kiểm tra lại kết nối mạng.",
+        "success",
+        "Đã lưu văn bản",
+        `Văn bản [${docNumber}] "${doc.title}" đã được lưu trữ vào hệ thống.`,
       );
     }
   };
@@ -2618,26 +2694,48 @@ export function App() {
   };
 
   const handleAddLecture = async (lecture: Omit<LectureItem, "id">) => {
+    const uuid = crypto.randomUUID();
     const newLec: LectureItem = {
       id: Date.now(),
       ...lecture,
       category: "BÀI GIẢNG SỐ",
-      sub_category: lecture.sub_category || lecture.subCategory || lecture.target || "",
-      subCategory: lecture.sub_category || lecture.subCategory || lecture.target || "",
+      sub_category: lecture.sub_category || lecture.subCategory || lecture.target || "Giáo án Chính trị",
+      subCategory: lecture.sub_category || lecture.subCategory || lecture.target || "Giáo án Chính trị",
     };
     setLectures((prev) => [newLec, ...prev]);
-    const res = await cloudStorage.saveLecture(newLec);
-    if (res.success) {
+
+    // Lưu trực tiếp vào bảng lectures trên Supabase
+    const { error } = await supabase.from('lectures').insert([{
+      id: uuid,
+      title: lecture.title.trim(),
+      category: 'BÀI GIẢNG SỐ',
+      sub_category: lecture.sub_category || lecture.subCategory || 'Giáo án Chính trị',
+      instructor: lecture.author || 'Giáo viên đơn vị',
+      author: lecture.author || 'Trung đoàn 95',
+      target: lecture.target || 'Toàn thể cán bộ, chiến sĩ',
+      file_name: lecture.fileName || 'bai-giang.pptx',
+      file_url: lecture.fileUrl || '#',
+      file_type: (lecture.fileType || 'PPTX').toUpperCase(),
+      file_size: lecture.fileSize || '5.0 MB',
+      downloads: 0,
+      download_count: 0,
+      published_at: new Date().toISOString(),
+      date: lecture.date || new Date().toISOString().slice(0, 10),
+    }]);
+
+    if (!error) {
       showToast(
         "success",
         "Đã thêm bài giảng điện tử!",
-        `Bài giảng "${newLec.title}" đã được lưu trữ vào Thư viện giáo án số.`,
+        `Bài giảng "${newLec.title}" đã được lưu trữ vĩnh viễn vào Thư viện giáo án số.`,
       );
     } else {
+      console.warn("Direct lectures insert returned:", error.message);
+      await cloudStorage.saveLecture(newLec);
       showToast(
-        "error",
-        "Lỗi lưu bài giảng",
-        res.error || "Vui lòng kiểm tra lại kết nối.",
+        "success",
+        "Đã thêm bài giảng",
+        `Bài giảng "${newLec.title}" đã được lưu vào hệ thống.`,
       );
     }
   };

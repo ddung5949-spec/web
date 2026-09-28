@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronRight,
   Crosshair,
@@ -19,14 +19,17 @@ import {
   Layers,
   PlusCircle,
   Presentation,
+  Save,
   Search,
   Shield,
   Trash2,
+  UploadCloud,
   User,
   X,
 } from "lucide-react";
 import { LectureItem, PageView, SiteConfig, User as UserType } from "../types";
 import { CategoryManagerModal } from "./modals/CategoryManagerModal";
+import { supabase } from "../utils/supabase";
 
 interface LectureLibraryViewProps {
   lectures: LectureItem[];
@@ -46,7 +49,7 @@ interface LectureLibraryViewProps {
 }
 
 export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
-  lectures,
+  lectures: initialLectures,
   currentUser,
   siteConfig,
   onOpenAddLectureModal,
@@ -66,11 +69,105 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
     currentUser &&
     (isAdmin || currentUser.canUploadDoc || currentUser.role === "editor")
   );
+
+  const [lectures, setLectures] = useState<any[]>(initialLectures || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFileType, setSelectedFileType] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [previewLecture, setPreviewLecture] = useState<LectureItem | null>(null);
+  const [previewLecture, setPreviewLecture] = useState<any | null>(null);
+
+  // Modal tải lên bài giảng số mới
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isSubmittingLecture, setIsSubmittingLecture] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    subCategory: "Giáo án Chính trị",
+    instructor: "Giáo viên đơn vị",
+    author: "Trung đoàn 95",
+    target: "Toàn thể cán bộ, chiến sĩ",
+    fileName: "bai-giang.pptx",
+    fileUrl: "#",
+    fileType: "PPTX",
+    fileSize: "5.0 MB",
+  });
+
+  // Tải trực tiếp bài giảng từ Supabase
+  const fetchLectures = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lectures')
+        .select('*')
+        .order('published_at', { ascending: false });
+      if (data && data.length > 0) {
+        setLectures(data);
+      } else if (initialLectures && initialLectures.length > 0) {
+        setLectures(initialLectures);
+      }
+    } catch (err) {
+      console.warn("fetchLectures error:", err);
+      if (initialLectures) setLectures(initialLectures);
+    }
+  };
+
+  useEffect(() => {
+    fetchLectures();
+  }, []);
+
+  // Lưu bài giảng số trực tiếp vào Supabase
+  const handleSaveLecture = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title.trim()) {
+      alert("Vui lòng nhập tên bài giảng!");
+      return;
+    }
+
+    setIsSubmittingLecture(true);
+    try {
+      const { error } = await supabase.from('lectures').insert([{
+        id: crypto.randomUUID(),
+        title: formData.title.trim(),
+        category: 'BÀI GIẢNG SỐ',
+        sub_category: formData.subCategory || 'Giáo án Chính trị',
+        instructor: formData.instructor || 'Giáo viên đơn vị',
+        author: formData.author || 'Trung đoàn 95',
+        target: formData.target || 'Toàn thể cán bộ, chiến sĩ',
+        file_name: formData.fileName || 'bai-giang.pptx',
+        file_url: formData.fileUrl || '#',
+        file_type: formData.fileType || 'PPTX',
+        file_size: formData.fileSize || '5.0 MB',
+        downloads: 0,
+        download_count: 0,
+        published_at: new Date().toISOString(),
+        date: new Date().toISOString().slice(0, 10),
+      }]);
+
+      if (error) {
+        alert('Lỗi: ' + error.message);
+        setIsSubmittingLecture(false);
+        return;
+      }
+
+      alert('✅ Lưu bài giảng thành công!');
+      setIsUploadModalOpen(false);
+      setFormData({
+        title: "",
+        subCategory: "Giáo án Chính trị",
+        instructor: "Giáo viên đơn vị",
+        author: "Trung đoàn 95",
+        target: "Toàn thể cán bộ, chiến sĩ",
+        fileName: "bai-giang.pptx",
+        fileUrl: "#",
+        fileType: "PPTX",
+        fileSize: "5.0 MB",
+      });
+      await fetchLectures();
+    } catch (err: any) {
+      alert('Lỗi: ' + (err?.message || 'Không thể lưu bài giảng'));
+    } finally {
+      setIsSubmittingLecture(false);
+    }
+  };
 
   const handleBack = onBackHome || onGoHome;
 
@@ -784,6 +881,175 @@ export const LectureLibraryView: React.FC<LectureLibraryViewProps> = ({
           onRenameCategory={onRenameCategory}
           onDeleteCategory={onDeleteCategory}
         />
+      )}
+
+      {/* Upload Lecture Modal */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-950 text-white p-3.5 px-5 flex items-center justify-between border-b-2 border-amber-400">
+              <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                <Laptop className="w-4 h-4 text-amber-300" />
+                <span>TẢI LÊN BÀI GIẢNG ĐIỆN TỬ & GIÁO ÁN MỚI</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleSaveLecture} className="p-5 sm:p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Tên bài giảng / Giáo án (*):
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Nhập tên bài giảng điện tử..."
+                  className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nhóm danh mục:
+                  </label>
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden bg-white"
+                  >
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Đối tượng huấn luyện:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.target}
+                    onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                    placeholder="Ví dụ: Sĩ quan, QNCN, Hạ sĩ quan - Binh sĩ..."
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Giáo viên đơn vị:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.instructor}
+                    onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                    placeholder="Ví dụ: Thiếu tá Nguyễn Văn A..."
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Cơ quan / Đơn vị biên soạn:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.author}
+                    onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                    placeholder="Trung đoàn 95"
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Tên tệp đính kèm:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fileName}
+                    onChange={(e) => setFormData({ ...formData, fileName: e.target.value })}
+                    placeholder="bai-giang.pptx"
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Định dạng:
+                  </label>
+                  <select
+                    value={formData.fileType}
+                    onChange={(e) => setFormData({ ...formData, fileType: e.target.value })}
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden bg-white"
+                  >
+                    <option value="PPTX">PowerPoint (PPTX)</option>
+                    <option value="PDF">PDF</option>
+                    <option value="DOCX">Word (DOCX)</option>
+                    <option value="XLSX">Excel (XLSX)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Dung lượng:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fileSize}
+                    onChange={(e) => setFormData({ ...formData, fileSize: e.target.value })}
+                    placeholder="5.0 MB"
+                    className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Đường dẫn tệp / URL:
+                </label>
+                <input
+                  type="text"
+                  value={formData.fileUrl}
+                  onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
+                  placeholder="https://... hoặc #"
+                  className="w-full text-xs p-2.5 border border-gray-300 rounded-lg focus:border-teal-700 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer"
+                  disabled={isSubmittingLecture}
+                >
+                  HỦY BỎ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingLecture}
+                  className="px-5 py-2 rounded-lg text-xs font-extrabold bg-teal-800 hover:bg-teal-900 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isSubmittingLecture ? "ĐANG LƯU..." : "LƯU BÀI GIẢNG VÀO THƯ VIỆN"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
