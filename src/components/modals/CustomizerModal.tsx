@@ -69,6 +69,7 @@ interface CustomizerModalProps {
     config: SiteConfig,
     categoryRenames?: { sectionKey: SectionType; oldName: string; newName: string }[]
   ) => void;
+  onUpdateSiteConfig?: (updatedConfig: Partial<SiteConfig>) => void;
 }
 
 type TabType = 'logo' | 'ticker' | 'sections' | 'menu' | 'theme' | 'typography' | 'footer' | 'backup';
@@ -80,6 +81,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   articles = [],
   onClose,
   onSave,
+  onUpdateSiteConfig,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('logo');
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -154,14 +156,51 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
   const [colorRed, setColorRed] = useState(siteConfig?.colorRed || '#b91c1c');
   const [colorGreen, setColorGreen] = useState(siteConfig?.colorGreen || '#143d2b');
   const [establishedDate, setEstablishedDate] = useState(siteConfig?.establishedDate || '23/8/1945');
-  const [logoType, setLogoType] = useState<'official_vector' | 'custom_image'>(
-    siteConfig?.logoType || 'official_vector'
+
+  // Tab 1 Logo & Identity States
+  const initialLogoType: 'default' | 'custom' =
+    siteConfig?.logo_type === 'custom' || siteConfig?.logoType === 'custom' || siteConfig?.logoType === 'custom_image'
+      ? 'custom'
+      : 'default';
+  const [logoType, setLogoType] = useState<'default' | 'custom'>(initialLogoType);
+  const [customLogoUrl, setCustomLogoUrl] = useState(
+    siteConfig?.logo_url || siteConfig?.customLogoUrl || ''
   );
-  const [customLogoUrl, setCustomLogoUrl] = useState(siteConfig?.customLogoUrl || '');
-  const [enableLogoBeam, setEnableLogoBeam] = useState(siteConfig?.enableLogoBeam !== false);
-  const [enableLogoGlow, setEnableLogoGlow] = useState(siteConfig?.enableLogoGlow !== false);
-  const [logoSizePx, setLogoSizePx] = useState(siteConfig?.logoSizePx || 48);
-  const [footerLogoSizePx, setFooterLogoSizePx] = useState(siteConfig?.footerLogoSizePx || 38);
+
+  const initialPreset: LogoSizePreset = (() => {
+    const raw = siteConfig?.logo_size || siteConfig?.logoSize;
+    if (raw === 'small' || raw === 'standard' || raw === 'prominent' || raw === 'large' || raw === 'xlarge') {
+      return raw;
+    }
+    if (siteConfig?.logoSizePx === 36) return 'small';
+    if (siteConfig?.logoSizePx === 60) return 'prominent';
+    if (siteConfig?.logoSizePx === 76) return 'large';
+    if (siteConfig?.logoSizePx === 90) return 'xlarge';
+    return 'standard';
+  })();
+  const [logoSizePreset, setLogoSizePreset] = useState<LogoSizePreset>(initialPreset);
+  const [logoSizePx, setLogoSizePx] = useState(
+    siteConfig?.logoSizePx ||
+    (initialPreset === 'small' ? 36 : initialPreset === 'prominent' ? 60 : initialPreset === 'large' ? 76 : initialPreset === 'xlarge' ? 90 : 48)
+  );
+  const [footerLogoSizePx, setFooterLogoSizePx] = useState(
+    siteConfig?.footerLogoSizePx ||
+    Math.max(28, Math.min(Math.round((siteConfig?.logoSizePx || 48) * 0.85), 65))
+  );
+  const [logoEffect, setLogoEffect] = useState<LogoEffectType>(
+    siteConfig?.logo_effect || siteConfig?.logoEffect || 'all'
+  );
+  const [enableLogoBeam, setEnableLogoBeam] = useState(
+    siteConfig?.enableLogoBeam !== undefined
+      ? siteConfig.enableLogoBeam
+      : (siteConfig?.logo_effect === 'all' || siteConfig?.logo_effect === 'shine' || siteConfig?.logoEffect === 'all' || siteConfig?.logoEffect === 'shine')
+  );
+  const [enableLogoGlow, setEnableLogoGlow] = useState(
+    siteConfig?.enableLogoGlow !== undefined
+      ? siteConfig.enableLogoGlow
+      : (siteConfig?.logo_effect === 'all' || siteConfig?.logo_effect === 'glow' || siteConfig?.logoEffect === 'all' || siteConfig?.logoEffect === 'glow')
+  );
+  const [isSyncingLogo, setIsSyncingLogo] = useState(false);
 
   // Font Size & Typography Settings
   const [scalePreset, setScalePreset] = useState<'standard' | 'large' | 'very_large' | 'maximum' | 'custom'>(
@@ -320,12 +359,42 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       setColorRed(siteConfig?.colorRed || '#b91c1c');
       setColorGreen(siteConfig?.colorGreen || '#143d2b');
       setEstablishedDate(siteConfig?.establishedDate || '23/8/1945');
-      setLogoType(siteConfig?.logoType || 'official_vector');
-      setCustomLogoUrl(siteConfig?.customLogoUrl || '');
-      setEnableLogoBeam(siteConfig?.enableLogoBeam !== false);
-      setEnableLogoGlow(siteConfig?.enableLogoGlow !== false);
-      setLogoSizePx(siteConfig?.logoSizePx || 48);
-      setFooterLogoSizePx(siteConfig?.footerLogoSizePx || 38);
+      const effLogoType: 'default' | 'custom' =
+        siteConfig?.logo_type === 'custom' || siteConfig?.logoType === 'custom' || siteConfig?.logoType === 'custom_image'
+          ? 'custom'
+          : 'default';
+      setLogoType(effLogoType);
+      setCustomLogoUrl(siteConfig?.logo_url || siteConfig?.customLogoUrl || '');
+      const effPreset: LogoSizePreset = (() => {
+        const raw = siteConfig?.logo_size || siteConfig?.logoSize;
+        if (raw === 'small' || raw === 'standard' || raw === 'prominent' || raw === 'large' || raw === 'xlarge') {
+          return raw;
+        }
+        if (siteConfig?.logoSizePx === 36) return 'small';
+        if (siteConfig?.logoSizePx === 60) return 'prominent';
+        if (siteConfig?.logoSizePx === 76) return 'large';
+        if (siteConfig?.logoSizePx === 90) return 'xlarge';
+        return 'standard';
+      })();
+      setLogoSizePreset(effPreset);
+      const effLogoSizePx = siteConfig?.logoSizePx || (effPreset === 'small' ? 36 : effPreset === 'prominent' ? 60 : effPreset === 'large' ? 76 : effPreset === 'xlarge' ? 90 : 48);
+      setLogoSizePx(effLogoSizePx);
+      setFooterLogoSizePx(
+        siteConfig?.footerLogoSizePx ||
+        Math.max(28, Math.min(Math.round(effLogoSizePx * 0.85), 65))
+      );
+      const effEffect: LogoEffectType = siteConfig?.logo_effect || siteConfig?.logoEffect || 'all';
+      setLogoEffect(effEffect);
+      setEnableLogoBeam(
+        siteConfig?.enableLogoBeam !== undefined
+          ? siteConfig.enableLogoBeam
+          : (effEffect === 'all' || effEffect === 'shine')
+      );
+      setEnableLogoGlow(
+        siteConfig?.enableLogoGlow !== undefined
+          ? siteConfig.enableLogoGlow
+          : (effEffect === 'all' || effEffect === 'glow')
+      );
       const tMode = siteConfig?.marquee_mode || siteConfig?.tickerMode || 'combined';
       setTickerMode((tMode === 'today' ? 'auto_today' : tMode === 'recent_days' ? 'auto_days' : tMode) as any);
       setTickerDays(Number(siteConfig?.marquee_days ?? siteConfig?.tickerDays ?? 3));
@@ -483,10 +552,75 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       const result = loadEvent.target?.result as string;
       if (result) {
         setCustomLogoUrl(result);
-        setLogoType('custom_image');
+        setLogoType('custom');
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // LƯU & ĐỒNG BỘ LOGO REALTIME THEO YÊU CẦU TAB 1
+  const handleSyncLogoRealtime = async () => {
+    setIsSyncingLogo(true);
+    try {
+      const resolvedSizePreset = logoSizePreset;
+      const updatedConfig: SiteConfig = {
+        ...siteConfig,
+        title: title.trim(),
+        subtitle: subtitle.trim(),
+        slogan: slogan.trim(),
+        establishedDate: establishedDate.trim(),
+        logo_type: logoType,
+        logoType: logoType,
+        logo_url: logoType === 'custom' ? customLogoUrl.trim() : '',
+        customLogoUrl: logoType === 'custom' ? customLogoUrl.trim() : '',
+        logo_size: resolvedSizePreset,
+        logoSize: resolvedSizePreset,
+        logoSizePx,
+        footerLogoSizePx,
+        logo_effect: logoEffect,
+        logoEffect: logoEffect,
+        enableLogoBeam: logoEffect === 'all' || logoEffect === 'shine',
+        enableLogoGlow: logoEffect === 'all' || logoEffect === 'glow',
+      };
+
+      // 1. Lưu cấu hình vào site_config trên Supabase
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('site_config').upsert(
+            {
+              id: 'default',
+              ...updatedConfig,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
+        } catch (dbErr) {
+          console.warn('[CustomizerModal] Supabase logo sync notice:', dbErr);
+        }
+      }
+
+      // 2. Lưu vào localStorage cache
+      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      safeStore.set('mangyang_site_config', updatedConfig);
+
+      // 3. Cập nhật tức thì vào State toàn cục của ứng dụng (không cần F5)
+      if (onUpdateSiteConfig) {
+        onUpdateSiteConfig(updatedConfig);
+      } else {
+        onSave(updatedConfig);
+      }
+
+      toast.success(
+        'ĐÃ LƯU & ĐỒNG BỘ LOGO THÀNH CÔNG!',
+        `Logo ${logoType === 'custom' ? 'Riêng tải lên' : 'Quân kỳ chuẩn'} (${logoSizePx}px) và hiệu ứng đã cập nhật tức thì trên cả Header và Footer.`
+      );
+    } catch (e: any) {
+      toast.error('Lỗi khi đồng bộ Logo', e?.message || 'Không thể đồng bộ');
+    } finally {
+      setIsSyncingLogo(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1077,12 +1211,18 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       ticker: ticker.trim(),
       colorRed,
       colorGreen,
-      logoType,
-      customLogoUrl: customLogoUrl.trim(),
-      enableLogoBeam,
-      enableLogoGlow,
+      logo_type: logoType,
+      logoType: logoType,
+      logo_url: logoType === 'custom' ? customLogoUrl.trim() : '',
+      customLogoUrl: logoType === 'custom' ? customLogoUrl.trim() : '',
+      logo_size: logoSizePreset,
+      logoSize: logoSizePreset,
       logoSizePx,
       footerLogoSizePx,
+      logo_effect: logoEffect,
+      logoEffect: logoEffect,
+      enableLogoBeam: logoEffect === 'all' || logoEffect === 'shine',
+      enableLogoGlow: logoEffect === 'all' || logoEffect === 'glow',
       establishedDate: establishedDate.trim(),
       sections,
       categories_config: categoriesList,
@@ -1179,6 +1319,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           layout_settings: updatedConfig.layoutSettings,
           home_category_columns: updatedConfig.homeCategoryColumns,
           daily_widgets: updatedConfig.dailyWidgets,
+          logo_type: updatedConfig.logo_type,
+          logo_url: updatedConfig.logo_url,
+          logo_size: updatedConfig.logo_size,
+          logo_effect: updatedConfig.logo_effect,
           updated_at: new Date().toISOString(),
         };
 
@@ -1221,6 +1365,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       localStorage.setItem('cached_categories', JSON.stringify(categoriesList));
       localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
       localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      if (onUpdateSiteConfig) {
+        onUpdateSiteConfig(updatedConfig);
+      }
       onSave(updatedConfig, pendingRenames);
       alert('✅ ĐÃ LƯU & ĐỒNG BỘ GIAO DIỆN HỆ THỐNG THÀNH CÔNG!');
       onClose();
@@ -1408,69 +1555,147 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 text-xs space-y-5">
           {/* TAB 1: LOGO & IDENTITY */}
           {activeTab === 'logo' && (
-            <div className="space-y-5">
-              {/* Interactive Logo Live Preview Block */}
-              <div className="bg-gradient-to-br from-[#143d2b] to-[#0a251a] p-4 sm:p-5 rounded-xl border border-emerald-800 text-white flex flex-col sm:flex-row items-center justify-between gap-5">
-                <div className="flex items-center gap-4">
-                  <UnitLogo
-                    size="xl"
-                    customSizePx={logoSizePx}
-                    withGlow={enableLogoGlow}
-                    withRotatingBeam={enableLogoBeam}
-                    logoType={logoType}
-                    customLogoUrl={customLogoUrl}
-                    slogan={slogan}
-                    establishedDate={establishedDate}
-                  />
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase text-amber-300 tracking-wider bg-black/40 px-2 py-0.5 rounded border border-white/10">
-                      Xem trước hiệu ứng hiển thị thực tế ({logoSizePx}px)
-                    </span>
-                    <h4 className="text-base sm:text-lg font-black text-amber-400 leading-snug">
-                      {title}
-                    </h4>
-                    <p className="text-xs text-emerald-200 font-medium">{subtitle}</p>
-                    <p className="text-[11px] text-amber-200 italic font-bold">{slogan}</p>
-                  </div>
+            <div className="space-y-6">
+              {/* TOP ACTION BAR: REALTIME SYNC BUTTON */}
+              <div className="bg-gradient-to-r from-amber-500/15 via-red-500/10 to-emerald-500/15 p-4 rounded-xl border border-amber-300 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-amber-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600 animate-pulse" />
+                    <span>Đồng bộ Logo & Hiệu ứng Realtime (Header & Footer)</span>
+                  </h4>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    Lưu cấu hình trực tiếp vào cơ sở dữ liệu Supabase và cập nhật tức thì cả 2 vị trí trên toàn trang mà không cần tải lại (F5).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  id="tab1-realtime-sync-btn"
+                  onClick={handleSyncLogoRealtime}
+                  disabled={isSyncingLogo}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-red-950 font-black text-xs uppercase tracking-wide rounded-lg shadow-md border border-amber-300 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all shrink-0"
+                >
+                  <RefreshCw className={`w-4 h-4 text-red-900 ${isSyncingLogo ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingLogo ? 'Đang lưu & Đồng bộ...' : 'LƯU & ĐỒNG BỘ LOGO'}</span>
+                </button>
+              </div>
+
+              {/* DUAL LIVE PREVIEW: HEADER & FOOTER SIDE-BY-SIDE */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-gray-900 uppercase text-xs flex items-center gap-1.5">
+                    <Laptop className="w-4 h-4 text-red-700" />
+                    <span>Xem trước hiển thị thực tế trên Header và Footer:</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    Hiệu ứng đang chọn: {logoEffect.toUpperCase()}
+                  </span>
                 </div>
 
-                <div className="flex flex-col gap-2 w-full sm:w-auto shrink-0 bg-black/30 p-3 rounded-lg border border-white/10">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs">
-                    <input
-                      type="checkbox"
-                      checked={enableLogoBeam}
-                      onChange={(e) => setEnableLogoBeam(e.target.checked)}
-                      className="w-4 h-4 accent-amber-400 cursor-pointer"
-                    />
-                    <span className="font-bold text-amber-300">Tia sáng quét 360°</span>
-                  </label>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* 1. Header Preview */}
+                  <div
+                    className="p-4 rounded-xl border border-red-800 text-white shadow-md flex flex-col justify-between"
+                    style={{ backgroundColor: colorRed || '#b91c1c' }}
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-white/20 mb-3">
+                      <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">
+                        ★ Vị trí Header đầu trang ({logoSizePx}px)
+                      </span>
+                      <span className="text-[10px] text-white/80 font-bold">Kích thước chuẩn</span>
+                    </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-xs">
-                    <input
-                      type="checkbox"
-                      checked={enableLogoGlow}
-                      onChange={(e) => setEnableLogoGlow(e.target.checked)}
-                      className="w-4 h-4 accent-amber-400 cursor-pointer"
-                    />
-                    <span className="font-bold text-amber-300">Hào quang tỏa sáng</span>
-                  </label>
+                    <div className="flex items-center gap-3 py-2">
+                      <UnitLogo
+                        customSizePx={logoSizePx}
+                        logo_type={logoType}
+                        logoType={logoType}
+                        logo_url={logoType === 'custom' ? customLogoUrl : ''}
+                        customLogoUrl={logoType === 'custom' ? customLogoUrl : ''}
+                        logo_effect={logoEffect}
+                        logoEffect={logoEffect}
+                        withGlow={enableLogoGlow}
+                        withRotatingBeam={enableLogoBeam}
+                        slogan={slogan}
+                        establishedDate={establishedDate}
+                      />
+                      <div className="min-w-0">
+                        <h4 className="text-sm sm:text-base font-black uppercase text-white leading-tight drop-shadow-xs">
+                          {title}
+                        </h4>
+                        <p className="text-[10px] sm:text-xs font-semibold text-white/90 uppercase tracking-wider mt-0.5">
+                          {subtitle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/10 mt-2 flex items-center justify-between text-[10px] text-amber-200">
+                      <span>Loại: {logoType === 'custom' ? 'Biểu trưng riêng (Upload/URL)' : 'Huy hiệu Quân kỳ chuẩn'}</span>
+                      <span className="font-mono font-bold">{logoSizePx} x {logoSizePx} px</span>
+                    </div>
+                  </div>
+
+                  {/* 2. Footer Preview */}
+                  <div
+                    className="p-4 rounded-xl border border-emerald-900 text-white shadow-md flex flex-col justify-between"
+                    style={{ backgroundColor: footerBgColor || colorGreen || '#143d2b' }}
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-white/20 mb-3">
+                      <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">
+                        ★ Vị trí Footer chân trang ({footerLogoSizePx}px)
+                      </span>
+                      <span className="text-[10px] text-white/80 font-bold">Tỷ lệ cân đối 0.85</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 py-2">
+                      <UnitLogo
+                        customSizePx={footerLogoSizePx}
+                        logo_type={logoType}
+                        logoType={logoType}
+                        logo_url={logoType === 'custom' ? customLogoUrl : ''}
+                        customLogoUrl={logoType === 'custom' ? customLogoUrl : ''}
+                        logo_effect={logoEffect}
+                        logoEffect={logoEffect}
+                        withGlow={enableLogoGlow}
+                        withRotatingBeam={enableLogoBeam}
+                        slogan={slogan}
+                        establishedDate={establishedDate}
+                      />
+                      <p className="font-bold text-[11px] sm:text-xs uppercase tracking-wide text-amber-400 leading-tight">
+                        TRUYỀN THÔNG ĐOÀN MANG YANG — {footerUnitName || 'TRUNG ĐOÀN 95'}
+                      </p>
+                    </div>
+
+                    {/* Slogan strip */}
+                    <div
+                      className="w-full py-1 px-2 rounded mt-2 text-center text-[10px] font-black uppercase tracking-wider border border-amber-400/20 text-amber-300"
+                      style={{ backgroundColor: footerSloganBgColor || '#0a2318' }}
+                    >
+                      {slogan}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* ADMIN LOGO SIZE CONTROLLER */}
+              {/* 1. KÍCH THƯỚC LOGO (logo_size) */}
               <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-amber-900 font-black uppercase text-xs">
                     <Maximize2 className="w-4 h-4 text-amber-700" />
-                    <span>Kích thước Logo trên Header & Toàn trang (Do Admin điều chỉnh):</span>
+                    <span>1. Kích thước Logo Header & Tự động cân đối Footer:</span>
                   </div>
-                  <div className="text-sm font-black text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-md border border-amber-300">
-                    {logoSizePx} px
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-amber-800">
+                      Header: <strong className="text-red-700 text-sm font-black">{logoSizePx}px</strong>
+                    </span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-xs font-bold text-emerald-800">
+                      Footer: <strong className="text-emerald-700 text-sm font-black">{footerLogoSizePx}px</strong>
+                    </span>
                   </div>
                 </div>
 
                 {/* Range Slider */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <span className="text-[11px] font-bold text-gray-500">32px (Nhỏ)</span>
                   <input
                     type="range"
@@ -1478,98 +1703,131 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                     max="96"
                     step="2"
                     value={logoSizePx}
-                    onChange={(e) => setLogoSizePx(parseInt(e.target.value, 10))}
+                    onChange={(e) => {
+                      const newSize = parseInt(e.target.value, 10);
+                      setLogoSizePx(newSize);
+                      // Auto-sync footer logo size with 0.85 ratio
+                      setFooterLogoSizePx(Math.max(28, Math.min(Math.round(newSize * 0.85), 65)));
+                      // Map to closest preset
+                      if (newSize <= 38) setLogoSizePreset('small');
+                      else if (newSize <= 52) setLogoSizePreset('standard');
+                      else if (newSize <= 66) setLogoSizePreset('prominent');
+                      else if (newSize <= 82) setLogoSizePreset('large');
+                      else setLogoSizePreset('xlarge');
+                    }}
                     className="flex-1 accent-red-700 h-2 bg-gray-200 rounded-lg cursor-pointer"
                   />
                   <span className="text-[11px] font-bold text-gray-500">96px (Cực đại)</span>
                 </div>
 
-                {/* Quick Presets */}
+                {/* 5 Quick Presets as strictly specified in Requirement 1 */}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-[11px] font-bold text-gray-600">Chọn nhanh:</span>
+                  <span className="text-[11px] font-bold text-gray-600">Chọn nhanh theo chuẩn:</span>
                   {[
-                    { label: 'Gọn nhỏ (36px)', val: 36 },
-                    { label: 'Tiêu chuẩn (48px)', val: 48 },
-                    { label: 'Nổi bật (60px)', val: 60 },
-                    { label: 'Lớn uy nghi (76px)', val: 76 },
-                    { label: 'Cực đại (90px)', val: 90 },
+                    { label: 'Gọn nhỏ (36px)', val: 36, preset: 'small' as LogoSizePreset },
+                    { label: 'Tiêu chuẩn (48px)', val: 48, preset: 'standard' as LogoSizePreset },
+                    { label: 'Nổi bật (60px)', val: 60, preset: 'prominent' as LogoSizePreset },
+                    { label: 'Lớn uy nghi (76px)', val: 76, preset: 'large' as LogoSizePreset },
+                    { label: 'Cực đại (90px)', val: 90, preset: 'xlarge' as LogoSizePreset },
                   ].map((preset) => (
                     <button
-                      key={preset.val}
+                      key={preset.preset}
                       type="button"
-                      onClick={() => setLogoSizePx(preset.val)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                        logoSizePx === preset.val
-                          ? 'bg-red-700 text-white shadow-xs'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                      onClick={() => {
+                        setLogoSizePreset(preset.preset);
+                        setLogoSizePx(preset.val);
+                        setFooterLogoSizePx(Math.max(28, Math.min(Math.round(preset.val * 0.85), 65)));
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                        logoSizePreset === preset.preset || logoSizePx === preset.val
+                          ? 'bg-red-700 text-white shadow-sm ring-2 ring-red-400'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:text-red-700'
                       }`}
                     >
-                      {preset.label}
+                      <span>{preset.label}</span>
+                      {(logoSizePreset === preset.preset || logoSizePx === preset.val) && (
+                        <Check className="w-3.5 h-3.5 text-amber-300" />
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Logo Selection Options */}
+              {/* 2. LOẠI BIỂU TRƯNG / NGUỒN DỮ LIỆU (logo_type & logo_url) */}
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
-                <h4 className="font-black text-gray-900 uppercase text-xs">
-                  Lựa chọn loại biểu trưng / Huy hiệu đơn vị:
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-gray-900 uppercase text-xs flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-red-700" />
+                    <span>2. Lựa chọn loại Biểu trưng đơn vị (logo_type & logo_url):</span>
+                  </h4>
+                  <span className="text-[10px] font-bold text-gray-500">
+                    Áp dụng đồng bộ Header & Footer
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Option Default: Vector Huy hiệu Quân kỳ */}
                   <label
-                    className={`p-3.5 rounded-lg border-2 flex items-start gap-3 cursor-pointer transition-all ${
-                      logoType === 'official_vector'
-                        ? 'border-red-700 bg-red-50/50 shadow-xs'
+                    className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      logoType === 'default'
+                        ? 'border-red-700 bg-red-50/60 shadow-xs ring-1 ring-red-200'
                         : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
                     <input
                       type="radio"
-                      name="logoType"
-                      value="official_vector"
-                      checked={logoType === 'official_vector'}
-                      onChange={() => setLogoType('official_vector')}
-                      className="mt-1 accent-red-700"
+                      name="logo_type_selection"
+                      value="default"
+                      checked={logoType === 'default'}
+                      onChange={() => setLogoType('default')}
+                      className="mt-1 accent-red-700 cursor-pointer"
                     />
-                    <div>
-                      <div className="font-black text-red-900 text-xs">
-                        Huy hiệu Quân kỳ Trung đoàn 95, Sư đoàn 2 (Vector chuẩn)
+                    <div className="space-y-1">
+                      <div className="font-black text-red-900 text-xs flex items-center gap-1.5">
+                        <span>Huy hiệu Quân kỳ chuẩn của đơn vị</span>
+                        <span className="bg-red-700 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase">
+                          Mặc định
+                        </span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Sao vàng năm cánh, bánh răng công nghiệp, bông lúa và dải lụa chữ "TRUNG ĐOÀN 95".
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Huy hiệu Quân kỳ Trung đoàn 95, Sư đoàn 2 (Sao vàng năm cánh, bánh răng công nghiệp, bông lúa và dải lụa đỏ TRUNG ĐOÀN 95).
                       </p>
                     </div>
                   </label>
 
+                  {/* Option Custom: Biểu trưng riêng */}
                   <label
-                    className={`p-3.5 rounded-lg border-2 flex items-start gap-3 cursor-pointer transition-all ${
-                      logoType === 'custom_image'
-                        ? 'border-red-700 bg-red-50/50 shadow-xs'
+                    className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      logoType === 'custom'
+                        ? 'border-red-700 bg-red-50/60 shadow-xs ring-1 ring-red-200'
                         : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
                     <input
                       type="radio"
-                      name="logoType"
-                      value="custom_image"
-                      checked={logoType === 'custom_image'}
-                      onChange={() => setLogoType('custom_image')}
-                      className="mt-1 accent-red-700"
+                      name="logo_type_selection"
+                      value="custom"
+                      checked={logoType === 'custom'}
+                      onChange={() => setLogoType('custom')}
+                      className="mt-1 accent-red-700 cursor-pointer"
                     />
-                    <div>
-                      <div className="font-black text-red-900 text-xs">
-                        Tải ảnh biểu trưng riêng từ thiết bị
+                    <div className="space-y-1">
+                      <div className="font-black text-red-900 text-xs flex items-center gap-1.5">
+                        <span>Biểu trưng riêng tải lên / URL hình ảnh</span>
+                        <span className="bg-amber-500 text-red-950 text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase">
+                          Tùy biến
+                        </span>
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Tải lên tệp ảnh PNG / SVG trong suốt hoặc nhập URL hình ảnh.
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Tải ảnh biểu trưng riêng của cơ quan, đơn vị (PNG nền trong suốt, SVG hoặc dán URL hình ảnh từ internet).
                       </p>
                     </div>
                   </label>
                 </div>
 
-                {logoType === 'custom_image' && (
-                  <div className="p-3 bg-white rounded-lg border border-red-200 space-y-3">
+                {/* Upload or URL controls for Custom Logo */}
+                {logoType === 'custom' && (
+                  <div className="p-3.5 bg-white rounded-xl border border-red-200 space-y-3 shadow-2xs">
                     <input
                       type="file"
                       ref={logoFileInputRef}
@@ -1581,65 +1839,187 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => logoFileInputRef.current?.click()}
-                        className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        className="px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
                       >
                         <UploadCloud className="w-4 h-4" />
-                        <span>Chọn tệp ảnh từ máy tính</span>
+                        <span>Tải tệp ảnh từ thiết bị</span>
                       </button>
 
                       <div className="text-gray-400 text-xs font-bold">HOẶC</div>
 
-                      <div className="flex-1 min-w-[200px]">
+                      <div className="flex-1 min-w-[220px]">
                         <input
                           type="text"
                           value={customLogoUrl}
                           onChange={(e) => setCustomLogoUrl(e.target.value)}
                           placeholder="Dán đường dẫn link ảnh (https://...)..."
-                          className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-xs"
+                          className="w-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-xs focus:bg-white focus:border-red-600 focus:outline-hidden"
                         />
                       </div>
+
+                      {customLogoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomLogoUrl('')}
+                          className="px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg border border-red-200 font-bold cursor-pointer"
+                          title="Xóa link ảnh hiện tại"
+                        >
+                          Xóa
+                        </button>
+                      )}
                     </div>
+
+                    {customLogoUrl && (
+                      <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <img
+                          src={customLogoUrl}
+                          alt="Xem trước logo riêng"
+                          className="w-10 h-10 object-contain rounded-md border border-gray-300 bg-white"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="text-[11px] text-gray-600 truncate flex-1">
+                          <span className="font-bold text-gray-800">Đã chọn ảnh: </span>
+                          <span className="font-mono text-gray-500 truncate">
+                            {customLogoUrl.startsWith('data:image') ? 'Tệp ảnh tải lên từ máy tính' : customLogoUrl}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Title & Slogans Form */}
-              <div className="space-y-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Tiêu đề Header chính (*):
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-black text-gray-900"
-                    required
-                  />
+              {/* 3. HIỆU ỨNG NHẬN DIỆN (logo_effect) */}
+              <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-emerald-950 uppercase text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-emerald-700" />
+                    <span>3. Hiệu ứng nhận diện hiển thị (logo_effect):</span>
+                  </h4>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                    Đồng bộ cả Header & Footer
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">
-                    Phụ đề đơn vị & hệ thống:
-                  </label>
-                  <input
-                    type="text"
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold"
-                  />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {[
+                    {
+                      id: 'all' as LogoEffectType,
+                      name: 'Toàn diện cao cấp',
+                      desc: 'Hào quang + Quét sáng 360° + Bóng nổi 3D + Phóng to hover',
+                      badge: 'Khuyên dùng',
+                    },
+                    {
+                      id: 'glow' as LogoEffectType,
+                      name: 'Viền phát sáng nhẹ',
+                      desc: 'Hào quang vàng kim tỏa sáng nhẹ nhàng',
+                      badge: 'Thanh lịch',
+                    },
+                    {
+                      id: 'shine' as LogoEffectType,
+                      name: 'Quét sáng xoay 360°',
+                      desc: 'Tia sáng viền quét chuyển động tròn liên tục',
+                      badge: 'Động',
+                    },
+                    {
+                      id: '3d_shadow' as LogoEffectType,
+                      name: 'Đổ bóng nổi 3D',
+                      desc: 'Độ sâu drop-shadow uy nghi trên nền cờ',
+                      badge: 'Nổi khối',
+                    },
+                    {
+                      id: 'scale' as LogoEffectType,
+                      name: 'Phóng to khi rê chuột',
+                      desc: 'Tương tác hover scale 105% nhẹ nhàng',
+                      badge: 'Tương tác',
+                    },
+                    {
+                      id: 'none' as LogoEffectType,
+                      name: 'Cơ bản / Tĩnh',
+                      desc: 'Không hiệu ứng viền, hiển thị phẳng tối giản',
+                      badge: 'Tối giản',
+                    },
+                  ].map((eff) => (
+                    <label
+                      key={eff.id}
+                      onClick={() => {
+                        setLogoEffect(eff.id);
+                        setEnableLogoBeam(eff.id === 'all' || eff.id === 'shine');
+                        setEnableLogoGlow(eff.id === 'all' || eff.id === 'glow');
+                      }}
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                        logoEffect === eff.id
+                          ? 'border-emerald-700 bg-white shadow-sm ring-2 ring-emerald-300'
+                          : 'border-gray-200 bg-white/70 hover:bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`font-black text-xs ${logoEffect === eff.id ? 'text-emerald-900' : 'text-gray-800'}`}>
+                          {eff.name}
+                        </span>
+                        <input
+                          type="radio"
+                          name="logo_effect_choice"
+                          value={eff.id}
+                          checked={logoEffect === eff.id}
+                          onChange={() => {}}
+                          className="accent-emerald-700 cursor-pointer"
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-500 leading-tight mb-2">
+                        {eff.desc}
+                      </p>
+                      <span className="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded w-fit border border-emerald-200">
+                        {eff.badge}
+                      </span>
+                    </label>
+                  ))}
                 </div>
+              </div>
+
+              {/* 4. TIÊU ĐỀ & KHẨU HIỆU TRUYỀN THỐNG */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <h4 className="font-black text-gray-900 uppercase text-xs">
+                  4. Tiêu đề Cổng thông tin & Khẩu hiệu đơn vị:
+                </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1">
-                      Khẩu hiệu truyền thống:
+                      Tiêu đề Header chính (*):
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:border-red-700 focus:outline-hidden font-black text-gray-900 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      Phụ đề đơn vị & hệ thống:
+                    </label>
+                    <input
+                      type="text"
+                      value={subtitle}
+                      onChange={(e) => setSubtitle(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:border-red-700 focus:outline-hidden font-bold text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">
+                      Khẩu hiệu truyền thống (Slogan):
                     </label>
                     <input
                       type="text"
                       value={slogan}
                       onChange={(e) => setSlogan(e.target.value)}
-                      className="w-full p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold text-red-900"
+                      className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:border-red-700 focus:outline-hidden font-bold text-red-900 text-xs"
                     />
                   </div>
 
@@ -1651,10 +2031,23 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
                       type="text"
                       value={establishedDate}
                       onChange={(e) => setEstablishedDate(e.target.value)}
-                      className="w-full p-2.5 bg-gray-50/50 border border-gray-300 rounded-lg focus:bg-white focus:border-red-700 focus:outline-hidden font-bold"
+                      className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:border-red-700 focus:outline-hidden font-bold text-xs"
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* BOTTOM REALTIME SYNC PROMPT */}
+              <div className="flex items-center justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={handleSyncLogoRealtime}
+                  disabled={isSyncingLogo}
+                  className="px-6 py-2.5 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white font-black text-xs uppercase tracking-wide rounded-lg shadow-md flex items-center gap-2 cursor-pointer active:scale-95 transition-all"
+                >
+                  <Save className="w-4 h-4 text-amber-300" />
+                  <span>{isSyncingLogo ? 'Đang lưu CSDL...' : 'LƯU & ĐỒNG BỘ LOGO (REALTIME)'}</span>
+                </button>
               </div>
             </div>
           )}

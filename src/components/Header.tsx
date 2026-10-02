@@ -190,6 +190,17 @@ export const Header: React.FC<HeaderProps> = ({
     return cat.name || cat.navName || cat.shortLabel || cat.short_name || cat.label || cat.id || '';
   };
 
+  // Resolve Header Logo size and effect accurately from siteConfig
+  let headerLogoPx = 48;
+  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize;
+  if (rawHeaderSize === 'small') headerLogoPx = 36;
+  else if (rawHeaderSize === 'standard') headerLogoPx = 48;
+  else if (rawHeaderSize === 'prominent') headerLogoPx = 60;
+  else if (rawHeaderSize === 'large') headerLogoPx = 76;
+  else if (rawHeaderSize === 'xlarge') headerLogoPx = 90;
+  else if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) headerLogoPx = rawHeaderSize;
+  else if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) headerLogoPx = siteConfig.logoSizePx;
+
   return (
     <header className="w-full select-none relative z-50">
       {/* Main Header Banner */}
@@ -213,19 +224,18 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-3 cursor-pointer group pb-0.5"
           >
             <UnitLogo
-              size="md"
-              logo_type={siteConfig.logo_type || siteConfig.logoType}
-              logoType={siteConfig.logo_type || siteConfig.logoType}
-              logo_url={siteConfig.logo_url || siteConfig.customLogoUrl}
-              customLogoUrl={siteConfig.logo_url || siteConfig.customLogoUrl}
-              logo_size={siteConfig.logo_size || siteConfig.logoSize || siteConfig.logoSizePx}
-              customSizePx={siteConfig.logoSizePx}
-              logo_effect={siteConfig.logo_effect || siteConfig.logoEffect}
-              logoEffect={siteConfig.logo_effect || siteConfig.logoEffect}
-              withGlow={siteConfig.enableLogoGlow}
-              withRotatingBeam={siteConfig.enableLogoBeam}
-              slogan={siteConfig.slogan}
-              establishedDate={siteConfig.establishedDate}
+              customSizePx={headerLogoPx}
+              logo_type={siteConfig?.logo_type || siteConfig?.logoType}
+              logoType={siteConfig?.logo_type || siteConfig?.logoType}
+              logo_url={siteConfig?.logo_url || siteConfig?.customLogoUrl}
+              customLogoUrl={siteConfig?.logo_url || siteConfig?.customLogoUrl}
+              logo_size={siteConfig?.logo_size || siteConfig?.logoSize}
+              logo_effect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+              logoEffect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+              withGlow={siteConfig?.enableLogoGlow}
+              withRotatingBeam={siteConfig?.enableLogoBeam}
+              slogan={siteConfig?.slogan}
+              establishedDate={siteConfig?.establishedDate}
             />
             <div>
               <h1 className="text-sm md:text-base lg:text-xl font-black uppercase tracking-wide text-white leading-tight drop-shadow-xs group-hover:text-amber-200 transition-colors">

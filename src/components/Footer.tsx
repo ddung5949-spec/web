@@ -59,8 +59,8 @@ export const Footer: React.FC<FooterProps> = ({
 
   // Calculate Header and Footer balanced Logo dimensions
   let headerLogoSize = 48;
-  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize || siteConfig?.logoSizePx;
-  if (typeof rawHeaderSize === 'number') {
+  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize;
+  if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) {
     headerLogoSize = rawHeaderSize;
   } else if (rawHeaderSize === 'small') {
     headerLogoSize = 36;
@@ -72,11 +72,13 @@ export const Footer: React.FC<FooterProps> = ({
     headerLogoSize = 76;
   } else if (rawHeaderSize === 'xlarge') {
     headerLogoSize = 90;
+  } else if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) {
+    headerLogoSize = siteConfig.logoSizePx;
   }
 
   const footerLogoPx =
     siteConfig?.footerLogoSizePx ||
-    Math.max(28, Math.min(Math.round(headerLogoSize * 0.85), 52));
+    Math.max(28, Math.min(Math.round(headerLogoSize * 0.85), 65));
 
   const showFooterLogo =
     siteConfig?.footer_config?.toggles?.show_logo ??

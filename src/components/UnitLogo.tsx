@@ -43,7 +43,7 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
   onClick,
 }) => {
   // Determine effective type: 'custom' if logo_type or logoType says custom/custom_image
-  const resolvedType = logo_type || logoType || 'official_vector';
+  const resolvedType = String(logo_type || logoType || 'default').toLowerCase();
   const resolvedUrl = (logo_url || customLogoUrl || '').trim();
   const isCustomImage =
     (resolvedType === 'custom' || resolvedType === 'custom_image') &&
@@ -68,53 +68,54 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
       ? withHoverScale
       : effect === 'all' || effect === 'scale';
 
-  // Determine pixel size
-  let calculatedPx = customSizePx;
+  // Determine pixel size based on preset or explicit pixel size
+  let calculatedPx: number | undefined = undefined;
   const rawSize = logo_size || size;
+
+  if (rawSize === 'small') {
+    calculatedPx = 36;
+  } else if (rawSize === 'standard') {
+    calculatedPx = 48;
+  } else if (rawSize === 'prominent') {
+    calculatedPx = 60;
+  } else if (rawSize === 'large') {
+    calculatedPx = 76;
+  } else if (rawSize === 'xlarge') {
+    calculatedPx = 90;
+  } else if (typeof rawSize === 'number') {
+    calculatedPx = rawSize;
+  }
+
+  // If customSizePx is explicitly passed without a preset overriding it
+  if (!calculatedPx && typeof customSizePx === 'number' && customSizePx > 0) {
+    calculatedPx = customSizePx;
+  }
+
   if (!calculatedPx) {
-    if (typeof rawSize === 'number') {
-      calculatedPx = rawSize;
-    } else {
-      switch (rawSize) {
-        case 'small':
-          calculatedPx = 36;
-          break;
-        case 'standard':
-          calculatedPx = 48;
-          break;
-        case 'prominent':
-          calculatedPx = 60;
-          break;
-        case 'large':
-          calculatedPx = 76;
-          break;
-        case 'xlarge':
-          calculatedPx = 90;
-          break;
-        case 'xs':
-          calculatedPx = 28;
-          break;
-        case 'sm':
-          calculatedPx = 36;
-          break;
-        case 'md':
-          calculatedPx = 48;
-          break;
-        case 'lg':
-          calculatedPx = 60;
-          break;
-        case 'xl':
-          calculatedPx = 80;
-          break;
-        case '2xl':
-          calculatedPx = 112;
-          break;
-        case 'hero':
-          calculatedPx = 192;
-          break;
-        default:
-          calculatedPx = 48;
-      }
+    switch (rawSize) {
+      case 'xs':
+        calculatedPx = 28;
+        break;
+      case 'sm':
+        calculatedPx = 36;
+        break;
+      case 'md':
+        calculatedPx = 48;
+        break;
+      case 'lg':
+        calculatedPx = 60;
+        break;
+      case 'xl':
+        calculatedPx = 80;
+        break;
+      case '2xl':
+        calculatedPx = 112;
+        break;
+      case 'hero':
+        calculatedPx = 192;
+        break;
+      default:
+        calculatedPx = customSizePx || 48;
     }
   }
 

@@ -57,11 +57,12 @@ const ProfileModal = React.lazy(() =>
     default: m.ProfileModal,
   })),
 );
-const CustomizerModal = React.lazy(() =>
-  import("./components/modals/CustomizerModal").then((m) => ({
-    default: m.CustomizerModal,
+const SiteConfigModal = React.lazy(() =>
+  import("./components/modals/SiteConfigModal").then((m) => ({
+    default: m.SiteConfigModal,
   })),
 );
+const CustomizerModal = SiteConfigModal;
 const PostArticleModal = React.lazy(() =>
   import("./components/modals/PostArticleModal").then((m) => ({
     default: m.PostArticleModal,
@@ -738,6 +739,34 @@ export function App() {
       }
       if (config.footer_config) {
         mergedConfig.footer_config = config.footer_config;
+      }
+      if (config.logo_type || config.logoType) {
+        mergedConfig.logo_type = config.logo_type || config.logoType;
+        mergedConfig.logoType = config.logo_type || config.logoType;
+      }
+      if (config.logo_url !== undefined || config.customLogoUrl !== undefined) {
+        mergedConfig.logo_url = config.logo_url ?? config.customLogoUrl;
+        mergedConfig.customLogoUrl = config.logo_url ?? config.customLogoUrl;
+      }
+      if (config.logo_size || config.logoSize) {
+        mergedConfig.logo_size = config.logo_size || config.logoSize;
+        mergedConfig.logoSize = config.logo_size || config.logoSize;
+      }
+      if (config.logo_size_px !== undefined || config.logoSizePx !== undefined) {
+        mergedConfig.logoSizePx = config.logo_size_px ?? config.logoSizePx;
+      }
+      if (config.footer_logo_size_px !== undefined || config.footerLogoSizePx !== undefined) {
+        mergedConfig.footerLogoSizePx = config.footer_logo_size_px ?? config.footerLogoSizePx;
+      }
+      if (config.logo_effect || config.logoEffect) {
+        mergedConfig.logo_effect = config.logo_effect || config.logoEffect;
+        mergedConfig.logoEffect = config.logo_effect || config.logoEffect;
+      }
+      if (config.enable_logo_beam !== undefined || config.enableLogoBeam !== undefined) {
+        mergedConfig.enableLogoBeam = config.enable_logo_beam ?? config.enableLogoBeam;
+      }
+      if (config.enable_logo_glow !== undefined || config.enableLogoGlow !== undefined) {
+        mergedConfig.enableLogoGlow = config.enable_logo_glow ?? config.enableLogoGlow;
       }
       if (Array.isArray(config.home_layout)) {
         mergedConfig.homeCategoryColumns = config.home_layout;
@@ -2974,6 +3003,15 @@ export function App() {
             navigation_tabs: newConfig.categories_config,
             home_category_columns: newConfig.homeCategoryColumns,
             daily_widgets: newConfig.dailyWidgets,
+            logo_type: newConfig.logo_type || newConfig.logoType,
+            logo_url: newConfig.logo_url || newConfig.customLogoUrl,
+            logo_size: newConfig.logo_size || newConfig.logoSize,
+            logo_size_px: newConfig.logoSizePx,
+            footer_logo_size_px: newConfig.footerLogoSizePx,
+            logo_effect: newConfig.logo_effect || newConfig.logoEffect,
+            enable_logo_beam: newConfig.enableLogoBeam,
+            enable_logo_glow: newConfig.enableLogoGlow,
+            config_json: newConfig,
             updated_at: nowIso,
           },
           { onConflict: "id" },
@@ -3032,6 +3070,36 @@ export function App() {
 
         return changed ? updatedArticles : prevArticles;
       });
+    }
+  };
+
+  // Realtime Site Config updater (used by SiteConfigModal Tab 1 & Footer Manager)
+  const handleUpdateSiteConfig = async (partialConfig: Partial<SiteConfig>) => {
+    const updated: SiteConfig = {
+      ...siteConfig,
+      ...partialConfig,
+    };
+    setSiteConfig(updated);
+    safeStore.set("mangyang_site_config", updated);
+    try {
+      localStorage.setItem("site_config_cache", JSON.stringify(updated));
+      localStorage.setItem("mangyang_site_config", JSON.stringify(updated));
+    } catch {}
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("site_config").upsert(
+          {
+            id: "default",
+            ...updated,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+      } catch (err) {
+        console.warn("[App] handleUpdateSiteConfig Supabase upsert notice:", err);
+      }
     }
   };
 
@@ -4067,7 +4135,7 @@ export function App() {
         siteConfig={siteConfig}
         currentUser={currentUser}
         onSelectPage={handleSelectPage}
-        onUpdateSiteConfig={handleSaveCustomizer}
+        onUpdateSiteConfig={handleUpdateSiteConfig}
       />
 
       {/* 6. Modals (Suspense Code-Splitting) */}
@@ -4094,13 +4162,14 @@ export function App() {
         )}
 
         {customizerModalOpen && (
-          <CustomizerModal
+          <SiteConfigModal
             isOpen={customizerModalOpen}
             siteConfig={siteConfig}
             categories={categories}
             articles={articles}
             onClose={() => setCustomizerModalOpen(false)}
             onSave={handleSaveCustomizer}
+            onUpdateSiteConfig={handleUpdateSiteConfig}
           />
         )}
 
