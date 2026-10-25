@@ -25,6 +25,7 @@ export const DailyPosterCard: React.FC<DailyPosterCardProps> = ({
   onZoom,
   aspectRatioClass,
 }) => {
+  const [imageError, setImageError] = React.useState(false);
   const rawUrl = poster.image_url || poster.image_data || '';
   const timestamp = poster.updated_at ? new Date(poster.updated_at).getTime() : Date.now();
   
@@ -34,6 +35,10 @@ export const DailyPosterCard: React.FC<DailyPosterCardProps> = ({
       ? rawUrl
       : `${rawUrl.split('?')[0]}?t=${timestamp}`
     : '';
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [antiCacheUrl]);
 
   const getAspectClass = () => {
     if (aspectRatioClass) return aspectRatioClass;
@@ -50,7 +55,7 @@ export const DailyPosterCard: React.FC<DailyPosterCardProps> = ({
 
   return (
     <div className="relative w-full rounded-lg overflow-hidden bg-slate-900/5 border border-gray-200/80 shadow-2xs group flex items-center justify-center">
-      {antiCacheUrl ? (
+      {antiCacheUrl && !imageError ? (
         <div
           onClick={onZoom}
           className="relative w-full h-full cursor-zoom-in flex items-center justify-center overflow-hidden"
@@ -63,6 +68,7 @@ export const DailyPosterCard: React.FC<DailyPosterCardProps> = ({
             className={`w-full transition-transform duration-300 group-hover:scale-[1.02] ${getAspectClass()}`}
             loading="eager"
             decoding="async"
+            onError={() => setImageError(true)}
           />
 
           {/* Hover overlay hint */}

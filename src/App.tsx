@@ -667,29 +667,61 @@ export function App() {
       }
     };
 
-    const safeCacheDailyPosters = (map: Record<string, any>) => {
+    const sanitizePostersForCache = (posters: any[]) => {
+      return (posters || []).map((p: any) => ({
+        id: p.id || p.key || p.widget_id,
+        title: p.title || "",
+        category_name: p.category_name || p.categoryName || "",
+        aspect_ratio: p.aspect_ratio || p.aspectRatio || "auto",
+        updated_at: p.updated_at || p.updatedAt || "",
+        // Nếu là chuỗi data:image dài quá 500 ký tự thì không nhét vào localStorage
+        image_url:
+          p.image_url && p.image_url.startsWith("data:") && p.image_url.length > 500
+            ? ""
+            : p.image_url || "",
+      }));
+    };
+
+    const safeCacheDailyPosters = (map: Record<string, any>, rawList?: any[]) => {
       try {
         const lightweight: Record<string, any> = {};
         Object.entries(map).forEach(([k, v]) => {
-          if (
+          const isHeavy =
             v &&
-            typeof v.image_data === "string" &&
-            v.image_data.startsWith("data:image") &&
-            v.image_data.length > 300000
-          ) {
-            lightweight[k] = { ...v, image_data: "" };
+            ((typeof v.image_data === "string" &&
+              v.image_data.startsWith("data:") &&
+              v.image_data.length > 500) ||
+              (typeof v.image_url === "string" &&
+                v.image_url.startsWith("data:") &&
+                v.image_url.length > 500));
+          if (isHeavy) {
+            lightweight[k] = { ...v, image_data: "", image_url: "" };
           } else {
             lightweight[k] = v;
           }
         });
-        localStorage.setItem("cached_posters", JSON.stringify(lightweight));
-        localStorage.setItem("daily_posters", JSON.stringify(lightweight));
-        localStorage.setItem(
-          "daily_posters_cache",
-          JSON.stringify(lightweight),
-        );
+
+        const listToCache = (rawList && Array.isArray(rawList)) ? rawList : Object.values(lightweight);
+        try {
+          localStorage.setItem(
+            "cached_posters",
+            JSON.stringify(sanitizePostersForCache(listToCache)),
+          );
+        } catch (err) {
+          console.warn("Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt");
+        }
+
+        try {
+          localStorage.setItem("daily_posters", JSON.stringify(lightweight));
+          localStorage.setItem(
+            "daily_posters_cache",
+            JSON.stringify(lightweight),
+          );
+        } catch (err) {
+          console.warn("Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt");
+        }
       } catch (e) {
-        console.warn("Error caching daily_posters:", e);
+        console.warn("Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt");
       }
     };
 
@@ -979,7 +1011,7 @@ export function App() {
         if (normKey === "traffic") posterMap["traffic_situation"] = entry;
       });
 
-      safeCacheDailyPosters(posterMap);
+      safeCacheDailyPosters(posterMap, posters);
       setDailyPosters(posterMap);
 
       if (posterMap["uncle_ho"]) {
@@ -1163,12 +1195,10 @@ export function App() {
             () => {},
           );
 
-        // 1.2 Tải bài viết trang chủ (Chỉ lấy các trường tóm tắt, TUYỆT ĐỐI không lấy 'content' để giảm 90% dung lượng)
+        // 1.2 Tải bài viết trang chủ dùng select('*') để tương thích hoàn toàn CSDL
         supabase
           .from("articles")
-          .select(
-            "id, title, summary, category, sub_category, author, author_role, image_url, views, published_at, is_featured",
-          )
+          .select("*")
           .order("published_at", { ascending: false })
           .limit(10)
           .then(
@@ -1177,15 +1207,14 @@ export function App() {
               if (!error && data && Array.isArray(data) && data.length > 0) {
                 processArticlesData(data);
               } else {
-                // Fallback nếu schema chưa migrate sang tên cột mới
-                (supabase.from("articles") as any)
-                  .select(
-                    "id, title, category, author, date, image, images, excerpt, summary, views, status, section_key, is_featured, published_at, created_at",
-                  )
+                // Fallback nếu order theo published_at chưa được định nghĩa
+                supabase
+                  .from("articles")
+                  .select("*")
                   .order("created_at", { ascending: false })
                   .limit(10)
                   .then(
-                    ({ data: fbData }: any) => {
+                    ({ data: fbData }) => {
                       if (
                         isMounted &&
                         fbData &&
@@ -1221,14 +1250,11 @@ export function App() {
             () => {},
           );
 
-        // 1.4 Tài liệu (Nạp độc lập - chỉ lấy mục trang chủ)
+        // 1.4 Tài liệu (Nạp độc lập - gọi select('*') hoặc danh sách cột chuẩn)
         supabase
           .from("documents")
-          .select(
-            "id, code, code_number, title, category, issuer, date, issue_date, type, file_type, file_url, downloads, created_at",
-          )
-          .order("created_at", { ascending: false })
-          .limit(8)
+          .select("*")
+          .limit(10)
           .then(
             ({ data, error }) => {
               if (
@@ -1239,6 +1265,21 @@ export function App() {
                 data.length > 0
               ) {
                 processDocumentsData(data);
+              } else {
+                supabase
+                  .from("documents")
+                  .select(
+                    "id, document_number, code, title, file_url, file_type, file_size, category, sub_category, published_at",
+                  )
+                  .limit(10)
+                  .then(
+                    ({ data: colDocs }) => {
+                      if (isMounted && colDocs && Array.isArray(colDocs) && colDocs.length > 0) {
+                        processDocumentsData(colDocs);
+                      }
+                    },
+                    () => {},
+                  );
               }
             },
             () => {},
@@ -1267,8 +1308,8 @@ export function App() {
           .select("*")
           .limit(366)
           .then(
-            ({ data }) => {
-              if (isMounted && data && Array.isArray(data) && data.length > 0) {
+            ({ data, error }) => {
+              if (!error && isMounted && data && Array.isArray(data) && data.length > 0) {
                 setUncleHoQuotes(data as any);
                 try {
                   localStorage.setItem(
@@ -1276,9 +1317,48 @@ export function App() {
                     JSON.stringify(data),
                   );
                 } catch {}
+              } else {
+                // Fallback sang uncle_ho_teachings
+                supabase
+                  .from("uncle_ho_teachings")
+                  .select("*")
+                  .limit(366)
+                  .then(
+                    ({ data: teachData, error: teachErr }) => {
+                      if (!teachErr && isMounted && teachData && Array.isArray(teachData) && teachData.length > 0) {
+                        setUncleHoQuotes(teachData as any);
+                        try {
+                          localStorage.setItem("uncle_ho_quotes_cache", JSON.stringify(teachData));
+                        } catch {}
+                      } else if (isMounted) {
+                        setUncleHoQuotes((prev) => (prev.length > 0 ? prev : defaultUncleHoQuotes));
+                      }
+                    },
+                    () => {
+                      if (isMounted) setUncleHoQuotes((prev) => (prev.length > 0 ? prev : defaultUncleHoQuotes));
+                    }
+                  );
               }
             },
-            () => {},
+            () => {
+              // Khi uncle_ho_quotes reject promise
+              supabase
+                .from("uncle_ho_teachings")
+                .select("*")
+                .limit(366)
+                .then(
+                  ({ data: teachData }) => {
+                    if (isMounted && teachData && Array.isArray(teachData) && teachData.length > 0) {
+                      setUncleHoQuotes(teachData as any);
+                    } else if (isMounted) {
+                      setUncleHoQuotes((prev) => (prev.length > 0 ? prev : defaultUncleHoQuotes));
+                    }
+                  },
+                  () => {
+                    if (isMounted) setUncleHoQuotes((prev) => (prev.length > 0 ? prev : defaultUncleHoQuotes));
+                  }
+                );
+            },
           );
 
         supabase

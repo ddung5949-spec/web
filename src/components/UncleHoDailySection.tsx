@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { UncleHoQuote, UncleHoSettings, User } from '../types';
 import { getSupabase } from '../utils/supabase';
+import { defaultUncleHoQuotes } from '../data/initialData';
 
 // Danh sách ảnh mặc định chất lượng cao về Chủ tịch Hồ Chí Minh
 export const DEFAULT_UNCLE_HO_IMAGES = [
@@ -64,8 +65,9 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [fetchedAlbumImages, setFetchedAlbumImages] = useState<string[]>([]);
+  const [liveQuotes, setLiveQuotes] = useState<UncleHoQuote[]>([]);
 
-  // Tải trực tiếp ảnh và nội dung Bác Hồ từ Supabase bảng site_config (uncle_ho_data) và daily_posters để luôn đồng bộ tức thì cho tất cả người xem
+  // Tải trực tiếp ảnh và nội dung Bác Hồ từ Supabase bảng site_config (uncle_ho_data), daily_posters, uncle_ho_quotes / uncle_ho_teachings
   useEffect(() => {
     let isMounted = true;
     const fetchUncleHoFromSupabase = async () => {
@@ -113,8 +115,59 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
             setFetchedAlbumImages((prev) => (prev.length > 0 ? prev : imgs));
           }
         }
+
+        // 3. Tải danh sách Lời Bác dạy an toàn: fallback uncle_ho_quotes -> uncle_ho_teachings -> defaultUncleHoQuotes
+        supabase
+          .from('uncle_ho_quotes')
+          .select('*')
+          .limit(366)
+          .then(
+            ({ data: quoteData, error: quoteError }) => {
+              if (!quoteError && quoteData && Array.isArray(quoteData) && quoteData.length > 0 && isMounted) {
+                setLiveQuotes(quoteData as any);
+                return;
+              }
+              // Fallback uncle_ho_teachings
+              supabase
+                .from('uncle_ho_teachings')
+                .select('*')
+                .limit(366)
+                .then(
+                  ({ data: teachData, error: teachErr }) => {
+                    if (!teachErr && teachData && Array.isArray(teachData) && teachData.length > 0 && isMounted) {
+                      setLiveQuotes(teachData as any);
+                    } else if (isMounted) {
+                      setLiveQuotes(defaultUncleHoQuotes);
+                    }
+                  },
+                  () => {
+                    if (isMounted) setLiveQuotes(defaultUncleHoQuotes);
+                  }
+                );
+            },
+            () => {
+              // Khi uncle_ho_quotes reject promise
+              supabase
+                .from('uncle_ho_teachings')
+                .select('*')
+                .limit(366)
+                .then(
+                  ({ data: teachData }) => {
+                    if (teachData && Array.isArray(teachData) && teachData.length > 0 && isMounted) {
+                      setLiveQuotes(teachData as any);
+                    } else if (isMounted) {
+                      setLiveQuotes(defaultUncleHoQuotes);
+                    }
+                  },
+                  () => {
+                    if (isMounted) setLiveQuotes(defaultUncleHoQuotes);
+                  }
+                );
+            }
+          );
       } catch (err) {
         console.warn('Error fetching uncle_ho from Supabase:', err);
+        if (isMounted) setLiveQuotes(defaultUncleHoQuotes);
       }
     };
     fetchUncleHoFromSupabase();
@@ -125,6 +178,13 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // State xem nhanh Bối cảnh lịch sử & Bài học vận dụng
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+  // Danh sách quotes hiệu lực
+  const effectiveQuotes: UncleHoQuote[] = useMemo(() => {
+    if (quotes && quotes.length > 0) return quotes;
+    if (liveQuotes && liveQuotes.length > 0) return liveQuotes;
+    return defaultUncleHoQuotes;
+  }, [quotes, liveQuotes]);
 
   // Lấy Album ảnh Slideshow (luôn đảm bảo có ảnh Bác Hồ chất lượng cao, không bao giờ để trống)
   const albumImages: string[] = useMemo(() => {
@@ -181,11 +241,15 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // Quote hiện tại hiển thị cố định theo ngày thực tế của hệ thống (Ví dụ ngày 17/09)
   const currentQuote: UncleHoQuote = useMemo(() => {
-    // 1. Tìm câu trích dẫn cho ngày hôm nay từ danh sách quotes
-    const matched = quotes.find((q) => q.dayMonth === todayStr);
+    // 1. Tìm câu trích dẫn cho ngày hôm nay từ danh sách effectiveQuotes
+    const matched = effectiveQuotes.find((q) => q.dayMonth === todayStr);
     if (matched) return matched;
 
-    // 2. Kiểm tra cache localStorage uncle_ho_data nếu có
+    // 2. Tìm trong defaultUncleHoQuotes
+    const defMatched = defaultUncleHoQuotes.find((q) => q.dayMonth === todayStr);
+    if (defMatched) return defMatched;
+
+    // 3. Kiểm tra cache localStorage uncle_ho_data nếu có
     try {
       const cfgCache = localStorage.getItem('site_config_cache');
       if (cfgCache) {
@@ -197,7 +261,12 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       }
     } catch {}
 
-    // 3. Fallback chuẩn xác cho ngày hôm nay
+    // 4. Nếu có ít nhất 1 quote, lấy quote đầu tiên
+    if (effectiveQuotes.length > 0) {
+      return effectiveQuotes[0];
+    }
+
+    // 5. Fallback an toàn mặc định
     return {
       id: `default-${todayStr}`,
       dayMonth: todayStr,
@@ -212,7 +281,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
       status: 'active',
       isAutoPublish: true,
     };
-  }, [quotes, todayStr]);
+  }, [effectiveQuotes, todayStr]);
 
   // Chuyển slide tiếp theo / trước đó
   const handlePrevSlide = (e: React.MouseEvent) => {

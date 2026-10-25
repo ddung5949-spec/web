@@ -413,13 +413,15 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
       }
 
       // -------------------------------------------------------------
-      // 2. LocalStorage: Lưu vào localStorage('daily_posters')
+      // 2. LocalStorage: Lưu vào localStorage an toàn (không chứa Base64 thô)
       // -------------------------------------------------------------
       try {
         const cachedRaw = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
         const targetId = isTraffic ? 'tinh-huong-giao-thong' : posterKey;
-        const cacheEntry = {
+        
+        // Entry đầy đủ cho Live state và CustomEvent
+        const liveEntry = {
           id: targetId,
           title: finalTitle,
           category_name: finalCat,
@@ -430,28 +432,62 @@ export const DailyPosterWidget: React.FC<DailyPosterWidgetProps> = ({
           extra_data: { category_name: finalCat },
           updated_at: nowIso,
         };
-        cacheMap[targetId] = cacheEntry;
-        cacheMap[cleanId] = cacheEntry;
-        if (posterKey === 'safety') cacheMap['safety_message'] = cacheEntry;
-        if (isTraffic) {
-          cacheMap['tinh-huong-giao-thong'] = cacheEntry;
-          cacheMap['traffic'] = cacheEntry;
-          cacheMap['traffic_situation'] = cacheEntry;
-        }
-        localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
-        localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
 
-        // Bắn sự kiện cập nhật tức thì cho các Component ngoài trang chủ
+        // Entry rút gọn cho LocalStorage để không vượt QuotaExceededError
+        const sanitizedUrl = (finalUrl && finalUrl.startsWith('data:') && finalUrl.length > 500) ? '' : finalUrl;
+        const storageEntry = {
+          id: targetId,
+          title: finalTitle,
+          category_name: finalCat,
+          aspect_ratio: formAspectRatio,
+          updated_at: nowIso,
+          image_url: sanitizedUrl,
+          image_data: sanitizedUrl,
+        };
+
+        cacheMap[targetId] = storageEntry;
+        cacheMap[cleanId] = storageEntry;
+        if (posterKey === 'safety') cacheMap['safety_message'] = storageEntry;
+        if (isTraffic) {
+          cacheMap['tinh-huong-giao-thong'] = storageEntry;
+          cacheMap['traffic'] = storageEntry;
+          cacheMap['traffic_situation'] = storageEntry;
+        }
+
+        try {
+          localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
+          localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+
+          // Cập nhật cached_posters danh sách metadata rút gọn
+          const posterList = Object.values(cacheMap);
+          const sanitizePostersForCache = (posters: any[]) => {
+            return posters.map(p => ({
+              id: p.id,
+              title: p.title,
+              category_name: p.category_name,
+              aspect_ratio: p.aspect_ratio,
+              updated_at: p.updated_at,
+              image_url: (p.image_url && p.image_url.startsWith('data:') && p.image_url.length > 500) 
+                ? '' 
+                : p.image_url
+            }));
+          };
+          localStorage.setItem('cached_posters', JSON.stringify(sanitizePostersForCache(posterList)));
+        } catch (err) {
+          console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
+        }
+
+        // Bắn sự kiện cập nhật tức thì cho các Component ngoài trang chủ mang dữ liệu đầy đủ
         window.dispatchEvent(
           new CustomEvent('daily_posters_updated', {
             detail: {
               id: targetId,
-              poster: cacheEntry,
+              poster: liveEntry,
             },
           })
         );
       } catch (cacheErr) {
-        console.warn('[DailyPosterWidget] Local cache save error:', cacheErr);
+        console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
       }
 
       // -------------------------------------------------------------

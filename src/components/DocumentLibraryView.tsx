@@ -110,18 +110,35 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
   // Tải danh sách văn bản vĩnh viễn từ Supabase
   const fetchDocuments = async () => {
     try {
+      // 1. Thử truy vấn với select('*')
       const { data, error } = await supabase
         .from('documents')
-        .select('*')
-        .order('published_at', { ascending: false });
-      if (data && data.length > 0) {
-        setDocuments(data);
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        // Sắp xếp an toàn theo published_at hoặc created_at
+        const sorted = [...data].sort((a: any, b: any) => {
+          const dateA = new Date(a.published_at || a.created_at || a.date || 0).getTime();
+          const dateB = new Date(b.published_at || b.created_at || b.date || 0).getTime();
+          return dateB - dateA;
+        });
+        setDocuments(sorted);
+        return;
+      }
+
+      // 2. Fallback gọi danh sách cột chuẩn
+      const { data: colData, error: colError } = await supabase
+        .from('documents')
+        .select('id, document_number, code, title, file_url, file_type, file_size, category, sub_category, published_at');
+
+      if (!colError && colData && colData.length > 0) {
+        setDocuments(colData);
       } else if (initialDocuments && initialDocuments.length > 0) {
         setDocuments(initialDocuments);
       }
     } catch (err) {
       console.warn("fetchDocuments error:", err);
-      if (initialDocuments) setDocuments(initialDocuments);
+      if (initialDocuments && initialDocuments.length > 0) setDocuments(initialDocuments);
     }
   };
 
