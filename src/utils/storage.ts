@@ -32,6 +32,14 @@ export const safeStore = {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
       console.warn('LocalStorage save skipped/failed for key:', key, e);
+      try {
+        localStorage.removeItem('cached_posters');
+        localStorage.removeItem('daily_posters');
+        localStorage.removeItem('daily_posters_cache');
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (retryErr) {
+        console.warn('LocalStorage retry also skipped due to quota limits:', retryErr);
+      }
     }
   },
   remove: (key: string): void => {

@@ -58,6 +58,7 @@ import { UnitLogo, LogoEffectType, LogoSizePreset } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
 import { getSupabase } from '../../utils/supabase';
+import { compressLogoImage } from './SiteConfigModal';
 
 interface CustomizerModalProps {
   isOpen: boolean;
@@ -540,22 +541,31 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
   }, [siteConfig, isOpen]);
 
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       toast.warning('Định dạng không hợp lệ', 'Vui lòng chọn tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP, SVG)!');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      if (result) {
-        setCustomLogoUrl(result);
-        setLogoType('custom');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Tự động thu nhỏ và nén logo qua HTML Canvas về tối đa 250x250px (dung lượng 15KB - 30KB)
+      const compressed = await compressLogoImage(file);
+      setCustomLogoUrl(compressed);
+      setLogoType('custom');
+      toast.success('Đã nén và tải logo!', 'Biểu trưng đã được tối ưu hóa siêu nhẹ (15KB - 30KB), hiển thị sắc nét.');
+    } catch (err) {
+      console.warn('Lỗi nén ảnh qua Canvas, dùng fallback:', err);
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const result = loadEvent.target?.result as string;
+        if (result) {
+          setCustomLogoUrl(result);
+          setLogoType('custom');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // LƯU & ĐỒNG BỘ LOGO REALTIME THEO YÊU CẦU TAB 1
@@ -586,8 +596,9 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       // 1. Lưu cấu hình vào site_config trên Supabase
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          await supabase.from('site_config').upsert(
+        const { error } = await supabase
+          .from('site_config')
+          .upsert(
             {
               id: 'default',
               ...updatedConfig,
@@ -595,29 +606,48 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
             },
             { onConflict: 'id' }
           );
-        } catch (dbErr) {
-          console.warn('[CustomizerModal] Supabase logo sync notice:', dbErr);
+
+        if (error) {
+          alert('❌ Lỗi lưu CSDL: ' + error.message);
+          setIsSyncingLogo(false);
+          return;
         }
       }
 
-      // 2. Lưu vào localStorage cache
-      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
-      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      // 2. Bọc an toàn khi lưu vào LocalStorage ('mangyang_site_config')
+      try {
+        localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+      } catch (storageErr) {
+        console.warn('LocalStorage đầy, tiến hành dọn dẹp và thử lại:', storageErr);
+        try {
+          // Xóa cache cũ để nhường chỗ
+          localStorage.removeItem('cached_posters');
+          localStorage.removeItem('daily_posters');
+          localStorage.removeItem('daily_posters_cache');
+          localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+        } catch (e) {
+          console.warn('Bỏ qua lưu cache local, ưu tiên lưu vào CSDL');
+        }
+      }
+
+      try {
+        localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      } catch {
+        // ignore
+      }
+
       safeStore.set('mangyang_site_config', updatedConfig);
 
-      // 3. Cập nhật tức thì vào State toàn cục của ứng dụng (không cần F5)
+      // 3. Cập nhật State React toàn cục tức thì
       if (onUpdateSiteConfig) {
         onUpdateSiteConfig(updatedConfig);
       } else {
         onSave(updatedConfig);
       }
 
-      toast.success(
-        'ĐÃ LƯU & ĐỒNG BỘ LOGO THÀNH CÔNG!',
-        `Logo ${logoType === 'custom' ? 'Riêng tải lên' : 'Quân kỳ chuẩn'} (${logoSizePx}px) và hiệu ứng đã cập nhật tức thì trên cả Header và Footer.`
-      );
+      alert('✅ Đã lưu và đồng bộ logo thành công!');
     } catch (e: any) {
-      toast.error('Lỗi khi đồng bộ Logo', e?.message || 'Không thể đồng bộ');
+      alert('❌ Lỗi khi đồng bộ Logo: ' + (e?.message || 'Không thể đồng bộ'));
     } finally {
       setIsSyncingLogo(false);
     }
@@ -1361,10 +1391,36 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         }
       }
 
-      // Cập nhật State toàn cục và Cache
-      localStorage.setItem('cached_categories', JSON.stringify(categoriesList));
-      localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
-      localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      // Cập nhật State toàn cục và Cache an toàn
+      try {
+        localStorage.setItem('cached_categories', JSON.stringify(categoriesList));
+      } catch (e) {
+        console.warn('Bỏ qua lưu cached_categories vào localStorage:', e);
+      }
+
+      try {
+        localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+      } catch (storageErr) {
+        console.warn('LocalStorage đầy, tiến hành dọn dẹp và thử lại:', storageErr);
+        try {
+          // Xóa cache cũ để nhường chỗ
+          localStorage.removeItem('cached_posters');
+          localStorage.removeItem('daily_posters');
+          localStorage.removeItem('daily_posters_cache');
+          localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
+        } catch (e) {
+          console.warn('Bỏ qua lưu cache local, ưu tiên lưu vào CSDL');
+        }
+      }
+
+      try {
+        localStorage.setItem('site_config_cache', JSON.stringify(updatedConfig));
+      } catch (e) {
+        // ignore
+      }
+
+      safeStore.set('mangyang_site_config', updatedConfig);
+
       if (onUpdateSiteConfig) {
         onUpdateSiteConfig(updatedConfig);
       }

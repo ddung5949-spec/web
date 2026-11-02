@@ -10,7 +10,41 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { getSupabase } from '../../utils/supabase';
-import { compressPosterImage } from '../DailyPosterWidget';
+
+/**
+ * Tự động vẽ ảnh lên HTML Canvas, giới hạn kích thước tối đa không quá 800px,
+ * xuất ra JPEG chất lượng 0.75. Tốc độ xử lý < 0.1s, dung lượng < 80KB.
+ */
+const compressPosterImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > h && w > MAX_DIM) {
+          h = Math.round((h * MAX_DIM) / w);
+          w = MAX_DIM;
+        } else if (h > MAX_DIM) {
+          w = Math.round((w * MAX_DIM) / h);
+          h = MAX_DIM;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => reject(new Error('Không thể đọc hình ảnh.'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Lỗi khi đọc file.'));
+    reader.readAsDataURL(file);
+  });
+};
 
 export interface DailyPosterModalProps {
   isOpen: boolean;
@@ -96,39 +130,17 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
 
     try {
       setIsCompressing(true);
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `poster_${targetId}_${Date.now()}.${fileExt}`;
-      const supabase = getSupabase();
-
-      let uploadedUrl = '';
-      if (supabase && supabase.storage) {
-        try {
-          const { data: uploadData, error: uploadErr } = await supabase.storage
-            .from('posters')
-            .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-          if (!uploadErr && uploadData) {
-            const { data: publicData } = supabase.storage.from('posters').getPublicUrl(fileName);
-            if (publicData?.publicUrl) {
-              uploadedUrl = `${publicData.publicUrl}?t=${Date.now()}`;
-            }
-          }
-        } catch (storageErr) {
-          console.warn('[DailyPosterModal] Storage upload fallback:', storageErr);
-        }
-      }
-
-      if (uploadedUrl) {
-        setFormImage(uploadedUrl);
-      } else {
-        const compressedBase64 = await compressPosterImage(file, 800, 0.7);
-        setFormImage(compressedBase64);
-      }
+      // Nén ảnh Canvas tức thì trong 0.1s, đưa dung lượng về dưới 80KB
+      const compressedBase64 = await compressPosterImage(file);
+      setFormImage(compressedBase64);
     } catch (err) {
-      console.error('[DailyPosterModal] File error:', err);
+      console.error('[DailyPosterModal] File compression error:', err);
       alert('Không thể tải hoặc xử lý ảnh. Vui lòng thử lại với ảnh khác.');
     } finally {
       setIsCompressing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -144,7 +156,7 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
       const nowIso = new Date().toISOString();
       const rawImg = formImage || initialImage || '';
 
-      // Thêm timestamp chống cache URL ảnh (?t=timestamp)
+      // Thêm timestamp chống cache URL ảnh nếu là liên kết http
       let finalUrl = rawImg;
       if (finalUrl && finalUrl.startsWith('http')) {
         finalUrl = finalUrl.includes('?t=')
@@ -156,7 +168,7 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
       const finalTitle = formTitle.trim() || defaultCategory;
 
       const posterRecord = {
-        id: targetId, // 'tinh-huong-giao-thong'
+        id: targetId, // 'tinh-huong-giao-thong' | 'safety' | 'good_deed'
         title: finalTitle,
         category_name: finalCategory,
         image_url: finalUrl,
@@ -194,29 +206,49 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
         }
       }
 
-      // 2. Cập nhật localStorage để nạp tức thì
+      // 2. Cập nhật localStorage an toàn (CHỐNG TRÀN BỘ NHỚ QuotaExceededError)
       try {
         const cachedRaw =
           localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
-        cacheMap[targetId] = posterRecord;
+
+        // Rút gọn: tuyệt đối không nhồi Base64 dài quá 500 ký tự vào LocalStorage
+        const sanitizedUrl = (finalUrl && finalUrl.startsWith('data:') && finalUrl.length > 500) ? '' : finalUrl;
+        const storageRecord = {
+          ...posterRecord,
+          image_url: sanitizedUrl,
+          image_data: sanitizedUrl,
+        };
+
+        cacheMap[targetId] = storageRecord;
         if (isTraffic) {
-          cacheMap['tinh-huong-giao-thong'] = posterRecord;
-          cacheMap['traffic'] = posterRecord;
-          cacheMap['traffic_situation'] = posterRecord;
+          cacheMap['tinh-huong-giao-thong'] = storageRecord;
+          cacheMap['traffic'] = storageRecord;
+          cacheMap['traffic_situation'] = storageRecord;
         } else if (isSafety) {
-          cacheMap['safety'] = posterRecord;
-          cacheMap['safety_message'] = posterRecord;
+          cacheMap['safety'] = storageRecord;
+          cacheMap['safety_message'] = storageRecord;
         } else {
-          cacheMap['good_deed'] = posterRecord;
+          cacheMap['good_deed'] = storageRecord;
         }
         localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
         localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
+
+        // Metadata ngắn gọn không chứa Base64 cho cached_posters
+        const posterList = Object.values(cacheMap).map((p: any) => ({
+          id: p.id,
+          title: p.title || '',
+          category_name: p.category_name || '',
+          aspect_ratio: p.aspect_ratio || 'auto',
+          updated_at: p.updated_at || '',
+          image_url: (p.image_url && p.image_url.startsWith('data:') && p.image_url.length > 500) ? '' : (p.image_url || ''),
+        }));
+        localStorage.setItem('cached_posters', JSON.stringify(posterList));
       } catch (err) {
-        console.warn('[DailyPosterModal] Local cache write error:', err);
+        console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
       }
 
-      // 3. Phát CustomEvent để State ngoài trang chủ cập nhật tức thì
+      // 3. Phát CustomEvent để State ngoài trang chủ cập nhật tức thì (đầy đủ ảnh gốc trong RAM)
       window.dispatchEvent(
         new CustomEvent('daily_posters_updated', {
           detail: {
@@ -255,7 +287,7 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
         await Promise.resolve(onSaveDailyWidgets(nextList));
       }
 
-      alert('✅ Cập nhật Poster thành công!');
+      // Đóng modal tức thì
       onClose();
     } catch (err: any) {
       console.error('[DailyPosterModal] Save error:', err);
@@ -447,11 +479,16 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
               className="px-5 py-2 bg-gradient-to-r from-amber-700 to-yellow-700 hover:from-amber-800 hover:to-yellow-800 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors disabled:opacity-50"
             >
               {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>⏳ Đang lưu...</span>
+                </>
               ) : (
-                <Check className="w-4 h-4" />
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>✓ LƯU POSTER</span>
+                </>
               )}
-              <span>✓ LƯU POSTER</span>
             </button>
           </div>
         </form>

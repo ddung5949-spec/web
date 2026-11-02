@@ -55,7 +55,7 @@ import {
   User,
   CategoryConfig,
 } from '../types';
-import { defaultCategoriesConfig, defaultSidebarWidgets } from '../data/initialData';
+import { defaultCategoriesConfig, defaultSidebarWidgets, defaultArticles, defaultDocuments, defaultUncleHoQuotes } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
 import { DailyWidgetsSection } from './DailyWidgetsSection';
 import { DailyPosterWidget } from './DailyPosterWidget';
@@ -134,20 +134,34 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const isAdmin = currentUser?.role === 'admin';
 
-  // Live state đồng bộ trực tiếp từ CSDL nếu props ban đầu chưa có
+  // Live state đồng bộ an toàn từ CSDL nếu props ban đầu rỗng
   const [liveArticles, setLiveArticles] = useState<Article[]>([]);
   const [liveDocuments, setLiveDocuments] = useState<DocumentItem[]>([]);
+  const [liveUncleHoQuotes, setLiveUncleHoQuotes] = useState<UncleHoQuote[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const effectiveArticles = (articles && articles.length > 0) ? articles : liveArticles;
-  const effectiveDocuments = (documents && documents.length > 0) ? documents : liveDocuments;
-  const approvedArticles = (effectiveArticles || []).filter((a) => !a?.status || a.status === 'approved' || a.status !== 'pending');
+  const effectiveArticles = (articles && articles.length > 0)
+    ? articles
+    : (liveArticles.length > 0 ? liveArticles : defaultArticles);
+
+  const effectiveDocuments = (documents && documents.length > 0)
+    ? documents
+    : (liveDocuments.length > 0 ? liveDocuments : defaultDocuments);
+
+  const effectiveUncleHoQuotes = (uncleHoQuotes && uncleHoQuotes.length > 0)
+    ? uncleHoQuotes
+    : (liveUncleHoQuotes.length > 0 ? liveUncleHoQuotes : defaultUncleHoQuotes);
+
+  const approvedArticles = (effectiveArticles || []).filter(
+    (a) => !a?.status || a.status === 'approved' || a.status !== 'pending'
+  );
 
   // Modals state for Admin
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [isSectionManagerModalOpen, setIsSectionManagerModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
 
-  // Helper rút gọn metadata poster trước khi lưu cache localStorage tránh QuotaExceededError
+  // Helper rút gọn metadata poster trước khi lưu cache localStorage - TUYỆT ĐỐI KHÔNG LƯU ẢNH BASE64
   const sanitizePostersForCache = (posters: any[]) => {
     return (posters || []).map((p) => ({
       id: p.id || p.key || p.widget_id,
@@ -155,11 +169,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
       category_name: p.category_name || p.categoryName || '',
       aspect_ratio: p.aspect_ratio || p.aspectRatio || 'auto',
       updated_at: p.updated_at || p.updatedAt || '',
-      // Nếu là chuỗi data:image dài quá 500 ký tự thì không nhét vào localStorage
+      // Xóa chuỗi ảnh Base64 khỏi localStorage
       image_url:
-        p.image_url && p.image_url.startsWith('data:') && p.image_url.length > 500
-          ? ''
-          : p.image_url || '',
+        p.image_url && typeof p.image_url === 'string' && !p.image_url.startsWith('data:') && p.image_url.length <= 500
+          ? p.image_url
+          : '',
     }));
   };
 
@@ -175,22 +189,37 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const effectiveDailyPosters = React.useMemo(() => {
     return {
-      ...dailyPosters,
+      ...(dailyPosters || {}),
       ...(propsDailyPosters || {}),
     };
   }, [dailyPosters, propsDailyPosters]);
 
-  // Tải dữ liệu từ Supabase bảng 'daily_posters', 'articles', 'documents' khi khởi tạo
+  // CƠ CHẾ FETCH DỮ LIỆU AN TOÀN, CÓ TIMEOUT 5 GIÂY, CHỐNG TREO LOADING VÔ TẬN
   React.useEffect(() => {
     let isMounted = true;
 
-    // 1. Tải daily_posters
-    const fetchDailyPosters = async () => {
+    // Helper hàm timeout an toàn: sau 5s nếu mạng treo tự ngắt và trả về fallback
+    const withTimeout = <T,>(promise: PromiseLike<T>, ms = 5000, fallback: T): Promise<T> => {
+      return Promise.race([
+        Promise.resolve(promise),
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+      ]);
+    };
+
+    // 1. fetchPosters
+    const fetchPosters = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
-        const { data, error } = await supabase.from('daily_posters').select('*');
-        if (!error && data && Array.isArray(data) && data.length > 0) {
+
+        const res = await withTimeout(
+          supabase.from('daily_posters').select('*'),
+          5000,
+          { data: null, error: new Error('Timeout') } as any
+        );
+        const data = res?.data;
+
+        if (data && Array.isArray(data) && data.length > 0) {
           const map: Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }> = {};
           data.forEach((row: any) => {
             const rawId = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
@@ -235,17 +264,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
             setDailyPosters((prev) => ({ ...prev, ...map }));
           }
 
-          // Lưu cached_posters dạng danh sách metadata rút gọn an toàn tuyệt đối
+          // Lưu cache: Chỉ lưu danh sách ID và Tiêu đề ngắn gọn, không lưu ảnh Base64
           try {
             localStorage.setItem('cached_posters', JSON.stringify(sanitizePostersForCache(data)));
-          } catch (err) {
+          } catch {
             console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
           }
 
           try {
             const currentCache = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
             const mergedCache = currentCache ? { ...JSON.parse(currentCache), ...map } : map;
-            // Làm nhẹ localStorage: không lưu base64 dài hơn 500 ký tự
             const lightweightMap: Record<string, any> = {};
             Object.entries(mergedCache).forEach(([k, v]: [string, any]) => {
               const isHeavy =
@@ -256,121 +284,144 @@ export const HomeView: React.FC<HomeViewProps> = ({
             });
             localStorage.setItem('daily_posters', JSON.stringify(lightweightMap));
             localStorage.setItem('daily_posters_cache', JSON.stringify(lightweightMap));
-          } catch (err) {
+          } catch {
             console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
           }
         }
       } catch (err) {
-        console.warn('Error fetching daily_posters in HomeView:', err);
+        console.warn('[HomeView] fetchPosters error caught gracefully:', err);
       }
     };
 
-    // 2. Đồng bộ truy vấn articles và documents với schema CSDL (select('*'))
-    const fetchArticlesAndDocuments = async () => {
+    // 2. fetchArticles
+    const fetchArticles = async () => {
       try {
         const supabase = getSupabase();
         if (!supabase) return;
 
-        // Truy vấn articles dùng select('*')
-        supabase
-          .from('articles')
-          .select('*')
-          .order('published_at', { ascending: false })
-          .limit(10)
-          .then(
-            ({ data: artData, error: artError }) => {
-              if (!isMounted) return;
-              if (!artError && artData && Array.isArray(artData) && artData.length > 0) {
-                const mapped: Article[] = artData.map((row: any) => ({
-                  id: Number(row.id),
-                  title: row.title || '',
-                  excerpt: row.summary || row.excerpt || '',
-                  summary: row.summary || row.excerpt || '',
-                  content: row.content || '',
-                  category: row.category || 'Tin tức',
-                  subCategory: row.sub_category || row.subCategory || '',
-                  sectionKey: row.section_key || row.category || 'all',
-                  author: row.author || 'Ban Biên tập',
-                  authorRole: row.author_role || row.authorRole || '',
-                  date: row.published_at
-                    ? new Date(row.published_at).toLocaleDateString('vi-VN')
-                    : row.date || 'Hôm nay',
-                  image: row.image_url || row.image || '',
-                  images: Array.isArray(row.images) ? row.images : row.image_url ? [row.image_url] : [],
-                  views: Number(row.views || 0),
-                  isFeatured: !!row.is_featured,
-                  status: row.status || 'approved',
-                }));
-                setLiveArticles(mapped);
-              }
-            },
-            () => {}
-          );
+        const res = await withTimeout(
+          supabase.from('articles').select('*').order('published_at', { ascending: false }).limit(10),
+          5000,
+          { data: null, error: new Error('Timeout') } as any
+        );
+        const artData = res?.data;
 
-        // Truy vấn documents dùng select('*') hoặc danh sách cột chuẩn
-        supabase
-          .from('documents')
-          .select('id, document_number, code, title, file_url, file_type, file_size, category, sub_category, published_at')
-          .order('published_at', { ascending: false })
-          .limit(8)
-          .then(
-            ({ data: docData, error: docError }) => {
-              if (!isMounted) return;
-              if (!docError && docData && Array.isArray(docData) && docData.length > 0) {
-                const mappedDocs: DocumentItem[] = docData.map((item: any) => ({
-                  id: Number(item.id),
-                  code: item.document_number || item.code || '',
-                  title: item.title || '',
-                  category: item.category || 'Văn bản chỉ đạo',
-                  issuer: 'Trung đoàn 95',
-                  date: item.published_at ? new Date(item.published_at).toLocaleDateString('vi-VN') : '28/08/2026',
-                  type: item.file_type || 'pdf',
-                  fileUrl: item.file_url || undefined,
-                  fileSize: item.file_size || undefined,
-                  downloads: 0,
-                  secretLevel: 'normal',
-                }));
-                setLiveDocuments(mappedDocs);
-              } else {
-                // Fallback select('*')
-                supabase
-                  .from('documents')
-                  .select('*')
-                  .limit(8)
-                  .then(
-                    ({ data: allDocs }) => {
-                      if (isMounted && allDocs && Array.isArray(allDocs) && allDocs.length > 0) {
-                        const mappedDocs: DocumentItem[] = allDocs.map((item: any) => ({
-                          id: Number(item.id),
-                          code: item.document_number || item.code || item.code_number || '',
-                          title: item.title || '',
-                          category: item.category || 'Văn bản chỉ đạo',
-                          issuer: item.issuer || 'Trung đoàn 95',
-                          date: item.published_at
-                            ? new Date(item.published_at).toLocaleDateString('vi-VN')
-                            : '28/08/2026',
-                          type: item.file_type || item.type || 'pdf',
-                          fileUrl: item.file_url || item.fileUrl,
-                          fileSize: item.file_size || item.fileSize,
-                          downloads: Number(item.downloads || 0),
-                          secretLevel: item.secret_level || 'normal',
-                        }));
-                        setLiveDocuments(mappedDocs);
-                      }
-                    },
-                    () => {}
-                  );
-              }
-            },
-            () => {}
-          );
+        if (isMounted && artData && Array.isArray(artData) && artData.length > 0) {
+          const mapped: Article[] = artData.map((row: any) => ({
+            id: Number(row.id),
+            title: row.title || '',
+            excerpt: row.summary || row.excerpt || '',
+            summary: row.summary || row.excerpt || '',
+            content: row.content || '',
+            category: row.category || 'Tin tức',
+            subCategory: row.sub_category || row.subCategory || '',
+            sectionKey: row.section_key || row.category || 'all',
+            author: row.author || 'Ban Biên tập',
+            authorRole: row.author_role || row.authorRole || '',
+            date: row.published_at
+              ? new Date(row.published_at).toLocaleDateString('vi-VN')
+              : row.date || 'Hôm nay',
+            image: row.image_url || row.image || '',
+            images: Array.isArray(row.images) ? row.images : row.image_url ? [row.image_url] : [],
+            views: Number(row.views || 0),
+            isFeatured: !!row.is_featured,
+            status: row.status || 'approved',
+          }));
+          setLiveArticles(mapped);
+        }
       } catch (err) {
-        console.warn('Lỗi tải articles và documents trong HomeView:', err);
+        console.warn('[HomeView] fetchArticles error caught gracefully:', err);
       }
     };
 
-    fetchDailyPosters();
-    fetchArticlesAndDocuments();
+    // 3. fetchDocuments
+    const fetchDocuments = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        const res = await withTimeout(
+          supabase.from('documents').select('*').limit(8),
+          5000,
+          { data: null, error: new Error('Timeout') } as any
+        );
+        const docData = res?.data;
+
+        if (isMounted && docData && Array.isArray(docData) && docData.length > 0) {
+          const mappedDocs: DocumentItem[] = docData.map((item: any) => ({
+            id: Number(item.id),
+            code: item.document_number || item.code || item.code_number || '',
+            title: item.title || '',
+            category: item.category || 'Văn bản chỉ đạo',
+            issuer: item.issuer || 'Trung đoàn 95',
+            date: item.published_at ? new Date(item.published_at).toLocaleDateString('vi-VN') : '28/08/2026',
+            type: item.file_type || item.type || 'pdf',
+            fileUrl: item.file_url || item.fileUrl,
+            fileSize: item.file_size || item.fileSize,
+            downloads: Number(item.downloads || 0),
+            secretLevel: item.secret_level || 'normal',
+          }));
+          setLiveDocuments(mappedDocs);
+        }
+      } catch (err) {
+        console.warn('[HomeView] fetchDocuments error caught gracefully:', err);
+      }
+    };
+
+    // 4. fetchUncleHo
+    const fetchUncleHo = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        const res = await withTimeout(
+          supabase.from('uncle_ho_quotes').select('*').limit(366),
+          5000,
+          { data: null, error: new Error('Timeout') } as any
+        );
+        const qData = res?.data;
+
+        if (isMounted && qData && Array.isArray(qData) && qData.length > 0) {
+          setLiveUncleHoQuotes(qData as any);
+        } else {
+          // Fallback sang uncle_ho_teachings
+          const fbRes = await withTimeout(
+            supabase.from('uncle_ho_teachings').select('*').limit(366),
+            5000,
+            { data: null, error: new Error('Timeout') } as any
+          );
+          if (isMounted && fbRes?.data && Array.isArray(fbRes.data) && fbRes.data.length > 0) {
+            setLiveUncleHoQuotes(fbRes.data as any);
+          } else if (isMounted) {
+            setLiveUncleHoQuotes(defaultUncleHoQuotes);
+          }
+        }
+      } catch (err) {
+        console.warn('[HomeView] fetchUncleHo error caught gracefully:', err);
+        if (isMounted) setLiveUncleHoQuotes(defaultUncleHoQuotes);
+      }
+    };
+
+    // Khởi chạy tất cả fetch an toàn độc lập, LUÔN LUÔN gọi setLoading(false) trong finally
+    const loadAllDataSafely = async () => {
+      setLoading(true);
+      try {
+        await Promise.allSettled([
+          fetchPosters(),
+          fetchArticles(),
+          fetchDocuments(),
+          fetchUncleHo(),
+        ]);
+      } catch (globalErr) {
+        console.warn('[HomeView] loadAllDataSafely error caught:', globalErr);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAllDataSafely();
 
     const handlePosterUpdated = (e: any) => {
       const p = e?.detail?.poster;
@@ -784,13 +835,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {/* LEFT COLUMN */}
           {hasLeftColumn && (
             <div className="flex flex-col gap-4 w-full">
-              {leftWidgets.map((widget) => {
+              {(leftWidgets || []).map((widget) => {
                 switch (widget.id) {
                   case 'uncle_ho':
                     return (
                       <UncleHoDailySection
                         key="widget-uncle-ho"
-                        quotes={uncleHoQuotes}
+                        quotes={effectiveUncleHoQuotes}
                         settings={uncleHoSettings}
                         currentUser={currentUser}
                         isLoading={isLoading}
@@ -931,13 +982,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {/* RIGHT COLUMN */}
           {hasRightColumn && (
             <div className="flex flex-col gap-4 w-full">
-              {rightWidgets.map((widget) => {
+              {(rightWidgets || []).map((widget) => {
                 switch (widget.id) {
                   case 'uncle_ho':
                     return (
                       <UncleHoDailySection
                         key="widget-uncle-ho"
-                        quotes={uncleHoQuotes}
+                        quotes={effectiveUncleHoQuotes}
                         settings={uncleHoSettings}
                         currentUser={currentUser}
                         isLoading={isLoading}
@@ -1087,9 +1138,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           {/* Dynamic Equal-Height / Dynamic Size Categories & Embedded Content Columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-            {activeColumns.map((col) => {
+            {(activeColumns || []).map((col) => {
               const isEmbed = col.type === 'embed_code';
-              const matchedCat = availableCategories.find(
+              const matchedCat = (availableCategories || []).find(
                 (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
               );
               const displayTitle = matchedCat?.name || col.title;
@@ -1100,7 +1151,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
               const colArticles = isEmbed
                 ? []
-                : approvedArticles
+                : (approvedArticles || [])
                     .filter((a) => {
                       const matchSection =
                         !col.sectionKey ||
@@ -1187,9 +1238,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           </div>
                         )}
                       </div>
-                    ) : colArticles.length > 0 ? (
+                    ) : colArticles && colArticles.length > 0 ? (
                       <div className="p-3 space-y-2 flex-1">
-                        {colArticles.map((art) => (
+                        {(colArticles || []).map((art) => (
                           <div
                             key={art.id}
                             onClick={() => onOpenArticle(art)}

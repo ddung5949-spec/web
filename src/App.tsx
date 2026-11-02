@@ -3046,8 +3046,20 @@ export function App() {
     }
     safeStore.set("mangyang_site_config", newConfig);
     try {
-      localStorage.setItem("site_config_cache", JSON.stringify(newConfig));
       localStorage.setItem("mangyang_site_config", JSON.stringify(newConfig));
+    } catch (storageErr) {
+      console.warn("LocalStorage đầy, tiến hành dọn dẹp và thử lại:", storageErr);
+      try {
+        localStorage.removeItem("cached_posters");
+        localStorage.removeItem("daily_posters");
+        localStorage.removeItem("daily_posters_cache");
+        localStorage.setItem("mangyang_site_config", JSON.stringify(newConfig));
+      } catch {
+        console.warn("Bỏ qua lưu cache local, ưu tiên lưu vào CSDL");
+      }
+    }
+    try {
+      localStorage.setItem("site_config_cache", JSON.stringify(newConfig));
     } catch {
       // ignore
     }
