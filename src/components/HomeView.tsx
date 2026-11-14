@@ -217,9 +217,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
-        const data = res?.data;
+        const data = !res?.error ? res?.data : null;
 
-        if (data && Array.isArray(data) && data.length > 0) {
+        if (!res?.error && data && Array.isArray(data) && data.length > 0) {
           const map: Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }> = {};
           data.forEach((row: any) => {
             const rawId = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
@@ -304,9 +304,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
-        const artData = res?.data;
+        const artData = !res?.error ? res?.data : null;
 
-        if (isMounted && artData && Array.isArray(artData) && artData.length > 0) {
+        if (isMounted && !res?.error && artData && Array.isArray(artData) && artData.length > 0) {
           const mapped: Article[] = artData.map((row: any) => ({
             id: Number(row.id),
             title: row.title || '',
@@ -345,9 +345,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
-        const docData = res?.data;
+        const docData = !res?.error ? res?.data : null;
 
-        if (isMounted && docData && Array.isArray(docData) && docData.length > 0) {
+        if (isMounted && !res?.error && docData && Array.isArray(docData) && docData.length > 0) {
           const mappedDocs: DocumentItem[] = docData.map((item: any) => ({
             id: Number(item.id),
             code: item.document_number || item.code || item.code_number || '',
@@ -379,9 +379,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
-        const qData = res?.data;
+        const qData = !res?.error ? res?.data : null;
 
-        if (isMounted && qData && Array.isArray(qData) && qData.length > 0) {
+        if (isMounted && !res?.error && qData && Array.isArray(qData) && qData.length > 0) {
           setLiveUncleHoQuotes(qData as any);
         } else {
           // Fallback sang uncle_ho_teachings
@@ -390,7 +390,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             5000,
             { data: null, error: new Error('Timeout') } as any
           );
-          if (isMounted && fbRes?.data && Array.isArray(fbRes.data) && fbRes.data.length > 0) {
+          if (isMounted && !fbRes?.error && fbRes?.data && Array.isArray(fbRes.data) && fbRes.data.length > 0) {
             setLiveUncleHoQuotes(fbRes.data as any);
           } else if (isMounted) {
             setLiveUncleHoQuotes(defaultUncleHoQuotes);

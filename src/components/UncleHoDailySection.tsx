@@ -232,9 +232,16 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
 
   // Autoplay Slideshow 4.5s/lần
   useEffect(() => {
-    if (!isPlaying || albumImages.length <= 1) return;
+    if (!isPlaying || !albumImages || albumImages.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % albumImages.length);
+      try {
+        setCurrentSlideIndex((prev) => {
+          if (!albumImages || albumImages.length <= 1) return 0;
+          return (prev + 1) % albumImages.length;
+        });
+      } catch {
+        // ignore interval errors
+      }
     }, 4500);
     return () => clearInterval(interval);
   }, [isPlaying, albumImages.length]);
@@ -284,16 +291,33 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
   }, [effectiveQuotes, todayStr]);
 
   // Chuyển slide tiếp theo / trước đó
+  const safeAlbumImages =
+    Array.isArray(albumImages) && albumImages.length > 0
+      ? albumImages
+      : DEFAULT_UNCLE_HO_IMAGES;
+  const safeSlideIdx =
+    safeAlbumImages.length > 0
+      ? currentSlideIndex % safeAlbumImages.length
+      : 0;
+  const currentSlideImage =
+    safeAlbumImages[safeSlideIdx] ||
+    safeAlbumImages[0] ||
+    DEFAULT_UNCLE_HO_IMAGES[0];
+
+  if (!currentQuote || !currentSlideImage) {
+    return null;
+  }
+
   const handlePrevSlide = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (albumImages.length <= 1) return;
-    setCurrentSlideIndex((prev) => (prev - 1 + albumImages.length) % albumImages.length);
+    if (!safeAlbumImages || safeAlbumImages.length <= 1) return;
+    setCurrentSlideIndex((prev) => (prev - 1 + safeAlbumImages.length) % safeAlbumImages.length);
   };
 
   const handleNextSlide = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (albumImages.length <= 1) return;
-    setCurrentSlideIndex((prev) => (prev + 1) % albumImages.length);
+    if (!safeAlbumImages || safeAlbumImages.length <= 1) return;
+    setCurrentSlideIndex((prev) => (prev + 1) % safeAlbumImages.length);
   };
 
   return (
@@ -339,8 +363,8 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           onMouseLeave={() => setIsPlaying(true)}
         >
           <img
-            src={albumImages[currentSlideIndex % (albumImages.length || 1)] || DEFAULT_UNCLE_HO_IMAGES[0]}
-            alt={`Chân dung Bác Hồ - Ảnh ${currentSlideIndex + 1}`}
+            src={currentSlideImage}
+            alt={`Chân dung Bác Hồ - Ảnh ${safeSlideIdx + 1}`}
             className="w-full h-full object-cover transition-opacity duration-700 cursor-pointer hover:scale-102"
             loading="lazy"
             decoding="async"
@@ -351,14 +375,14 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                 target.src = DEFAULT_UNCLE_HO_IMAGES[0];
               }
             }}
-            onClick={() => setLightboxImage(albumImages[currentSlideIndex % (albumImages.length || 1)] || DEFAULT_UNCLE_HO_IMAGES[0])}
+            onClick={() => setLightboxImage(currentSlideImage)}
           />
 
           {/* Lớp phủ gradient viền dưới nhẹ */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
 
           {/* Nút mũi tên chuyển slide */}
-          {albumImages.length > 1 && (
+          {safeAlbumImages.length > 1 && (
             <>
               <button
                 type="button"
@@ -383,13 +407,13 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
           <div className="absolute bottom-2 left-0 right-0 px-3 flex items-center justify-between text-white text-[10px]">
             {/* Chấm tròn chỉ số slide */}
             <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xs px-2 py-0.5 rounded-full border border-white/20">
-              {albumImages.map((_, idx) => (
+              {safeAlbumImages.map((_, idx) => (
                 <button
                   key={`dot-${idx}`}
                   type="button"
                   onClick={() => setCurrentSlideIndex(idx)}
                   className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    idx === currentSlideIndex % albumImages.length
+                    idx === safeSlideIdx
                       ? 'w-4 bg-amber-400'
                       : 'w-1.5 bg-white/50 hover:bg-white/80'
                   }`}
@@ -397,7 +421,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
                 />
               ))}
               <span className="text-[9px] font-bold text-amber-300 ml-1">
-                {currentSlideIndex + 1}/{albumImages.length}
+                {safeSlideIdx + 1}/{safeAlbumImages.length}
               </span>
             </div>
 
@@ -413,7 +437,7 @@ export const UncleHoDailySection: React.FC<UncleHoDailySectionProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setLightboxImage(albumImages[currentSlideIndex % albumImages.length])}
+                onClick={() => setLightboxImage(currentSlideImage)}
                 className="p-1 bg-black/60 hover:bg-black/80 rounded-full border border-white/20 text-white transition-colors cursor-pointer"
                 title="Xem ảnh phóng to"
               >

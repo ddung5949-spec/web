@@ -881,14 +881,19 @@ export const supabaseDb = {
     if (!supabase) return null;
 
     try {
-      const { data, error } = await supabase.from('site_config').select('*').limit(1).maybeSingle();
+      const { data, error } = await supabase
+        .from('site_config')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) {
         console.warn('Supabase fetchSiteConfig error:', error.message);
         return null;
       }
       if (data) {
         const row = data;
-        let config = row.config_json || row.config || row.data || row;
+        let config: any = row.config || row.config_json || row.data || row;
         if (typeof config === 'string') {
           try {
             config = JSON.parse(config);
@@ -898,8 +903,53 @@ export const supabaseDb = {
         }
         if (config && typeof config === 'object') {
           const result: any = { ...config };
-          if (row.title) result.title = row.title;
-          if (row.subtitle) result.subtitle = row.subtitle;
+          const resolvedTitle = row.header_title || row.title || result.header_title || result.title;
+          const resolvedSubtitle = row.sub_title || row.subtitle || result.sub_title || result.subtitle;
+          const resolvedSlogan = row.slogan || result.slogan;
+          const resolvedFounded = row.founded_date || result.founded_date || result.establishedDate;
+
+          if (resolvedTitle) {
+            result.title = resolvedTitle;
+            result.header_title = resolvedTitle;
+          }
+          if (resolvedSubtitle) {
+            result.subtitle = resolvedSubtitle;
+            result.sub_title = resolvedSubtitle;
+          }
+          if (resolvedSlogan) {
+            result.slogan = resolvedSlogan;
+          }
+          if (resolvedFounded) {
+            result.founded_date = resolvedFounded;
+            result.establishedDate = resolvedFounded;
+          }
+
+          // Đồng bộ chuẩn các trường Logo từ cột rời và JSON config
+          const resolvedLogoUrl =
+            row.logo_url !== undefined && row.logo_url !== null && row.logo_url !== ''
+              ? row.logo_url
+              : result.logo_url ?? result.customLogoUrl ?? '';
+          const resolvedLogoType =
+            row.logo_type ||
+            result.logo_type ||
+            result.logoType ||
+            (resolvedLogoUrl ? 'custom' : 'default');
+          const resolvedLogoSize =
+            row.logo_size ?? result.logo_size ?? result.logoSize ?? result.logoSizePx ?? 48;
+          const resolvedLogoEffect =
+            row.logo_effect || result.logo_effect || result.logoEffect || 'shine';
+
+          result.logo_url = resolvedLogoUrl;
+          result.customLogoUrl = resolvedLogoUrl;
+          result.logo_type = resolvedLogoType;
+          result.logoType = resolvedLogoType;
+          result.logo_size = resolvedLogoSize;
+          if (typeof resolvedLogoSize === 'number' || !isNaN(Number(resolvedLogoSize))) {
+            result.logoSizePx = Number(resolvedLogoSize) || 48;
+          }
+          result.logo_effect = resolvedLogoEffect;
+          result.logoEffect = resolvedLogoEffect;
+
           if (row.marquee_text) {
             result.ticker = row.marquee_text;
             result.marquee_text = row.marquee_text;
@@ -1120,11 +1170,24 @@ export const supabaseDb = {
         });
       }
 
-      // 1. Primary payload containing all compatible columns as requested
+      // 1. Primary payload containing all compatible columns + full JSON config
+      const resolvedLogoUrl = configData.logo_url ?? configData.customLogoUrl ?? '';
+      const resolvedLogoType =
+        configData.logo_type || configData.logoType || (resolvedLogoUrl ? 'custom' : 'default');
+      const resolvedLogoSize =
+        Number(configData.logo_size ?? configData.logoSizePx ?? configData.logoSize) || 48;
+      const resolvedLogoEffect = configData.logo_effect || configData.logoEffect || 'shine';
+      const resolvedHeaderTitle = configData.header_title || configData.title || '';
+      const resolvedSubTitle = configData.sub_title || configData.subtitle || '';
+
       const payload: any = {
         id: 'default',
-        title: configData.title || '',
-        subtitle: configData.subtitle || '',
+        title: configData.title || resolvedHeaderTitle,
+        subtitle: configData.subtitle || resolvedSubTitle,
+        header_title: resolvedHeaderTitle,
+        sub_title: resolvedSubTitle,
+        slogan: configData.slogan || configData.marquee_text || configData.ticker || '',
+        founded_date: configData.founded_date || configData.establishedDate || '',
         unit_name: configData.footerUnitName || configData.site_info?.unit_name || configData.title || '',
         marquee_text: configData.ticker || configData.marquee_text || '',
         marquee_mode: configData.marquee_mode || configData.tickerMode || 'combined',
@@ -1134,83 +1197,101 @@ export const supabaseDb = {
         site_info: configData.site_info || {},
         footer_config: configData.footer_config || {},
         theme_color: configData.colorRed || '#b91c1c',
+        home_layout: configData.layoutSettings || configData.home_layout,
+        layout_settings: configData.layoutSettings,
         daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
         daily_posters: dailyWidgetsDict,
         categories_config: configData.categories_config || configData.categoriesConfig || [],
         navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
+        home_category_columns: configData.homeCategoryColumns,
+        logo_url: resolvedLogoUrl,
+        logo_type: resolvedLogoType,
+        logo_size: resolvedLogoSize,
+        logo_size_px: configData.logoSizePx ?? resolvedLogoSize,
+        footer_logo_size_px: configData.footerLogoSizePx,
+        logo_effect: resolvedLogoEffect,
+        enable_logo_beam: configData.enableLogoBeam,
+        enable_logo_glow: configData.enableLogoGlow,
+        config: configData,
+        config_json: configData,
         updated_at: now,
       };
 
-      const { error } = await supabase.from('site_config').upsert(payload, { onConflict: 'id' });
-      if (!error) {
+      const res = await this.upsertSiteConfigResilient(payload);
+      if (res.success) {
         return { success: true };
       }
 
-      // If column mismatch (e.g. some columns do not exist in custom schema), try fallback variations
-      const fallbackPayloads = [
-        {
-          id: 'default',
-          categories_config: configData.categories_config || configData.categoriesConfig || [],
-          navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
-          updated_at: now,
-        },
-        {
-          id: 'default',
-          title: configData.title || '',
-          subtitle: configData.subtitle || '',
-          unit_name: configData.footerUnitName || configData.title || '',
-          marquee_text: configData.ticker || '',
-          theme_color: configData.colorRed || '#b91c1c',
-          categories_config: configData.categories_config || configData.categoriesConfig || [],
-          navigation_tabs: configData.navigation_tabs || configData.categories_config || configData.categoriesConfig || [],
-          updated_at: now,
-        },
-        {
-          id: 'default',
-          daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
-          daily_posters: dailyWidgetsDict,
-          config_json: configData,
-          updated_at: now,
-        },
-        { id: 'default', config_json: configData, updated_at: now },
-        { id: 'default', config: configData, updated_at: now },
-        { id: 'default', data: configData, updated_at: now },
-        {
-          id: 1,
-          title: configData.title || '',
-          subtitle: configData.subtitle || '',
-          unit_name: configData.footerUnitName || configData.title || '',
-          marquee_text: configData.ticker || '',
-          theme_color: configData.colorRed || '#b91c1c',
-          daily_widgets: configData.dailyWidgets || dailyWidgetsDict,
-          daily_posters: dailyWidgetsDict,
-          config_json: configData,
-          config: configData,
-          data: configData,
-          updated_at: now,
-        },
-        { id: 1, config_json: configData, updated_at: now },
-        { id: 1, config: configData, updated_at: now },
-        { id: 1, data: configData, updated_at: now },
-      ];
-
-      for (const altPayload of fallbackPayloads) {
-        try {
-          const { error: altErr } = await supabase.from('site_config').upsert(altPayload as any, { onConflict: 'id' });
-          if (!altErr) {
-            return { success: true };
-          }
-        } catch {
-          // ignore and continue
-        }
-      }
-
-      console.warn('Supabase upsertSiteConfig notice (saved locally in storage):', error.message);
+      console.warn('Supabase upsertSiteConfig notice (saved locally in storage):', res.error);
       return { success: true };
     } catch (err: any) {
       console.warn('Supabase upsertSiteConfig caught error (saved locally):', err?.message || err);
       return { success: true };
     }
+  },
+
+  /**
+   * Resilient upsert vào bảng `site_config` với `id = 'default'`.
+   * Tự động loại bỏ các cột chưa có trong schema Supabase nếu PostgREST báo lỗi cột không tồn tại,
+   * đảm bảo dữ liệu Logo & Cấu hình luôn được lưu vĩnh viễn thành công lên CSDL.
+   */
+  async upsertSiteConfigResilient(rawPayload: Record<string, any>): Promise<{ success: boolean; error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { success: false, error: 'Chưa kết nối Supabase Client' };
+
+    const workingPayload: Record<string, any> = { ...rawPayload, id: rawPayload.id || 'default' };
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt < 15; attempt++) {
+      try {
+        const { error } = await supabase
+          .from('site_config')
+          .upsert(workingPayload, { onConflict: 'id' });
+
+        if (!error) {
+          return { success: true };
+        }
+
+        lastError = error;
+        const msg = `${error.message || ''} ${(error as any)?.details || ''} ${(error as any)?.hint || ''}`;
+
+        // Detect missing column from PostgREST / PostgreSQL error messages
+        const colMatch =
+          msg.match(/Could not find the '([^']+)' column/i) ||
+          msg.match(/column "([^"]+)" of relation "site_config" does not exist/i) ||
+          msg.match(/column site_config\.([a-zA-Z0-9_]+) does not exist/i);
+
+        if (colMatch && colMatch[1] && colMatch[1] !== 'id' && colMatch[1] in workingPayload) {
+          const badCol = colMatch[1];
+          delete workingPayload[badCol];
+          // If 'config' was stripped, ensure 'config_json' is tried if present in rawPayload
+          if (badCol === 'config' && rawPayload.config && !('config_json' in workingPayload)) {
+            workingPayload.config_json = rawPayload.config;
+          }
+          continue;
+        }
+
+        // Handle type mismatch on logo_size (e.g. DB column is text/preset vs integer or vice versa)
+        if (msg.includes('logo_size') && 'logo_size' in workingPayload) {
+          if (typeof workingPayload.logo_size === 'number') {
+            workingPayload.logo_size = String(workingPayload.logo_size);
+          } else {
+            delete workingPayload.logo_size;
+          }
+          continue;
+        }
+
+        break;
+      } catch (err: any) {
+        lastError = err;
+        break;
+      }
+    }
+
+    return {
+      success: false,
+      error: lastError?.message || 'Không thể lưu cấu hình lên Supabase',
+    };
   },
 
   async upsertDailyPoster(poster: {
@@ -1381,7 +1462,9 @@ export const supabaseDb = {
           try {
             if (callbacks.onDocumentsChange) {
               const fresh = await supabaseDb.fetchDocuments();
-              if (fresh !== null) callbacks.onDocumentsChange(fresh);
+              if (fresh !== null && Array.isArray(fresh) && fresh.length > 0) {
+                callbacks.onDocumentsChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime Documents Handler] Error caught safely:', e);
@@ -1392,7 +1475,9 @@ export const supabaseDb = {
           try {
             if (callbacks.onLecturesChange) {
               const fresh = await supabaseDb.fetchLectures();
-              if (fresh !== null) callbacks.onLecturesChange(fresh);
+              if (fresh !== null && Array.isArray(fresh) && fresh.length > 0) {
+                callbacks.onLecturesChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime Lectures Handler] Error caught safely:', e);
@@ -1403,7 +1488,9 @@ export const supabaseDb = {
           try {
             if (callbacks.onSiteConfigChange) {
               const fresh = await supabaseDb.fetchSiteConfig();
-              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+              if (fresh !== null && typeof fresh === 'object' && Object.keys(fresh).length > 0) {
+                callbacks.onSiteConfigChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime SiteConfig Handler] Error caught safely:', e);
@@ -1413,7 +1500,9 @@ export const supabaseDb = {
           try {
             if (callbacks.onSiteConfigChange) {
               const fresh = await supabaseDb.fetchSiteConfig();
-              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+              if (fresh !== null && typeof fresh === 'object' && Object.keys(fresh).length > 0) {
+                callbacks.onSiteConfigChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime Categories Handler] Error caught safely:', e);
@@ -1423,7 +1512,9 @@ export const supabaseDb = {
           try {
             if (callbacks.onSiteConfigChange) {
               const fresh = await supabaseDb.fetchSiteConfig();
-              if (fresh !== null) callbacks.onSiteConfigChange(fresh);
+              if (fresh !== null && typeof fresh === 'object' && Object.keys(fresh).length > 0) {
+                callbacks.onSiteConfigChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime DailyPosters Handler] Error caught safely:', e);
@@ -1434,20 +1525,25 @@ export const supabaseDb = {
           try {
             if (callbacks.onUsersChange) {
               const fresh = await supabaseDb.fetchUsers();
-              if (fresh !== null) callbacks.onUsersChange(fresh);
+              if (fresh !== null && Array.isArray(fresh) && fresh.length > 0) {
+                callbacks.onUsersChange(fresh);
+              }
             }
           } catch (e) {
             console.warn('[Realtime Users Handler] Error caught safely:', e);
           }
         })
         .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('Realtime connected successfully');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            // Safe logging without reconnect storm
-            if (err) {
-              console.warn(`[Supabase Realtime] Notice (${status}):`, err.message || err);
+          try {
+            if (status === 'SUBSCRIBED') {
+              console.log('Realtime connected successfully');
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              if (err) {
+                console.warn(`[Supabase Realtime] Notice (${status}):`, err.message || err);
+              }
             }
+          } catch (subErr) {
+            console.warn('[Supabase Realtime Subscribe Callback Error]:', subErr);
           }
         });
 

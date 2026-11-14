@@ -73,18 +73,22 @@ export const Header: React.FC<HeaderProps> = ({
   // Live Clock & Date update
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-      const dayName = days[now.getDay()];
-      const day = String(now.getDate()).padStart(2, '0');
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const year = now.getFullYear();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
+      try {
+        const now = new Date();
+        const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+        const dayName = days[now.getDay()];
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
 
-      setCurrentDateString(`${dayName}, ${day}/${month}/${year}`);
-      setCurrentTimeString(`${hours}:${minutes}:${seconds}`);
+        setCurrentDateString(`${dayName}, ${day}/${month}/${year}`);
+        setCurrentTimeString(`${hours}:${minutes}:${seconds}`);
+      } catch {
+        // ignore clock tick errors
+      }
     };
 
     updateTime();
@@ -192,14 +196,22 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Resolve Header Logo size and effect accurately from siteConfig
   let headerLogoPx = 48;
-  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize;
-  if (rawHeaderSize === 'small') headerLogoPx = 36;
+  const rawHeaderSize = siteConfig?.logo_size ?? siteConfig?.logoSize;
+  if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) headerLogoPx = siteConfig.logoSizePx;
+  else if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) headerLogoPx = rawHeaderSize;
+  else if (typeof rawHeaderSize === 'string' && !isNaN(Number(rawHeaderSize)) && Number(rawHeaderSize) > 0) headerLogoPx = Number(rawHeaderSize);
+  else if (rawHeaderSize === 'small') headerLogoPx = 36;
   else if (rawHeaderSize === 'standard') headerLogoPx = 48;
   else if (rawHeaderSize === 'prominent') headerLogoPx = 60;
   else if (rawHeaderSize === 'large') headerLogoPx = 76;
   else if (rawHeaderSize === 'xlarge') headerLogoPx = 90;
-  else if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) headerLogoPx = rawHeaderSize;
-  else if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) headerLogoPx = siteConfig.logoSizePx;
+
+  const resolvedLogoUrl = siteConfig?.logo_url || siteConfig?.customLogoUrl || '';
+  const resolvedLogoType =
+    siteConfig?.logo_type ||
+    siteConfig?.logoType ||
+    (resolvedLogoUrl ? 'custom' : 'default');
+  const resolvedLogoEffect = siteConfig?.logo_effect || siteConfig?.logoEffect || 'shine';
 
   return (
     <header className="w-full select-none relative z-50">
@@ -225,24 +237,24 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <UnitLogo
               customSizePx={headerLogoPx}
-              logo_type={siteConfig?.logo_type || siteConfig?.logoType}
-              logoType={siteConfig?.logo_type || siteConfig?.logoType}
-              logo_url={siteConfig?.logo_url || siteConfig?.customLogoUrl}
-              customLogoUrl={siteConfig?.logo_url || siteConfig?.customLogoUrl}
-              logo_size={siteConfig?.logo_size || siteConfig?.logoSize}
-              logo_effect={siteConfig?.logo_effect || siteConfig?.logoEffect}
-              logoEffect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+              logo_type={resolvedLogoType}
+              logoType={resolvedLogoType}
+              logo_url={resolvedLogoUrl}
+              customLogoUrl={resolvedLogoUrl}
+              logo_size={siteConfig?.logo_size ?? siteConfig?.logoSize}
+              logo_effect={resolvedLogoEffect}
+              logoEffect={resolvedLogoEffect}
               withGlow={siteConfig?.enableLogoGlow}
               withRotatingBeam={siteConfig?.enableLogoBeam}
               slogan={siteConfig?.slogan}
-              establishedDate={siteConfig?.establishedDate}
+              establishedDate={siteConfig?.founded_date || siteConfig?.establishedDate}
             />
             <div>
               <h1 className="text-sm md:text-base lg:text-xl font-black uppercase tracking-wide text-white leading-tight drop-shadow-xs group-hover:text-amber-200 transition-colors">
-                {siteConfig.title}
+                {siteConfig.header_title || siteConfig.title}
               </h1>
               <h2 className="text-[10px] md:text-xs lg:text-sm font-semibold uppercase tracking-wider text-white/90 mt-0.5">
-                {siteConfig.subtitle}
+                {siteConfig.sub_title || siteConfig.subtitle}
               </h2>
             </div>
           </div>

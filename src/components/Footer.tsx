@@ -59,9 +59,13 @@ export const Footer: React.FC<FooterProps> = ({
 
   // Calculate Header and Footer balanced Logo dimensions
   let headerLogoSize = 48;
-  const rawHeaderSize = siteConfig?.logo_size || siteConfig?.logoSize;
-  if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) {
+  const rawHeaderSize = siteConfig?.logo_size ?? siteConfig?.logoSize;
+  if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) {
+    headerLogoSize = siteConfig.logoSizePx;
+  } else if (typeof rawHeaderSize === 'number' && rawHeaderSize > 0) {
     headerLogoSize = rawHeaderSize;
+  } else if (typeof rawHeaderSize === 'string' && !isNaN(Number(rawHeaderSize)) && Number(rawHeaderSize) > 0) {
+    headerLogoSize = Number(rawHeaderSize);
   } else if (rawHeaderSize === 'small') {
     headerLogoSize = 36;
   } else if (rawHeaderSize === 'standard') {
@@ -72,13 +76,18 @@ export const Footer: React.FC<FooterProps> = ({
     headerLogoSize = 76;
   } else if (rawHeaderSize === 'xlarge') {
     headerLogoSize = 90;
-  } else if (typeof siteConfig?.logoSizePx === 'number' && siteConfig.logoSizePx > 0) {
-    headerLogoSize = siteConfig.logoSizePx;
   }
 
   const footerLogoPx =
     siteConfig?.footerLogoSizePx ||
     Math.max(28, Math.min(Math.round(headerLogoSize * 0.85), 65));
+
+  const resolvedLogoUrl = siteConfig?.logo_url || siteConfig?.customLogoUrl || '';
+  const resolvedLogoType =
+    siteConfig?.logo_type ||
+    siteConfig?.logoType ||
+    (resolvedLogoUrl ? 'custom' : 'default');
+  const resolvedLogoEffect = siteConfig?.logo_effect || siteConfig?.logoEffect || 'shine';
 
   const showFooterLogo =
     siteConfig?.footer_config?.toggles?.show_logo ??
@@ -134,16 +143,17 @@ export const Footer: React.FC<FooterProps> = ({
             {showFooterLogo && (
               <UnitLogo
                 customSizePx={footerLogoPx}
-                logo_type={siteConfig?.logo_type || siteConfig?.logoType}
-                logoType={siteConfig?.logo_type || siteConfig?.logoType}
-                logo_url={siteConfig?.logo_url || siteConfig?.customLogoUrl}
-                customLogoUrl={siteConfig?.logo_url || siteConfig?.customLogoUrl}
-                logo_effect={siteConfig?.logo_effect || siteConfig?.logoEffect}
-                logoEffect={siteConfig?.logo_effect || siteConfig?.logoEffect}
+                logo_type={resolvedLogoType}
+                logoType={resolvedLogoType}
+                logo_url={resolvedLogoUrl}
+                customLogoUrl={resolvedLogoUrl}
+                logo_size={footerLogoPx}
+                logo_effect={resolvedLogoEffect}
+                logoEffect={resolvedLogoEffect}
                 withGlow={siteConfig?.enableLogoGlow}
                 withRotatingBeam={siteConfig?.enableLogoBeam}
                 slogan={siteConfig?.slogan}
-                establishedDate={siteConfig?.establishedDate}
+                establishedDate={siteConfig?.founded_date || siteConfig?.establishedDate}
                 className="shrink-0"
               />
             )}
@@ -152,7 +162,7 @@ export const Footer: React.FC<FooterProps> = ({
               className="font-bold text-[10px] sm:text-xs uppercase tracking-wide leading-tight text-center break-words"
               style={{ color: accentColor }}
             >
-              TRUYỀN THÔNG ĐOÀN MANG YANG <span className="opacity-75">—</span> {unitName}
+              {siteConfig?.header_title || siteConfig?.title || 'TRUYỀN THÔNG ĐOÀN MANG YANG'} <span className="opacity-75">—</span> {unitName}
             </p>
           </div>
         </div>

@@ -72,7 +72,9 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
   let calculatedPx: number | undefined = undefined;
   const rawSize = logo_size || size;
 
-  if (rawSize === 'small') {
+  if (typeof customSizePx === 'number' && customSizePx > 0) {
+    calculatedPx = customSizePx;
+  } else if (rawSize === 'small') {
     calculatedPx = 36;
   } else if (rawSize === 'standard') {
     calculatedPx = 48;
@@ -82,13 +84,10 @@ export const UnitLogo: React.FC<UnitLogoProps> = ({
     calculatedPx = 76;
   } else if (rawSize === 'xlarge') {
     calculatedPx = 90;
-  } else if (typeof rawSize === 'number') {
+  } else if (typeof rawSize === 'number' && rawSize > 0) {
     calculatedPx = rawSize;
-  }
-
-  // If customSizePx is explicitly passed without a preset overriding it
-  if (!calculatedPx && typeof customSizePx === 'number' && customSizePx > 0) {
-    calculatedPx = customSizePx;
+  } else if (typeof rawSize === 'string' && !isNaN(Number(rawSize)) && Number(rawSize) > 0) {
+    calculatedPx = Number(rawSize);
   }
 
   if (!calculatedPx) {

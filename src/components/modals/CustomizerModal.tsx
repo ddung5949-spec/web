@@ -57,7 +57,7 @@ import { defaultCategoriesConfig, defaultDailyWidgets, defaultNavTabs, defaultSi
 import { UnitLogo, LogoEffectType, LogoSizePreset } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
-import { getSupabase } from '../../utils/supabase';
+import { getSupabase, supabaseDb } from '../../utils/supabase';
 import { compressLogoImage } from './SiteConfigModal';
 
 interface CustomizerModalProps {
@@ -353,32 +353,39 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       prevIsOpenRef.current = true;
       if (!justOpened) return;
 
-      setTitle(siteConfig?.title || defaultSiteConfig.title);
-      setSubtitle(siteConfig?.subtitle || defaultSiteConfig.subtitle);
+      setTitle((siteConfig as any)?.header_title || siteConfig?.title || defaultSiteConfig.title);
+      setSubtitle((siteConfig as any)?.sub_title || siteConfig?.subtitle || defaultSiteConfig.subtitle);
       setSlogan(siteConfig?.slogan || defaultSiteConfig.slogan);
       setTicker(siteConfig?.ticker || defaultSiteConfig.ticker);
       setColorRed(siteConfig?.colorRed || '#b91c1c');
       setColorGreen(siteConfig?.colorGreen || '#143d2b');
-      setEstablishedDate(siteConfig?.establishedDate || '23/8/1945');
+      setEstablishedDate((siteConfig as any)?.founded_date || siteConfig?.establishedDate || '23/8/1945');
+      const initLogoUrl = siteConfig?.logo_url || siteConfig?.customLogoUrl || '';
       const effLogoType: 'default' | 'custom' =
-        siteConfig?.logo_type === 'custom' || siteConfig?.logoType === 'custom' || siteConfig?.logoType === 'custom_image'
+        siteConfig?.logo_type === 'custom' ||
+        siteConfig?.logoType === 'custom' ||
+        siteConfig?.logoType === 'custom_image' ||
+        (initLogoUrl && siteConfig?.logo_type !== 'default' && siteConfig?.logoType !== 'default')
           ? 'custom'
           : 'default';
       setLogoType(effLogoType);
-      setCustomLogoUrl(siteConfig?.logo_url || siteConfig?.customLogoUrl || '');
+      setCustomLogoUrl(initLogoUrl);
+      const rawLogoSizeNum = Number(siteConfig?.logoSizePx ?? siteConfig?.logo_size ?? siteConfig?.logoSize);
       const effPreset: LogoSizePreset = (() => {
         const raw = siteConfig?.logo_size || siteConfig?.logoSize;
         if (raw === 'small' || raw === 'standard' || raw === 'prominent' || raw === 'large' || raw === 'xlarge') {
           return raw;
         }
-        if (siteConfig?.logoSizePx === 36) return 'small';
-        if (siteConfig?.logoSizePx === 60) return 'prominent';
-        if (siteConfig?.logoSizePx === 76) return 'large';
-        if (siteConfig?.logoSizePx === 90) return 'xlarge';
+        if (rawLogoSizeNum === 36) return 'small';
+        if (rawLogoSizeNum === 60) return 'prominent';
+        if (rawLogoSizeNum === 76) return 'large';
+        if (rawLogoSizeNum === 90) return 'xlarge';
         return 'standard';
       })();
       setLogoSizePreset(effPreset);
-      const effLogoSizePx = siteConfig?.logoSizePx || (effPreset === 'small' ? 36 : effPreset === 'prominent' ? 60 : effPreset === 'large' ? 76 : effPreset === 'xlarge' ? 90 : 48);
+      const effLogoSizePx =
+        (!isNaN(rawLogoSizeNum) && rawLogoSizeNum > 0 ? rawLogoSizeNum : undefined) ||
+        (effPreset === 'small' ? 36 : effPreset === 'prominent' ? 60 : effPreset === 'large' ? 76 : effPreset === 'xlarge' ? 90 : 48);
       setLogoSizePx(effLogoSizePx);
       setFooterLogoSizePx(
         siteConfig?.footerLogoSizePx ||
@@ -573,42 +580,61 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     setIsSyncingLogo(true);
     try {
       const resolvedSizePreset = logoSizePreset;
+      const finalLogoUrl = logoType === 'custom' ? customLogoUrl.trim() : '';
+      const finalLogoType = logoType || (finalLogoUrl ? 'custom' : 'default');
+      const finalLogoSize = Number(logoSizePx) || 48;
+      const finalLogoEffect = logoEffect || 'shine';
+      const headerTitle = title.trim();
+      const subTitle = subtitle.trim();
+      const sloganText = slogan.trim();
+      const foundedDate = establishedDate.trim();
+
       const updatedConfig: SiteConfig = {
         ...siteConfig,
-        title: title.trim(),
-        subtitle: subtitle.trim(),
-        slogan: slogan.trim(),
-        establishedDate: establishedDate.trim(),
-        logo_type: logoType,
-        logoType: logoType,
-        logo_url: logoType === 'custom' ? customLogoUrl.trim() : '',
-        customLogoUrl: logoType === 'custom' ? customLogoUrl.trim() : '',
-        logo_size: resolvedSizePreset,
+        title: headerTitle,
+        header_title: headerTitle,
+        subtitle: subTitle,
+        sub_title: subTitle,
+        slogan: sloganText,
+        establishedDate: foundedDate,
+        founded_date: foundedDate,
+        logo_type: finalLogoType,
+        logoType: finalLogoType,
+        logo_url: finalLogoUrl,
+        customLogoUrl: finalLogoUrl,
+        logo_size: finalLogoSize,
         logoSize: resolvedSizePreset,
-        logoSizePx,
+        logoSizePx: finalLogoSize,
         footerLogoSizePx,
-        logo_effect: logoEffect,
-        logoEffect: logoEffect,
-        enableLogoBeam: logoEffect === 'all' || logoEffect === 'shine',
-        enableLogoGlow: logoEffect === 'all' || logoEffect === 'glow',
+        logo_effect: finalLogoEffect,
+        logoEffect: finalLogoEffect,
+        enableLogoBeam: finalLogoEffect === 'all' || finalLogoEffect === 'shine',
+        enableLogoGlow: finalLogoEffect === 'all' || finalLogoEffect === 'glow',
       };
 
-      // 1. Lưu cấu hình vào site_config trên Supabase
+      // 1. Lưu vĩnh viễn vào dòng id = 'default' trong bảng site_config trên Supabase
       const supabase = getSupabase();
       if (supabase) {
-        const { error } = await supabase
-          .from('site_config')
-          .upsert(
-            {
-              id: 'default',
-              ...updatedConfig,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          );
+        const payload: Record<string, any> = {
+          id: 'default',
+          logo_url: finalLogoUrl,
+          logo_type: finalLogoType,
+          logo_size: finalLogoSize,
+          logo_effect: finalLogoEffect,
+          header_title: headerTitle,
+          sub_title: subTitle,
+          slogan: sloganText,
+          founded_date: foundedDate,
+          title: headerTitle,
+          subtitle: subTitle,
+          config: updatedConfig,
+          config_json: updatedConfig,
+          updated_at: new Date().toISOString(),
+        };
 
-        if (error) {
-          alert('❌ Lỗi lưu CSDL: ' + error.message);
+        const { success, error } = await supabaseDb.upsertSiteConfigResilient(payload);
+        if (!success) {
+          alert('❌ Lỗi lưu Logo lên CSDL: ' + (error || 'Không thể kết nối CSDL'));
           setIsSyncingLogo(false);
           return;
         }
@@ -620,12 +646,11 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       } catch (storageErr) {
         console.warn('LocalStorage đầy, tiến hành dọn dẹp và thử lại:', storageErr);
         try {
-          // Xóa cache cũ để nhường chỗ
           localStorage.removeItem('cached_posters');
           localStorage.removeItem('daily_posters');
           localStorage.removeItem('daily_posters_cache');
           localStorage.setItem('mangyang_site_config', JSON.stringify(updatedConfig));
-        } catch (e) {
+        } catch {
           console.warn('Bỏ qua lưu cache local, ưu tiên lưu vào CSDL');
         }
       }
@@ -645,7 +670,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
         onSave(updatedConfig);
       }
 
-      alert('✅ Đã lưu và đồng bộ logo thành công!');
+      alert('✅ Đã lưu và đồng bộ Logo vĩnh viễn thành công!');
     } catch (e: any) {
       alert('❌ Lỗi khi đồng bộ Logo: ' + (e?.message || 'Không thể đồng bộ'));
     } finally {
@@ -1327,14 +1352,28 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     try {
       const supabase = getSupabase();
       if (supabase) {
-        // Lưu ĐỒNG THỜI và AN TOÀN vào các cột chuẩn
-        const fullPayload: any = {
+        const finalLogoUrl = updatedConfig.logo_url || updatedConfig.customLogoUrl || '';
+        const finalLogoType = updatedConfig.logo_type || updatedConfig.logoType || (finalLogoUrl ? 'custom' : 'default');
+        const finalLogoSize = Number(updatedConfig.logoSizePx ?? updatedConfig.logo_size ?? 48) || 48;
+        const finalLogoEffect = updatedConfig.logo_effect || updatedConfig.logoEffect || 'shine';
+
+        // Lưu ĐỒNG THỜI và AN TOÀN vào dòng id = 'default' chứa đầy đủ cột rời và JSON config
+        const fullPayload: Record<string, any> = {
           id: 'default',
-          categories_config: categoriesList,
-          navigation_tabs: categoriesList,
-          config_json: { tabs: categoriesList },
+          logo_url: finalLogoUrl,
+          logo_type: finalLogoType,
+          logo_size: finalLogoSize,
+          logo_effect: finalLogoEffect,
+          header_title: updatedConfig.title,
+          sub_title: updatedConfig.subtitle,
+          slogan: updatedConfig.slogan,
+          founded_date: updatedConfig.establishedDate,
           title: updatedConfig.title,
           subtitle: updatedConfig.subtitle,
+          categories_config: categoriesList,
+          navigation_tabs: categoriesList,
+          config: updatedConfig,
+          config_json: updatedConfig,
           marquee_text: updatedConfig.ticker,
           marquee_mode: updatedConfig.marquee_mode,
           marquee_days: updatedConfig.marquee_days,
@@ -1349,45 +1388,14 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           layout_settings: updatedConfig.layoutSettings,
           home_category_columns: updatedConfig.homeCategoryColumns,
           daily_widgets: updatedConfig.dailyWidgets,
-          logo_type: updatedConfig.logo_type,
-          logo_url: updatedConfig.logo_url,
-          logo_size: updatedConfig.logo_size,
-          logo_effect: updatedConfig.logo_effect,
           updated_at: new Date().toISOString(),
         };
 
-        let { error } = await supabase
-          .from('site_config')
-          .upsert(fullPayload, { onConflict: 'id' });
-
-        if (error && (error.message?.includes('config_json') || (error as any)?.details?.includes('config_json'))) {
-          delete fullPayload.config_json;
-          const retryRes = await supabase
-            .from('site_config')
-            .upsert(fullPayload, { onConflict: 'id' });
-          error = retryRes.error;
-        }
-
-        if (error) {
-          console.warn('[CustomizerModal] Full upsert warning, retrying with core navigation columns:', error);
-          // Fallback an toàn vào các cột chuẩn nếu cột phụ khác không tồn tại
-          const { error: coreError } = await supabase
-            .from('site_config')
-            .upsert(
-              {
-                id: 'default',
-                categories_config: categoriesList,
-                navigation_tabs: categoriesList,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'id' }
-            );
-
-          if (coreError) {
-            alert('❌ Lỗi lưu CSDL: ' + coreError.message);
-            setIsSaving(false);
-            return;
-          }
+        const { success, error } = await supabaseDb.upsertSiteConfigResilient(fullPayload);
+        if (!success) {
+          alert('❌ Lỗi lưu CSDL: ' + (error || 'Không thể lưu cấu hình lên Supabase'));
+          setIsSaving(false);
+          return;
         }
       }
 

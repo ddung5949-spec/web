@@ -134,9 +134,23 @@ export function App() {
     let cachedObj: any = null;
     try {
       const cached =
+        localStorage.getItem("mangyang_site_config") ||
         localStorage.getItem("site_config_cache") ||
-        localStorage.getItem("mangyang_site_config");
-      if (cached) cachedObj = JSON.parse(cached);
+        localStorage.getItem("cached_site_config");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === "object") {
+          const innerConfig =
+            parsed.config && typeof parsed.config === "object"
+              ? parsed.config
+              : parsed.config_json && typeof parsed.config_json === "object"
+                ? parsed.config_json
+                : {};
+          cachedObj = { ...innerConfig, ...parsed };
+          delete cachedObj.config;
+          delete cachedObj.config_json;
+        }
+      }
     } catch {
       cachedObj = null;
     }
@@ -163,13 +177,20 @@ export function App() {
     } catch {}
 
     // Ensure titles are consistent with standardized branding
-    if (
+    if (initial.header_title) {
+      initial.title = initial.header_title;
+    } else if (
       !initial.title ||
       initial.title === "TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5"
     ) {
       initial.title = "TRUYỀN THÔNG ĐOÀN MANG YANG";
     }
-    if (!initial.subtitle || initial.subtitle.includes("HỆ THỐNG THÔNG TIN")) {
+    if (initial.sub_title) {
+      initial.subtitle = initial.sub_title;
+    } else if (
+      !initial.subtitle ||
+      initial.subtitle.includes("HỆ THỐNG THÔNG TIN")
+    ) {
       initial.subtitle = "TRUNG ĐOÀN 95 - SƯ ĐOÀN 2 - QUÂN KHU 5";
     }
     if (!initial.marquee_text) {
@@ -540,6 +561,8 @@ export function App() {
 
   // 1. Quản lý phiên đăng nhập thực tế từ Supabase Auth & Profiles (Session & onAuthStateChange)
   useEffect(() => {
+    let isAuthMounted = true;
+
     // Khởi tạo ngay lập tức từ localStorage để Admin không bị gián đoạn/đăng xuất khi F5
     try {
       const stored = localStorage.getItem("current_user");
@@ -553,71 +576,117 @@ export function App() {
       // ignore
     }
 
+    const syncUserFromSession = async (session: any) => {
+      try {
+        if (!isAuthMounted || !session?.user) return;
+
+        let profile: any = null;
+        try {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (!error && data) {
+            profile = data;
+          }
+        } catch (profErr) {
+          console.warn("[Auth] Profile lookup skipped:", profErr);
+        }
+
+        if (!isAuthMounted) return;
+
+        const isAdminEmail =
+          session.user.email === "ddung5949@gmail.com" ||
+          profile?.role === "admin";
+        const fullUserData = {
+          id: session.user.id,
+          email: session.user.email,
+          username:
+            profile?.username ||
+            session.user.email?.split("@")[0] ||
+            "user",
+          full_name: profile?.full_name || "Trung Dũng",
+          fullName: profile?.full_name || "Trung Dũng",
+          avatar_url: profile?.avatar_url || "",
+          avatar: profile?.avatar_url || "",
+          role: isAdminEmail ? "admin" : "user",
+          unit: profile?.unit || "Trung đoàn 95",
+          rankUnit: profile?.unit || "Trung đoàn 95",
+          rank: profile?.rank || "",
+          position: profile?.position || "",
+          canViewDoc: true,
+          canUploadDoc: isAdminEmail,
+        };
+
+        setCurrentUser(fullUserData as any);
+        try {
+          localStorage.setItem("current_user", JSON.stringify(fullUserData));
+        } catch {
+          // ignore QuotaExceededError
+        }
+      } catch (err) {
+        console.warn("[Auth] syncUserFromSession error caught safely:", err);
+      }
+    };
+
     // 1. Kiểm tra phiên đăng nhập hiện tại từ Supabase
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
+    try {
+      supabase.auth
+        .getSession()
+        .then(async ({ data, error }) => {
+          try {
+            if (!error && data?.session?.user) {
+              await syncUserFromSession(data.session);
+            }
+          } catch (err) {
+            console.warn("[Auth] getSession handler error caught safely:", err);
+          }
+        })
+        .catch((err) => {
+          console.warn("[Auth] getSession failed safely:", err);
+        });
+    } catch (err) {
+      console.warn("[Auth] getSession setup error:", err);
+    }
 
-        const fullUserData = {
-          id: session.user.id,
-          email: session.user.email,
-          full_name: profile?.full_name || 'Trung Dũng',
-          fullName: profile?.full_name || 'Trung Dũng',
-          avatar_url: profile?.avatar_url || '',
-          avatar: profile?.avatar_url || '',
-          role: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin') ? 'admin' : 'user',
-          unit: profile?.unit || 'Trung đoàn 95',
-          rankUnit: profile?.unit || 'Trung đoàn 95',
-          rank: profile?.rank || '',
-          position: profile?.position || '',
-          canViewDoc: true,
-          canUploadDoc: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin'),
-        };
-        setCurrentUser(fullUserData as any);
-        localStorage.setItem('current_user', JSON.stringify(fullUserData));
-      }
-    });
-
-    // 2. Lắng nghe sự kiện Đăng nhập / Đăng xuất
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        const fullUserData = {
-          id: session.user.id,
-          email: session.user.email,
-          full_name: profile?.full_name || 'Trung Dũng',
-          fullName: profile?.full_name || 'Trung Dũng',
-          avatar_url: profile?.avatar_url || '',
-          avatar: profile?.avatar_url || '',
-          role: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin') ? 'admin' : 'user',
-          unit: profile?.unit || 'Trung đoàn 95',
-          rankUnit: profile?.unit || 'Trung đoàn 95',
-          rank: profile?.rank || '',
-          position: profile?.position || '',
-          canViewDoc: true,
-          canUploadDoc: (session.user.email === 'ddung5949@gmail.com' || profile?.role === 'admin'),
-        };
-        setCurrentUser(fullUserData as any);
-        localStorage.setItem('current_user', JSON.stringify(fullUserData));
-      } else if (event === "SIGNED_OUT") {
-        localStorage.removeItem("current_user");
-        setCurrentUser(null);
-      }
-    });
+    // 2. Lắng nghe sự kiện Đăng nhập / Đăng xuất / Làm mới token
+    let subscription: { unsubscribe: () => void } | null = null;
+    try {
+      const authRes = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          try {
+            if (!isAuthMounted) return;
+            if (session?.user) {
+              await syncUserFromSession(session);
+            } else if (event === "SIGNED_OUT") {
+              try {
+                localStorage.removeItem("current_user");
+              } catch {
+                // ignore
+              }
+              setCurrentUser(null);
+            }
+          } catch (err) {
+            console.warn(
+              "[Auth] onAuthStateChange callback error caught safely:",
+              err,
+            );
+          }
+        },
+      );
+      subscription = authRes?.data?.subscription || null;
+    } catch (err) {
+      console.warn("[Auth] onAuthStateChange setup error:", err);
+    }
 
     return () => {
-      subscription.unsubscribe();
+      isAuthMounted = false;
+      try {
+        subscription?.unsubscribe();
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
@@ -727,7 +796,8 @@ export function App() {
 
     // Helper: Process site_config
     const processSiteConfigData = (config: any) => {
-      let parsed = config.config_json || config.config || config.data || config;
+      if (!config || typeof config !== "object") return;
+      let parsed = config.config || config.config_json || config.data || config;
       if (typeof parsed === "string") {
         try {
           parsed = JSON.parse(parsed);
@@ -737,8 +807,30 @@ export function App() {
       }
       const mergedConfig: any =
         typeof parsed === "object" && parsed !== null ? { ...parsed } : {};
-      if (config.title) mergedConfig.title = config.title;
-      if (config.subtitle) mergedConfig.subtitle = config.subtitle;
+      delete mergedConfig.config;
+      delete mergedConfig.config_json;
+      delete mergedConfig.data;
+
+      if (config.header_title) {
+        mergedConfig.header_title = config.header_title;
+        mergedConfig.title = config.header_title;
+      } else if (config.title) {
+        mergedConfig.title = config.title;
+      }
+      if (config.sub_title) {
+        mergedConfig.sub_title = config.sub_title;
+        mergedConfig.subtitle = config.sub_title;
+      } else if (config.subtitle) {
+        mergedConfig.subtitle = config.subtitle;
+      }
+      if (config.slogan) {
+        mergedConfig.slogan = config.slogan;
+        if (!config.marquee_text) mergedConfig.marquee_text = config.slogan;
+      }
+      if (config.founded_date) {
+        mergedConfig.founded_date = config.founded_date;
+        mergedConfig.foundedDate = config.founded_date;
+      }
       if (config.unit_name) mergedConfig.footerUnitName = config.unit_name;
       if (config.theme_color) mergedConfig.colorRed = config.theme_color;
       if (config.marquee_text) {
@@ -772,17 +864,31 @@ export function App() {
       if (config.footer_config) {
         mergedConfig.footer_config = config.footer_config;
       }
-      if (config.logo_type || config.logoType) {
-        mergedConfig.logo_type = config.logo_type || config.logoType;
-        mergedConfig.logoType = config.logo_type || config.logoType;
+      const resolvedLogoUrl =
+        config.logo_url ?? config.customLogoUrl ?? mergedConfig.logo_url ?? mergedConfig.customLogoUrl;
+      if (resolvedLogoUrl !== undefined) {
+        mergedConfig.logo_url = resolvedLogoUrl;
+        mergedConfig.customLogoUrl = resolvedLogoUrl;
       }
-      if (config.logo_url !== undefined || config.customLogoUrl !== undefined) {
-        mergedConfig.logo_url = config.logo_url ?? config.customLogoUrl;
-        mergedConfig.customLogoUrl = config.logo_url ?? config.customLogoUrl;
+      const resolvedLogoType =
+        config.logo_type ||
+        config.logoType ||
+        mergedConfig.logo_type ||
+        mergedConfig.logoType ||
+        (resolvedLogoUrl ? "custom" : undefined);
+      if (resolvedLogoType) {
+        mergedConfig.logo_type = resolvedLogoType;
+        mergedConfig.logoType = resolvedLogoType;
       }
-      if (config.logo_size || config.logoSize) {
-        mergedConfig.logo_size = config.logo_size || config.logoSize;
-        mergedConfig.logoSize = config.logo_size || config.logoSize;
+      const resolvedLogoSize =
+        config.logo_size ?? config.logoSize ?? mergedConfig.logo_size ?? mergedConfig.logoSize;
+      if (resolvedLogoSize !== undefined && resolvedLogoSize !== null) {
+        mergedConfig.logo_size = resolvedLogoSize;
+        mergedConfig.logoSize = resolvedLogoSize;
+        const parsedSize = Number(resolvedLogoSize);
+        if (!isNaN(parsedSize) && parsedSize > 0) {
+          mergedConfig.logoSizePx = config.logo_size_px ?? config.logoSizePx ?? parsedSize;
+        }
       }
       if (config.logo_size_px !== undefined || config.logoSizePx !== undefined) {
         mergedConfig.logoSizePx = config.logo_size_px ?? config.logoSizePx;
@@ -790,9 +896,11 @@ export function App() {
       if (config.footer_logo_size_px !== undefined || config.footerLogoSizePx !== undefined) {
         mergedConfig.footerLogoSizePx = config.footer_logo_size_px ?? config.footerLogoSizePx;
       }
-      if (config.logo_effect || config.logoEffect) {
-        mergedConfig.logo_effect = config.logo_effect || config.logoEffect;
-        mergedConfig.logoEffect = config.logo_effect || config.logoEffect;
+      const resolvedLogoEffect =
+        config.logo_effect || config.logoEffect || mergedConfig.logo_effect || mergedConfig.logoEffect;
+      if (resolvedLogoEffect) {
+        mergedConfig.logo_effect = resolvedLogoEffect;
+        mergedConfig.logoEffect = resolvedLogoEffect;
       }
       if (config.enable_logo_beam !== undefined || config.enableLogoBeam !== undefined) {
         mergedConfig.enableLogoBeam = config.enable_logo_beam ?? config.enableLogoBeam;
@@ -966,16 +1074,19 @@ export function App() {
         }
       }
 
-      setSiteConfig((prev) => ({
-        ...prev,
-        ...mergedConfig,
-      }));
-      safeStore.set("mangyang_site_config", { ...mergedConfig });
-      try {
-        localStorage.setItem("site_config_cache", JSON.stringify(mergedConfig));
-      } catch {
-        // ignore
-      }
+      setSiteConfig((prev) => {
+        const nextConfig = {
+          ...prev,
+          ...mergedConfig,
+        };
+        try {
+          localStorage.setItem("mangyang_site_config", JSON.stringify(nextConfig));
+          localStorage.setItem("site_config_cache", JSON.stringify(nextConfig));
+        } catch {
+          safeStore.set("mangyang_site_config", nextConfig);
+        }
+        return nextConfig;
+      });
     };
 
     // Helper: Process daily_posters
@@ -1157,39 +1268,34 @@ export function App() {
         const supabase = getSupabase();
         if (!supabase) return;
 
-        // 1.1 Tải cấu hình & Chuyên mục & Layout
+        // 1.1 Tải cấu hình & Chuyên mục & Layout (ưu tiên bản cập nhật mới nhất)
         supabase
           .from("site_config")
           .select("*")
-          .eq("id", "default")
+          .order("updated_at", { ascending: false })
+          .limit(1)
           .maybeSingle()
           .then(
             ({ data, error }) => {
-              if (isMounted && !error && data) {
-                if (
-                  data.categories_config &&
-                  Array.isArray(data.categories_config) &&
-                  data.categories_config.length > 0
-                ) {
-                  setCategories(data.categories_config);
-                  try {
-                    localStorage.setItem(
-                      "cached_categories",
-                      JSON.stringify(data.categories_config),
-                    );
-                  } catch {}
+              try {
+                if (isMounted && !error && data) {
+                  if (
+                    data.categories_config &&
+                    Array.isArray(data.categories_config) &&
+                    data.categories_config.length > 0
+                  ) {
+                    setCategories(data.categories_config);
+                    try {
+                      localStorage.setItem(
+                        "cached_categories",
+                        JSON.stringify(data.categories_config),
+                      );
+                    } catch {}
+                  }
+                  processSiteConfigData(data);
                 }
-                processSiteConfigData(data);
-                try {
-                  localStorage.setItem(
-                    "cached_site_config",
-                    JSON.stringify(data),
-                  );
-                  localStorage.setItem(
-                    "site_config_cache",
-                    JSON.stringify(data),
-                  );
-                } catch {}
+              } catch (cfgErr) {
+                console.warn("[App] processSiteConfigData error caught safely:", cfgErr);
               }
             },
             () => {},
@@ -1388,65 +1494,105 @@ export function App() {
     }
 
     // 3. Realtime Database-First subscription (Supabase postgres_changes)
-    let unsub = () => {};
+    let unsub: (() => void) | null = null;
     try {
       unsub = cloudStorage.subscribeAll({
         onArticlesChange: (freshArticles) => {
-          if (isMounted && freshArticles) {
-            setArticles(freshArticles.map(sanitizeArticle));
+          try {
+            if (isMounted && Array.isArray(freshArticles) && freshArticles.length > 0) {
+              setArticles(freshArticles.map(sanitizeArticle));
+            }
+          } catch (e) {
+            console.warn("[Realtime] onArticlesChange error caught safely:", e);
           }
         },
         onArticleInsert: (newArt) => {
-          if (isMounted && newArt) {
-            const safeArt = sanitizeArticle(newArt);
-            setArticles((prev) => {
-              const next = [
-                safeArt,
-                ...prev.filter((a) => String(a.id) !== String(safeArt.id)),
-              ];
-              return next;
-            });
+          try {
+            if (isMounted && newArt && newArt.id) {
+              const safeArt = sanitizeArticle(newArt);
+              setArticles((prev) => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                return [
+                  safeArt,
+                  ...safePrev.filter((a) => String(a.id) !== String(safeArt.id)),
+                ];
+              });
+            }
+          } catch (e) {
+            console.warn("[Realtime] onArticleInsert error caught safely:", e);
           }
         },
         onArticleUpdate: (updatedArt) => {
-          if (isMounted && updatedArt) {
-            const safeArt = sanitizeArticle(updatedArt);
-            setArticles((prev) => {
-              const next = prev.map((a) =>
-                String(a.id) === String(safeArt.id) ? safeArt : a,
-              );
-              return next;
-            });
+          try {
+            if (isMounted && updatedArt && updatedArt.id) {
+              const safeArt = sanitizeArticle(updatedArt);
+              setArticles((prev) => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                return safePrev.map((a) =>
+                  String(a.id) === String(safeArt.id) ? safeArt : a,
+                );
+              });
+            }
+          } catch (e) {
+            console.warn("[Realtime] onArticleUpdate error caught safely:", e);
           }
         },
         onArticleDelete: (deletedId) => {
-          if (isMounted && deletedId) {
-            setArticles((prev) => {
-              const next = prev.filter(
-                (a) => String(a.id) !== String(deletedId),
-              );
-              return next;
-            });
+          try {
+            if (isMounted && deletedId) {
+              setArticles((prev) => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                return safePrev.filter(
+                  (a) => String(a.id) !== String(deletedId),
+                );
+              });
+            }
+          } catch (e) {
+            console.warn("[Realtime] onArticleDelete error caught safely:", e);
           }
         },
         onDocumentsChange: (freshDocs) => {
-          if (isMounted && freshDocs) {
-            setDocuments(freshDocs);
+          try {
+            if (isMounted && Array.isArray(freshDocs) && freshDocs.length > 0) {
+              setDocuments(freshDocs);
+            }
+          } catch (e) {
+            console.warn("[Realtime] onDocumentsChange error caught safely:", e);
           }
         },
         onLecturesChange: (freshLectures) => {
-          if (isMounted && freshLectures) {
-            setLectures(freshLectures);
+          try {
+            if (isMounted && Array.isArray(freshLectures) && freshLectures.length > 0) {
+              setLectures(freshLectures);
+            }
+          } catch (e) {
+            console.warn("[Realtime] onLecturesChange error caught safely:", e);
           }
         },
         onSiteConfigChange: (freshConfig) => {
-          if (isMounted && freshConfig) {
-            setSiteConfig(freshConfig);
+          try {
+            if (
+              isMounted &&
+              freshConfig &&
+              typeof freshConfig === "object" &&
+              Object.keys(freshConfig).length > 0
+            ) {
+              setSiteConfig((prev) => ({
+                ...prev,
+                ...freshConfig,
+              }));
+            }
+          } catch (e) {
+            console.warn("[Realtime] onSiteConfigChange error caught safely:", e);
           }
         },
         onUsersChange: (freshUsers) => {
-          if (isMounted && freshUsers && freshUsers.length > 0) {
-            setUsers(freshUsers);
+          try {
+            if (isMounted && Array.isArray(freshUsers) && freshUsers.length > 0) {
+              setUsers(freshUsers);
+            }
+          } catch (e) {
+            console.warn("[Realtime] onUsersChange error caught safely:", e);
           }
         },
       });
@@ -1454,34 +1600,12 @@ export function App() {
       console.warn("Bỏ qua lỗi subscription:", err);
     }
 
-    // 4. Supabase Auth session checking & auto-listener
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => {
-        if (isMounted && session?.user) {
-          const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
-          setCurrentUser((prev) => (prev ? prev : adminUser));
-        }
-      })
-      .catch(console.warn);
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-        if (session?.user) {
-          const adminUser = supabaseAuth.mapSupabaseUserToAdmin(session.user);
-          setCurrentUser(adminUser);
-        } else if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-        }
-      },
-    );
-
     return () => {
       isMounted = false;
-      if (unsub) unsub();
-      if (authListener?.subscription) {
-        authListener.subscription.unsubscribe();
+      try {
+        if (unsub) unsub();
+      } catch {
+        // ignore
       }
     };
   }, []);
@@ -1554,55 +1678,62 @@ export function App() {
     if (!currentUser) return;
 
     const interval = setInterval(() => {
-      const now = new Date();
-      const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1,
-      ).padStart(
-        2,
-        "0",
-      )}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes(),
-      ).padStart(2, "0")}`;
+      try {
+        const now = new Date();
+        const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+          now.getMonth() + 1,
+        ).padStart(
+          2,
+          "0",
+        )}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
+          now.getMinutes(),
+        ).padStart(2, "0")}`;
 
-      // Update current user
-      setCurrentUser((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          totalActiveMinutes: (prev.totalActiveMinutes || 0) + 1,
-          lastActiveAt: timeStr,
-          isOnline: true,
-        };
-      });
+        // Update current user
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            totalActiveMinutes: (prev.totalActiveMinutes || 0) + 1,
+            lastActiveAt: timeStr,
+            isOnline: true,
+          };
+        });
 
-      // Update users list
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === currentUser.id
-            ? {
-                ...u,
-                totalActiveMinutes: (u.totalActiveMinutes || 0) + 1,
-                lastActiveAt: timeStr,
-                isOnline: true,
-              }
-            : u,
-        ),
-      );
+        // Update users list
+        setUsers((prev) =>
+          (prev || []).map((u) =>
+            u && u.id === currentUser.id
+              ? {
+                  ...u,
+                  totalActiveMinutes: (u.totalActiveMinutes || 0) + 1,
+                  lastActiveAt: timeStr,
+                  isOnline: true,
+                }
+              : u,
+          ),
+        );
 
-      // Update linked military profile
-      setMilitaryProfiles((prev) =>
-        prev.map((p) =>
-          p.userId === currentUser.id ||
-          p.username?.toLowerCase() === currentUser.username.toLowerCase()
-            ? {
-                ...p,
-                totalActiveMinutes: (p.totalActiveMinutes || 0) + 1,
-                lastActiveAt: timeStr,
-                isOnline: true,
-              }
-            : p,
-        ),
-      );
+        // Update linked military profile
+        const currentUsernameLower = currentUser.username?.toLowerCase();
+        setMilitaryProfiles((prev) =>
+          (prev || []).map((p) =>
+            p &&
+            (p.userId === currentUser.id ||
+              (currentUsernameLower &&
+                p.username?.toLowerCase() === currentUsernameLower))
+              ? {
+                  ...p,
+                  totalActiveMinutes: (p.totalActiveMinutes || 0) + 1,
+                  lastActiveAt: timeStr,
+                  isOnline: true,
+                }
+              : p,
+          ),
+        );
+      } catch (err) {
+        console.warn("[ActivityTimer] Error caught safely:", err);
+      }
     }, 60000); // every 60 seconds
 
     return () => clearInterval(interval);
@@ -3064,64 +3195,63 @@ export function App() {
       // ignore
     }
 
-    // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm Supabase
+    // 2. Lưu đồng bộ lên Cơ sở dữ liệu ngầm Supabase (dùng resilient upsert để không rớt cột logo)
     const nowIso = new Date().toISOString();
-    const supabase = getSupabase();
-    let saveSuccess = true;
+    const resolvedLogoUrl = newConfig.logo_url ?? newConfig.customLogoUrl ?? "";
+    const resolvedLogoType =
+      newConfig.logo_type || newConfig.logoType || (resolvedLogoUrl ? "custom" : "default");
+    const resolvedLogoSize =
+      Number(newConfig.logo_size ?? newConfig.logoSizePx ?? newConfig.logoSize) || 48;
+    const resolvedLogoEffect =
+      newConfig.logo_effect || newConfig.logoEffect || "shine";
+    const resolvedHeaderTitle = newConfig.header_title || newConfig.title || "";
+    const resolvedSubTitle = newConfig.sub_title || newConfig.subtitle || "";
 
-    if (supabase) {
-      try {
-        const { error: cfgErr } = await supabase.from("site_config").upsert(
-          {
-            id: "default",
-            title: newConfig.title,
-            subtitle: newConfig.subtitle,
-            marquee_text: newConfig.ticker || newConfig.marquee_text,
-            marquee_mode: newConfig.marquee_mode || newConfig.tickerMode,
-            marquee_days: newConfig.marquee_days ?? newConfig.tickerDays,
-            marquee_speed: newConfig.marquee_speed || newConfig.tickerSpeed,
-            announcements:
-              newConfig.announcements || newConfig.tickerCustomList,
-            theme_color: newConfig.colorRed,
-            unit_name:
-              newConfig.footerUnitName || newConfig.site_info?.unit_name,
-            military_utilities:
-              newConfig.quickActionCards || newConfig.military_utilities,
-            site_info: newConfig.site_info,
-            footer_config: newConfig.footer_config,
-            home_layout: newConfig.layoutSettings,
-            layout_settings: newConfig.layoutSettings,
-            categories_config: newConfig.categories_config,
-            navigation_tabs: newConfig.categories_config,
-            home_category_columns: newConfig.homeCategoryColumns,
-            daily_widgets: newConfig.dailyWidgets,
-            logo_type: newConfig.logo_type || newConfig.logoType,
-            logo_url: newConfig.logo_url || newConfig.customLogoUrl,
-            logo_size: newConfig.logo_size || newConfig.logoSize,
-            logo_size_px: newConfig.logoSizePx,
-            footer_logo_size_px: newConfig.footerLogoSizePx,
-            logo_effect: newConfig.logo_effect || newConfig.logoEffect,
-            enable_logo_beam: newConfig.enableLogoBeam,
-            enable_logo_glow: newConfig.enableLogoGlow,
-            config_json: newConfig,
-            updated_at: nowIso,
-          },
-          { onConflict: "id" },
-        );
-        if (cfgErr) {
-          console.error("[App] Supabase site_config upsert error:", cfgErr);
-          saveSuccess = false;
-        }
-      } catch (e) {
-        console.warn("handleSaveCustomizer caught error:", e);
-        saveSuccess = false;
-      }
-    }
+    const unifiedPayload = {
+      id: "default",
+      logo_url: resolvedLogoUrl,
+      logo_type: resolvedLogoType,
+      logo_size: resolvedLogoSize,
+      logo_size_px: newConfig.logoSizePx ?? resolvedLogoSize,
+      footer_logo_size_px: newConfig.footerLogoSizePx,
+      logo_effect: resolvedLogoEffect,
+      enable_logo_beam: newConfig.enableLogoBeam,
+      enable_logo_glow: newConfig.enableLogoGlow,
+      header_title: resolvedHeaderTitle,
+      sub_title: resolvedSubTitle,
+      slogan: newConfig.slogan || newConfig.marquee_text || newConfig.ticker || "",
+      founded_date: newConfig.founded_date || newConfig.establishedDate || "",
+      title: newConfig.title || resolvedHeaderTitle,
+      subtitle: newConfig.subtitle || resolvedSubTitle,
+      marquee_text: newConfig.ticker || newConfig.marquee_text || "",
+      marquee_mode: newConfig.marquee_mode || newConfig.tickerMode,
+      marquee_days: newConfig.marquee_days ?? newConfig.tickerDays,
+      marquee_speed: newConfig.marquee_speed || newConfig.tickerSpeed,
+      announcements: newConfig.announcements || newConfig.tickerCustomList,
+      theme_color: newConfig.colorRed,
+      unit_name: newConfig.footerUnitName || newConfig.site_info?.unit_name,
+      military_utilities:
+        newConfig.quickActionCards || newConfig.military_utilities,
+      site_info: newConfig.site_info,
+      footer_config: newConfig.footer_config,
+      home_layout: newConfig.layoutSettings,
+      layout_settings: newConfig.layoutSettings,
+      categories_config: newConfig.categories_config,
+      navigation_tabs: newConfig.categories_config,
+      home_category_columns: newConfig.homeCategoryColumns,
+      daily_widgets: newConfig.dailyWidgets,
+      config: newConfig,
+      config_json: newConfig,
+      updated_at: nowIso,
+    };
 
     try {
-      await cloudStorage.saveSiteConfig(newConfig);
+      const saveRes = await supabaseDb.upsertSiteConfigResilient(unifiedPayload);
+      if (!saveRes.success) {
+        console.warn("[App] Supabase site_config resilient upsert notice:", saveRes.error);
+      }
     } catch (e) {
-      console.warn("cloudStorage.saveSiteConfig error:", e);
+      console.warn("handleSaveCustomizer caught error:", e);
     }
 
     showToast(

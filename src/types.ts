@@ -371,7 +371,9 @@ export interface FontSettings {
 
 export interface SiteConfig {
   title: string;
+  header_title?: string;
   subtitle: string;
+  sub_title?: string;
   slogan: string;
   ticker: string;
   marquee_text?: string;
@@ -392,6 +394,7 @@ export interface SiteConfig {
   logoSizePx?: number;
   footerLogoSizePx?: number;
   establishedDate?: string;
+  founded_date?: string;
   sections: SiteSectionsConfig;
   categories_config?: CategoryConfig[];
   categoriesConfig?: CategoryConfig[];

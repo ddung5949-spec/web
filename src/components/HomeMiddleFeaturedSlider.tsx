@@ -40,17 +40,32 @@ export const HomeMiddleFeaturedSlider: React.FC<
 
   // Auto-play carousel (5s per slide, pauses on hover)
   useEffect(() => {
-    if (featuredArticles.length <= 1 || isHovered) return;
+    if (!featuredArticles || featuredArticles.length <= 1 || isHovered) return;
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % featuredArticles.length);
+      try {
+        setCurrentIndex((prev) => {
+          if (!featuredArticles || featuredArticles.length <= 1) return 0;
+          return (prev + 1) % featuredArticles.length;
+        });
+      } catch {
+        // ignore interval errors
+      }
     }, 5000);
     return () => clearInterval(interval);
   }, [featuredArticles.length, isHovered]);
 
-  const currentArticle = featuredArticles[currentIndex] || featuredArticles[0];
+  const safeIndex =
+    featuredArticles && featuredArticles.length > 0
+      ? currentIndex % featuredArticles.length
+      : 0;
+  const currentArticle =
+    featuredArticles && featuredArticles.length > 0
+      ? featuredArticles[safeIndex] || featuredArticles[0]
+      : null;
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!featuredArticles || featuredArticles.length <= 1) return;
     setCurrentIndex((prev) =>
       prev === 0 ? featuredArticles.length - 1 : prev - 1
     );
@@ -58,6 +73,7 @@ export const HomeMiddleFeaturedSlider: React.FC<
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!featuredArticles || featuredArticles.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % featuredArticles.length);
   };
 
