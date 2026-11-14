@@ -60,7 +60,7 @@ import {
   User,
   CategoryConfig,
 } from '../types';
-import { defaultCategoriesConfig, defaultSidebarWidgets, defaultArticles, defaultDocuments, defaultUncleHoQuotes } from '../data/initialData';
+import { defaultCategoriesConfig, defaultSidebarWidgets, defaultArticles, defaultUncleHoQuotes } from '../data/initialData';
 import { ArticleCard } from './ArticleCard';
 import { DailyWidgetsSection } from './DailyWidgetsSection';
 import { DailyPosterWidget } from './DailyPosterWidget';
@@ -145,9 +145,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
 }) => {
   const isAdmin = currentUser?.role === 'admin';
 
+  // Hàm chuẩn hóa chuỗi tiếng Việt (chuyển về chữ thường, xóa dấu, trim)
+  const norm = (s: unknown): string => {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   // Live state đồng bộ an toàn từ CSDL nếu props ban đầu rỗng
   const [liveArticles, setLiveArticles] = useState<Article[]>([]);
   const [liveDocuments, setLiveDocuments] = useState<DocumentItem[]>([]);
+  const [liveLectures, setLiveLectures] = useState<LectureItem[]>([]);
   const [liveUncleHoQuotes, setLiveUncleHoQuotes] = useState<UncleHoQuote[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -157,14 +170,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const effectiveDocuments = (documents && documents.length > 0)
     ? documents
-    : (liveDocuments.length > 0 ? liveDocuments : defaultDocuments);
+    : liveDocuments;
+
+  const effectiveLectures = (lectures && lectures.length > 0)
+    ? lectures
+    : liveLectures;
 
   const effectiveUncleHoQuotes = (uncleHoQuotes && uncleHoQuotes.length > 0)
     ? uncleHoQuotes
     : (liveUncleHoQuotes.length > 0 ? liveUncleHoQuotes : defaultUncleHoQuotes);
 
+  // Không lọc cứng status === 'published' (chấp nhận cả bài viết có status rỗng/null/approved/published)
   const approvedArticles = (effectiveArticles || []).filter(
-    (a) => !a?.status || a.status === 'approved' || a.status !== 'pending'
+    (a) => Boolean(a) && a.status !== 'pending'
   );
 
   // Modals state for Admin
@@ -386,11 +404,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
         const supabase = getSupabase();
         if (!supabase) return;
 
-        const res = await withTimeout(
-          supabase.from('articles').select('*').order('published_at', { ascending: false }).limit(10),
+        let res = await withTimeout(
+          supabase.from('articles').select('*').order('published_at', { ascending: false }).limit(50),
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
+        if (res?.error) {
+          res = await withTimeout(
+            supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(50),
+            5000,
+            { data: null, error: new Error('Timeout') } as any
+          );
+        }
         const artData = !res?.error ? res?.data : null;
 
         if (isMounted && !res?.error && artData && Array.isArray(artData) && artData.length > 0) {
@@ -401,8 +426,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
             summary: row.summary || row.excerpt || '',
             content: row.content || '',
             category: row.category || 'Tin tức',
-            subCategory: row.sub_category || row.subCategory || '',
-            sectionKey: row.section_key || row.category || 'all',
+            category_id: row.category_id,
+            subCategory: row.sub_category || row.subcategory || row.subCategory || '',
+            sub_category: row.sub_category || row.subcategory || row.subCategory || '',
+            subcategory: row.subcategory || row.sub_category || row.subCategory || '',
+            sectionKey: row.section_key || row.category_id || row.category || 'all',
             author: row.author || 'Ban Biên tập',
             authorRole: row.author_role || row.authorRole || '',
             date: row.published_at
@@ -412,8 +440,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
             images: Array.isArray(row.images) ? row.images : row.image_url ? [row.image_url] : [],
             views: Number(row.views || 0),
             isFeatured: !!row.is_featured,
-            status: row.status || 'approved',
-          }));
+            status: row.status ?? '',
+          })) as any;
           setLiveArticles(mapped);
         }
       } catch (err) {
@@ -421,29 +449,38 @@ export const HomeView: React.FC<HomeViewProps> = ({
       }
     };
 
-    // 3. fetchDocuments
+    // 3. fetchDocuments (gọi trực tiếp Supabase lấy 5 văn bản mới nhất nếu props truyền vào rỗng)
     const fetchDocuments = async () => {
       try {
+        if (documents && documents.length > 0) return;
         const supabase = getSupabase();
         if (!supabase) return;
 
-        const res = await withTimeout(
-          supabase.from('documents').select('*').limit(8),
+        let res = await withTimeout(
+          supabase.from('documents').select('*').order('published_at', { ascending: false }).limit(5),
           5000,
           { data: null, error: new Error('Timeout') } as any
         );
+        if (res?.error) {
+          res = await withTimeout(
+            supabase.from('documents').select('*').limit(5),
+            5000,
+            { data: null, error: new Error('Timeout') } as any
+          );
+        }
         const docData = !res?.error ? res?.data : null;
 
-        if (isMounted && !res?.error && docData && Array.isArray(docData) && docData.length > 0) {
+        if (isMounted && !res?.error && Array.isArray(docData)) {
           const mappedDocs: DocumentItem[] = docData.map((item: any) => ({
             id: Number(item.id),
-            code: item.document_number || item.code || item.code_number || '',
+            code: item.document_number || item.code || item.code_number || 'VB',
             title: item.title || '',
             category: item.category || 'Văn bản chỉ đạo',
             issuer: item.issuer || 'Trung đoàn 95',
-            date: item.published_at ? new Date(item.published_at).toLocaleDateString('vi-VN') : '28/08/2026',
-            type: item.file_type || item.type || 'pdf',
+            date: item.published_at ? new Date(item.published_at).toLocaleDateString('vi-VN') : 'Mới nhất',
+            type: (item.file_type || item.type || 'pdf').toLowerCase(),
             fileUrl: item.file_url || item.fileUrl,
+            fileName: item.file_name || item.fileName,
             fileSize: item.file_size || item.fileSize,
             downloads: Number(item.downloads || 0),
             secretLevel: item.secret_level || 'normal',
@@ -455,7 +492,61 @@ export const HomeView: React.FC<HomeViewProps> = ({
       }
     };
 
-    // 4. fetchUncleHo
+    // 4. fetchLectures (gọi trực tiếp Supabase lấy 5 bài giảng mới nhất nếu props truyền vào rỗng)
+    const fetchLectures = async () => {
+      try {
+        if (lectures && lectures.length > 0) return;
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        let res = await withTimeout(
+          supabase.from('lectures').select('*').order('published_at', { ascending: false }).limit(5),
+          5000,
+          { data: null, error: new Error('Timeout') } as any
+        );
+        if (res?.error) {
+          res = await withTimeout(
+            supabase.from('lectures').select('*').order('created_at', { ascending: false }).limit(5),
+            5000,
+            { data: null, error: new Error('Timeout') } as any
+          );
+        }
+        if (res?.error) {
+          res = await withTimeout(
+            supabase.from('lectures').select('*').limit(5),
+            5000,
+            { data: null, error: new Error('Timeout') } as any
+          );
+        }
+        const lecData = !res?.error ? res?.data : null;
+
+        if (isMounted && !res?.error && Array.isArray(lecData)) {
+          const mappedLectures: LectureItem[] = lecData.map((item: any) => ({
+            id: Number(item.id),
+            title: item.title || '',
+            category: item.category || item.subject || 'Bài giảng số',
+            target: item.target || item.audience || item.category || 'Toàn đơn vị',
+            duration: item.duration || '45 phút',
+            author: item.author || item.instructor || 'Ban Tuyên huấn',
+            date: item.published_at
+              ? new Date(item.published_at).toLocaleDateString('vi-VN')
+              : item.created_at
+              ? new Date(item.created_at).toLocaleDateString('vi-VN')
+              : 'Mới nhất',
+            desc: item.description || item.desc || '',
+            fileType: (item.file_type || item.fileType || 'pptx').toLowerCase() as any,
+            fileName: item.file_name || item.fileName,
+            fileSize: item.file_size || item.fileSize,
+            fileUrl: item.file_url || item.fileUrl,
+          }));
+          setLiveLectures(mappedLectures);
+        }
+      } catch (err) {
+        console.warn('[HomeView] fetchLectures error caught gracefully:', err);
+      }
+    };
+
+    // 5. fetchUncleHo
     const fetchUncleHo = async () => {
       try {
         const supabase = getSupabase();
@@ -497,6 +588,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           fetchPosters(),
           fetchArticles(),
           fetchDocuments(),
+          fetchLectures(),
           fetchUncleHo(),
         ]);
       } catch (globalErr) {
@@ -1390,7 +1482,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
             {(activeColumns || []).map((col) => {
               const isEmbed = col.type === 'embed_code';
               const matchedCat = (availableCategories || []).find(
-                (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+                (c) =>
+                  c.id === col.sectionKey ||
+                  c.sectionKey === col.sectionKey ||
+                  norm(c.name) === norm(col.title)
               );
               const displayTitle = matchedCat?.name || col.title;
               const displaySubtitle =
@@ -1398,27 +1493,74 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   ? matchedCat.subcategories.join(' • ')
                   : col.subtitle;
 
+              const sectionIds = [col.sectionKey, matchedCat?.id, matchedCat?.sectionKey].filter(Boolean);
+              const sectionNameNorm = norm(displayTitle);
+              const sectionNavNorm = norm(matchedCat?.navName);
+              const sectionSubcategories = [
+                ...(Array.isArray(matchedCat?.subcategories) ? matchedCat.subcategories : []),
+                ...(col.categoryFilter && col.categoryFilter !== 'all' ? [col.categoryFilter] : []),
+              ]
+                .map((s) => norm(s))
+                .filter(Boolean);
+
               const colArticles = isEmbed
                 ? []
                 : (approvedArticles || [])
-                    .filter((a) => {
-                      const matchSection =
-                        !col.sectionKey ||
-                        a.sectionKey === col.sectionKey ||
-                        (!a.sectionKey && col.sectionKey === 'ctd') ||
-                        (matchedCat && (a.sectionKey === matchedCat.id || a.category === matchedCat.name || a.category === matchedCat.navName));
+                    .filter((a: any) => {
+                      // 1. article.category_id === section.id (hoặc sectionKey khớp)
+                      const matchId =
+                        (a.category_id && sectionIds.includes(a.category_id)) ||
+                        (a.sectionKey && sectionIds.includes(a.sectionKey));
 
-                      const filterVal = (col.categoryFilter || '').trim().toLowerCase();
-                      const matchCategory =
-                        !filterVal ||
-                        filterVal === 'all' ||
-                        !a.category ||
-                        a.category.trim().toLowerCase() === filterVal ||
-                        a.category.toLowerCase().includes(filterVal);
+                      // 2. norm(article.category) khớp hoặc chứa norm(section.name || section.title)
+                      const artCatNorm = norm(a.category);
+                      const matchSectionName =
+                        Boolean(artCatNorm) &&
+                        ((Boolean(sectionNameNorm) &&
+                          (artCatNorm === sectionNameNorm ||
+                            artCatNorm.includes(sectionNameNorm) ||
+                            sectionNameNorm.includes(artCatNorm))) ||
+                          (Boolean(sectionNavNorm) &&
+                            (artCatNorm === sectionNavNorm ||
+                              artCatNorm.includes(sectionNavNorm) ||
+                              sectionNavNorm.includes(artCatNorm))));
 
-                      return matchSection && matchCategory;
+                      // 3. norm(article.sub_category || article.subcategory || article.category) khớp với bất kỳ tiểu mục nào trong section.subcategories
+                      const artSubNorm = norm(a.sub_category || a.subcategory || a.subCategory || a.category);
+                      const matchSubcategory = sectionSubcategories.some(
+                        (subNorm) =>
+                          (artSubNorm &&
+                            (artSubNorm === subNorm ||
+                              artSubNorm.includes(subNorm) ||
+                              subNorm.includes(artSubNorm))) ||
+                          (artCatNorm &&
+                            (artCatNorm === subNorm ||
+                              artCatNorm.includes(subNorm) ||
+                              subNorm.includes(artCatNorm)))
+                      );
+
+                      return Boolean(matchId || matchSectionName || matchSubcategory);
                     })
                     .slice(0, col.articleLimit || 5);
+
+              // Fallback cho 2 khung VĂN BẢN - CHỈ THỊ và BÀI GIẢNG SỐ nếu chưa có bài trong articles
+              const colKeyNorm = norm(`${col.sectionKey || ''} ${displayTitle}`);
+              const isDocSection =
+                col.sectionKey === 'doc' ||
+                colKeyNorm.includes('van ban') ||
+                colKeyNorm.includes('chi thi');
+              const isLectureSection =
+                col.sectionKey === 'lecture' ||
+                colKeyNorm.includes('bai giang');
+
+              const fallbackDocs =
+                !isEmbed && colArticles.length === 0 && isDocSection
+                  ? (effectiveDocuments || []).slice(0, 4)
+                  : [];
+              const fallbackLectures =
+                !isEmbed && colArticles.length === 0 && isLectureSection
+                  ? (effectiveLectures || []).slice(0, 4)
+                  : [];
 
               const colSpanClass =
                 col.colSpan === 'full' || col.colSpan === '3'
@@ -1467,7 +1609,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       </div>
                     )}
 
-                    {/* Column Body: Either Embedded Code or Articles */}
+                    {/* Column Body: Either Embedded Code, Articles, or Documents/Lectures fallback */}
                     {isEmbed ? (
                       <div className="p-3 flex-1 flex flex-col justify-center">
                         {col.embedCode || col.embedHtml ? (
@@ -1493,7 +1635,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           <div
                             key={art.id}
                             onClick={() => onOpenArticle(art)}
-                            className="p-2.5 rounded-xl border border-gray-100 hover:border-red-200 bg-white hover:bg-amber-50/50 shadow-xs hover:shadow-lg hover:scale-105 transition-all duration-200 group/item cursor-pointer transform"
+                            className="p-2.5 rounded-xl border border-gray-100 hover:border-red-200 bg-white hover:bg-amber-50/50 shadow-xs hover:shadow-lg hover:scale-[1.02] transition-all duration-200 group/item cursor-pointer transform"
                           >
                             <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-red-700 leading-snug line-clamp-2 transition-colors">
                               {art.title}
@@ -1503,6 +1645,50 @@ export const HomeView: React.FC<HomeViewProps> = ({
                               <span>•</span>
                               <span>{art.date}</span>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : fallbackDocs.length > 0 ? (
+                      <div className="p-3 space-y-2 flex-1">
+                        {fallbackDocs.map((doc) => (
+                          <div
+                            key={doc.id}
+                            onClick={() => onSelectSection('doc')}
+                            className="p-2.5 rounded-xl border border-gray-100 hover:border-blue-200 bg-white hover:bg-blue-50/50 shadow-xs transition-all duration-200 group/item cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="font-mono text-[10px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 truncate">
+                                {doc.code || 'VĂN BẢN'}
+                              </span>
+                              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                                {(doc.type || 'pdf').toUpperCase()}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-blue-800 leading-snug line-clamp-2 transition-colors">
+                              {doc.title}
+                            </h4>
+                          </div>
+                        ))}
+                      </div>
+                    ) : fallbackLectures.length > 0 ? (
+                      <div className="p-3 space-y-2 flex-1">
+                        {fallbackLectures.map((lec) => (
+                          <div
+                            key={lec.id}
+                            onClick={() => onSelectSection('lecture')}
+                            className="p-2.5 rounded-xl border border-gray-100 hover:border-teal-200 bg-white hover:bg-teal-50/50 shadow-xs transition-all duration-200 group/item cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 truncate">
+                                {lec.target || lec.category || 'Bài giảng'}
+                              </span>
+                              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                {(lec.fileType || 'pptx').toUpperCase()}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-gray-800 group-hover/item:text-teal-800 leading-snug line-clamp-2 transition-colors">
+                              {lec.title}
+                            </h4>
                           </div>
                         ))}
                       </div>
@@ -1570,32 +1756,68 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
-              {(effectiveDocuments || []).slice(0, 4).map((d) => (
-                <div key={d.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 group">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
-                        {d.code}
-                      </span>
-                      <span className="text-[10px] text-gray-500 font-medium">{d.date}</span>
+              {(effectiveDocuments || []).length > 0 ? (
+                (effectiveDocuments || []).slice(0, 5).map((d) => {
+                  const docExt = (d.type || 'pdf').toUpperCase();
+                  return (
+                    <div key={d.id} className="pt-2 first:pt-0 flex items-center justify-between gap-2.5 group">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-[10px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                            {d.code || 'VB'}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {docExt}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-medium">{d.date}</span>
+                        </div>
+                        <h4
+                          onClick={() => onSelectSection('doc')}
+                          className="text-xs font-bold text-gray-800 hover:text-blue-800 line-clamp-1 cursor-pointer mt-1"
+                        >
+                          {d.title}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {d.fileUrl ? (
+                          <a
+                            href={d.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Xem tài liệu"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Xem</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onSelectSection('doc')}
+                            className="px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Xem tài liệu"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Xem</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleFastDownloadDoc(d)}
+                          className="p-1.5 bg-blue-50 hover:bg-blue-800 text-blue-800 hover:text-white rounded-lg transition-colors cursor-pointer"
+                          title="Tải về tệp này"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <h4
-                      onClick={() => onSelectSection('doc')}
-                      className="text-xs font-bold text-gray-800 hover:text-blue-800 line-clamp-1 cursor-pointer mt-1"
-                    >
-                      {d.title}
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleFastDownloadDoc(d)}
-                    className="p-1.5 bg-blue-50 hover:bg-blue-800 text-blue-800 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0"
-                    title="Tải về tệp này"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
+                  );
+                })
+              ) : (
+                <div className="py-6 text-center text-xs italic text-gray-400">
+                  Chưa có tài liệu nào được cập nhật
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -1617,32 +1839,68 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
 
             <div className="p-3 divide-y divide-gray-100 space-y-2 flex-1">
-              {(lectures || []).slice(0, 4).map((l) => (
-                <div key={l.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3 group">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
-                        {l.target}
-                      </span>
-                      <span className="text-[10px] text-gray-500">{l.author}</span>
+              {(effectiveLectures || []).length > 0 ? (
+                (effectiveLectures || []).slice(0, 5).map((l) => {
+                  const lecExt = (l.fileType || 'pptx').toUpperCase();
+                  return (
+                    <div key={l.id} className="pt-2 first:pt-0 flex items-center justify-between gap-2.5 group">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                            {l.target || l.category || 'Bài giảng'}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {lecExt}
+                          </span>
+                          <span className="text-[10px] text-gray-500">{l.author}</span>
+                        </div>
+                        <h4
+                          onClick={() => onSelectSection('lecture')}
+                          className="text-xs font-bold text-gray-800 hover:text-teal-800 line-clamp-1 cursor-pointer mt-1"
+                        >
+                          {l.title}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {l.fileUrl ? (
+                          <a
+                            href={l.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Xem bài giảng"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Xem</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onSelectSection('lecture')}
+                            className="px-2 py-1 bg-slate-100 hover:bg-teal-100 text-slate-700 hover:text-teal-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Xem bài giảng"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Xem</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleFastDownloadLecture(l)}
+                          className="p-1.5 bg-teal-50 hover:bg-teal-800 text-teal-800 hover:text-white rounded-lg transition-colors cursor-pointer"
+                          title="Tải bài giảng về"
+                        >
+                          <HardDriveDownload className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <h4
-                      onClick={() => onSelectSection('lecture')}
-                      className="text-xs font-bold text-gray-800 hover:text-teal-800 line-clamp-1 cursor-pointer mt-1"
-                    >
-                      {l.title}
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleFastDownloadLecture(l)}
-                    className="p-1.5 bg-teal-50 hover:bg-teal-800 text-teal-800 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0"
-                    title="Tải bài giảng về"
-                  >
-                    <HardDriveDownload className="w-3.5 h-3.5" />
-                  </button>
+                  );
+                })
+              ) : (
+                <div className="py-6 text-center text-xs italic text-gray-400">
+                  Chưa có tài liệu nào được cập nhật
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
