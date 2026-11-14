@@ -7,13 +7,15 @@ import {
   Car,
   ShieldAlert,
   HeartHandshake,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { getSupabase } from '../../utils/supabase';
 
+export const POSTER_ID_SAFETY = 'thong-diep-an-toan';
+export const POSTER_ID_TRAFFIC = 'tinh-huong-giao-thong';
+
 /**
- * Tự động vẽ ảnh lên HTML Canvas, giới hạn kích thước tối đa không quá 800px,
- * xuất ra JPEG chất lượng 0.75. Tốc độ xử lý < 0.1s, dung lượng < 80KB.
+ * Tự động vẽ ảnh lên HTML Canvas, giới hạn chiều rộng/dài tối đa 800px,
+ * xuất ra JPEG chất lượng 0.75 (tự điều chỉnh nhẹ nếu vượt 80KB để đảm bảo < 80KB).
  */
 const compressPosterImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -35,8 +37,23 @@ const compressPosterImage = (file: File): Promise<string> => {
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
+        ctx.drawImage(img, 0, 0, w, h);
+
+        let dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        // Đảm bảo dung lượng < 80KB (~81,920 bytes) để upsert siêu nhanh
+        const MAX_BYTES = 80 * 1024;
+        const qualities = [0.65, 0.55, 0.45];
+        for (const q of qualities) {
+          if (dataUrl.length <= MAX_BYTES) break;
+          dataUrl = canvas.toDataURL('image/jpeg', q);
+        }
+        resolve(dataUrl);
       };
       img.onerror = () => reject(new Error('Không thể đọc hình ảnh.'));
       img.src = e.target?.result as string;
@@ -46,56 +63,69 @@ const compressPosterImage = (file: File): Promise<string> => {
   });
 };
 
+export interface SavedDailyPosterPayload {
+  id: string;
+  category_name: string;
+  title: string;
+  image_url: string;
+  aspect_ratio: string;
+  updated_at: string;
+}
+
 export interface DailyPosterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  widgetId?: string; // 'tinh-huong-giao-thong' | 'traffic_situation' | 'traffic' | 'safety_message' | 'good_deed'
+  posterId?: string; // Khóa cứng: 'thong-diep-an-toan' | 'tinh-huong-giao-thong'
+  widgetId?: string;
   initialCategory?: string;
   initialTitle?: string;
   initialImage?: string;
   initialAspectRatio?: 'auto' | 'portrait' | 'landscape';
-  onSaveSuccess?: (savedData: {
-    id: string;
-    title: string;
-    category_name: string;
-    image_url: string;
-    aspect_ratio: string;
-  }) => void;
+  onSaved?: (savedData: SavedDailyPosterPayload) => void;
+  onSaveSuccess?: (savedData: SavedDailyPosterPayload) => void;
   onSaveDailyWidgets?: (widgets: any[]) => Promise<void> | void;
   dailyWidgets?: any[];
 }
 
+const resolveLockedPosterId = (rawId?: string): string => {
+  const id = (rawId || '').trim();
+  if (
+    id === POSTER_ID_SAFETY ||
+    id === 'safety' ||
+    id === 'safety_message' ||
+    id === 'widget_safety_message'
+  ) {
+    return POSTER_ID_SAFETY;
+  }
+  if (
+    !id ||
+    id === POSTER_ID_TRAFFIC ||
+    id === 'tinh_huong_giao_thong' ||
+    id === 'traffic' ||
+    id === 'traffic_situation' ||
+    id === 'widget_traffic_situation'
+  ) {
+    return POSTER_ID_TRAFFIC;
+  }
+  return id;
+};
+
 export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
   isOpen,
   onClose,
-  widgetId = 'tinh-huong-giao-thong',
+  posterId: propPosterId,
+  widgetId,
   initialCategory,
   initialTitle,
   initialImage,
-  initialAspectRatio = 'auto',
+  initialAspectRatio = 'portrait',
+  onSaved,
   onSaveSuccess,
-  onSaveDailyWidgets,
-  dailyWidgets,
 }) => {
-  // Chuẩn hóa ID: Nếu thuộc chuyên mục Giao thông, ép ID chính xác là 'tinh-huong-giao-thong'
-  const isTraffic =
-    !widgetId ||
-    widgetId === 'tinh-huong-giao-thong' ||
-    widgetId === 'tinh_huong_giao_thong' ||
-    widgetId === 'traffic_situation' ||
-    widgetId === 'traffic' ||
-    widgetId === 'widget_traffic_situation';
-
-  const isSafety =
-    widgetId === 'safety_message' ||
-    widgetId === 'safety' ||
-    widgetId === 'widget_safety_message';
-
-  const targetId = isTraffic
-    ? 'tinh-huong-giao-thong'
-    : isSafety
-    ? 'safety'
-    : 'good_deed';
+  // Khóa cứng mã ID định danh cho 2 khung poster
+  const posterId = resolveLockedPosterId(propPosterId || widgetId);
+  const isTraffic = posterId === POSTER_ID_TRAFFIC;
+  const isSafety = posterId === POSTER_ID_SAFETY;
 
   const defaultCategory = isTraffic
     ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
@@ -103,11 +133,11 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
     ? 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN'
     : 'MỖI NGÀY MỘT HÀNH ĐỘNG ĐẸP';
 
-  const [formCategory, setFormCategory] = useState(initialCategory || defaultCategory);
-  const [formTitle, setFormTitle] = useState(initialTitle || '');
-  const [formImage, setFormImage] = useState(initialImage || '');
-  const [formAspectRatio, setFormAspectRatio] = useState<'auto' | 'portrait' | 'landscape'>(
-    initialAspectRatio || 'auto'
+  const [categoryName, setCategoryName] = useState(initialCategory || defaultCategory);
+  const [title, setTitle] = useState(initialTitle || '');
+  const [imageUrl, setImageUrl] = useState(initialImage || '');
+  const [aspectRatio, setAspectRatio] = useState<'auto' | 'portrait' | 'landscape'>(
+    initialAspectRatio || 'portrait'
   );
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -115,12 +145,12 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setFormCategory(initialCategory || defaultCategory);
-      setFormTitle(initialTitle || '');
-      setFormImage(initialImage || '');
-      setFormAspectRatio(initialAspectRatio || 'auto');
+      setCategoryName(initialCategory || defaultCategory);
+      setTitle(initialTitle || '');
+      setImageUrl(initialImage || '');
+      setAspectRatio(initialAspectRatio || 'portrait');
     }
-  }, [isOpen, initialCategory, initialTitle, initialImage, initialAspectRatio, defaultCategory]);
+  }, [isOpen, posterId, initialCategory, initialTitle, initialImage, initialAspectRatio, defaultCategory]);
 
   if (!isOpen) return null;
 
@@ -130,9 +160,8 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
 
     try {
       setIsCompressing(true);
-      // Nén ảnh Canvas tức thì trong 0.1s, đưa dung lượng về dưới 80KB
       const compressedBase64 = await compressPosterImage(file);
-      setFormImage(compressedBase64);
+      setImageUrl(compressedBase64);
     } catch (err) {
       console.error('[DailyPosterModal] File compression error:', err);
       alert('Không thể tải hoặc xử lý ảnh. Vui lòng thử lại với ảnh khác.');
@@ -146,152 +175,90 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formImage && !initialImage) {
+    const rawImg = imageUrl || initialImage || '';
+    if (!rawImg.trim()) {
       alert('Vui lòng chọn hình ảnh Poster!');
       return;
     }
 
     try {
       setIsSaving(true);
-      const nowIso = new Date().toISOString();
-      const rawImg = formImage || initialImage || '';
 
-      // Thêm timestamp chống cache URL ảnh nếu là liên kết http
-      let finalUrl = rawImg;
-      if (finalUrl && finalUrl.startsWith('http')) {
-        finalUrl = finalUrl.includes('?t=')
-          ? finalUrl.replace(/\?t=\d+/, `?t=${Date.now()}`)
-          : `${finalUrl}?t=${Date.now()}`;
+      let finalImageUrl = rawImg.trim();
+      if (finalImageUrl.startsWith('http')) {
+        finalImageUrl = finalImageUrl.includes('?t=')
+          ? finalImageUrl.replace(/\?t=\d+/, `?t=${Date.now()}`)
+          : `${finalImageUrl}?t=${Date.now()}`;
       }
 
-      const finalCategory = formCategory.trim() || defaultCategory;
-      const finalTitle = formTitle.trim() || defaultCategory;
+      const finalCategoryName = categoryName.trim() || defaultCategory;
+      const finalTitle = title?.trim() || finalCategoryName;
 
-      const posterRecord = {
-        id: targetId, // 'tinh-huong-giao-thong' | 'safety' | 'good_deed'
+      const payload: SavedDailyPosterPayload = {
+        id: posterId, // 'thong-diep-an-toan' hoặc 'tinh-huong-giao-thong'
+        category_name: finalCategoryName,
         title: finalTitle,
-        category_name: finalCategory,
-        image_url: finalUrl,
-        image_data: finalUrl,
-        aspect_ratio: formAspectRatio,
-        content: finalTitle || '',
-        extra_data: { category_name: finalCategory },
-        updated_at: nowIso,
+        image_url: finalImageUrl,
+        aspect_ratio: aspectRatio || 'portrait',
+        updated_at: new Date().toISOString(),
       };
 
-      // 1. Lưu trực tiếp vào Supabase bảng 'daily_posters'
       const supabase = getSupabase();
-      if (supabase) {
-        const { error: upsertErr } = await supabase.from('daily_posters').upsert(posterRecord, {
-          onConflict: 'id',
-        });
-
-        if (upsertErr) {
-          console.error('[DailyPosterModal] Supabase error:', upsertErr);
-          alert('❌ Lỗi khi lưu lên cơ sở dữ liệu: ' + upsertErr.message);
-          setIsSaving(false);
-          return;
-        }
-
-        // Đồng bộ các ID tương thích (traffic, traffic_situation)
-        if (isTraffic) {
-          try {
-            await supabase.from('daily_posters').upsert([
-              { ...posterRecord, id: 'traffic' },
-              { ...posterRecord, id: 'traffic_situation' },
-            ], { onConflict: 'id' });
-          } catch {
-            // ignore
-          }
-        }
+      if (!supabase) {
+        alert('❌ Lỗi lưu chuyên mục: Chưa kết nối được cơ sở dữ liệu Supabase.');
+        return;
       }
 
-      // 2. Cập nhật localStorage an toàn (CHỐNG TRÀN BỘ NHỚ QuotaExceededError)
+      const { error } = await supabase
+        .from('daily_posters')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error) {
+        alert('❌ Lỗi lưu chuyên mục: ' + error.message);
+        return;
+      }
+
+      // Cập nhật localStorage metadata gọn nhẹ (không lưu Base64 ảnh nặng gây QuotaExceededError)
       try {
         const cachedRaw =
           localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
         const cacheMap = cachedRaw ? JSON.parse(cachedRaw) : {};
-
-        // Rút gọn: tuyệt đối không nhồi Base64 dài quá 500 ký tự vào LocalStorage
-        const sanitizedUrl = (finalUrl && finalUrl.startsWith('data:') && finalUrl.length > 500) ? '' : finalUrl;
+        const sanitizedUrl =
+          finalImageUrl.startsWith('data:') && finalImageUrl.length > 500 ? '' : finalImageUrl;
         const storageRecord = {
-          ...posterRecord,
+          ...payload,
           image_url: sanitizedUrl,
           image_data: sanitizedUrl,
         };
-
-        cacheMap[targetId] = storageRecord;
-        if (isTraffic) {
-          cacheMap['tinh-huong-giao-thong'] = storageRecord;
-          cacheMap['traffic'] = storageRecord;
-          cacheMap['traffic_situation'] = storageRecord;
-        } else if (isSafety) {
-          cacheMap['safety'] = storageRecord;
-          cacheMap['safety_message'] = storageRecord;
-        } else {
-          cacheMap['good_deed'] = storageRecord;
-        }
+        cacheMap[posterId] = storageRecord;
         localStorage.setItem('daily_posters', JSON.stringify(cacheMap));
         localStorage.setItem('daily_posters_cache', JSON.stringify(cacheMap));
-
-        // Metadata ngắn gọn không chứa Base64 cho cached_posters
-        const posterList = Object.values(cacheMap).map((p: any) => ({
-          id: p.id,
-          title: p.title || '',
-          category_name: p.category_name || '',
-          aspect_ratio: p.aspect_ratio || 'auto',
-          updated_at: p.updated_at || '',
-          image_url: (p.image_url && p.image_url.startsWith('data:') && p.image_url.length > 500) ? '' : (p.image_url || ''),
-        }));
-        localStorage.setItem('cached_posters', JSON.stringify(posterList));
-      } catch (err) {
-        console.warn('Bỏ qua lưu cache posters vào localStorage do hạn mức trình duyệt');
+      } catch {
+        // Bỏ qua lỗi hạn mức localStorage
       }
 
-      // 3. Phát CustomEvent để State ngoài trang chủ cập nhật tức thì (đầy đủ ảnh gốc trong RAM)
+      // Phát CustomEvent để các widget liên quan đồng bộ ngay lập tức
       window.dispatchEvent(
         new CustomEvent('daily_posters_updated', {
           detail: {
-            id: targetId,
-            poster: posterRecord,
+            id: posterId,
+            poster: payload,
           },
         })
       );
 
-      // 4. Đồng bộ callback ngoài HomeView nếu có
+      if (onSaved) {
+        onSaved(payload); // Cập nhật state ngoài HomeView ngay lập tức
+      }
       if (onSaveSuccess) {
-        onSaveSuccess(posterRecord);
+        onSaveSuccess(payload);
       }
 
-      if (onSaveDailyWidgets) {
-        const existingList = Array.isArray(dailyWidgets) ? [...dailyWidgets] : [];
-        const updatedItem = {
-          id: targetId,
-          categoryName: finalCategory,
-          title: finalTitle,
-          imageUrl: finalUrl,
-          aspectRatioMode: formAspectRatio,
-          updatedAt: nowIso,
-        };
-        const idx = existingList.findIndex(
-          (w) =>
-            w.id === targetId ||
-            (isTraffic && (w.id === 'traffic_situation' || w.id === 'traffic' || w.id === 'tinh-huong-giao-thong'))
-        );
-        let nextList: any[];
-        if (idx >= 0) {
-          nextList = existingList.map((w, i) => (i === idx ? updatedItem : w));
-        } else {
-          nextList = [...existingList, updatedItem];
-        }
-        await Promise.resolve(onSaveDailyWidgets(nextList));
-      }
-
-      // Đóng modal tức thì
+      alert('✅ Đã lưu chuyên mục thành công!');
       onClose();
     } catch (err: any) {
       console.error('[DailyPosterModal] Save error:', err);
-      alert('❌ Lỗi khi lưu poster: ' + (err?.message || 'Vui lòng thử lại'));
+      alert('❌ Lỗi lưu chuyên mục: ' + (err?.message || 'Vui lòng thử lại'));
     } finally {
       setIsSaving(false);
     }
@@ -319,7 +286,7 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
                 CHỈNH SỬA POSTER CHUYÊN MỤC
               </h3>
               <p className="text-[11px] text-white/80">
-                {formCategory || defaultCategory}
+                {categoryName || defaultCategory} ({posterId})
               </p>
             </div>
           </div>
@@ -341,8 +308,8 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
             </label>
             <input
               type="text"
-              value={formCategory}
-              onChange={(e) => setFormCategory(e.target.value)}
+              value={categoryName}
+              onChange={(e) => setCategoryName(e.target.value)}
               placeholder="Ví dụ: Mỗi ngày một tình huống giao thông"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-hidden font-bold text-gray-800"
               required
@@ -356,8 +323,8 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
             </label>
             <input
               type="text"
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="Ví dụ: Chú ý quan sát khi chuyển hướng xe quân sự..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-hidden text-gray-800"
             />
@@ -392,7 +359,7 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
                 </button>
               </div>
               <p className="text-[11px] text-gray-500 italic">
-                Ảnh sẽ được gắn mã chống lưu đệm cache (?t=...) để hiển thị ngay lập tức khi lưu.
+                Ảnh tự động nén qua Canvas (≤ 800px, JPEG 0.75, &lt; 80KB) và lưu trực tiếp lên Supabase.
               </p>
             </div>
           </div>
@@ -405,9 +372,9 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setFormAspectRatio('auto')}
+                onClick={() => setAspectRatio('auto')}
                 className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] text-center transition-all cursor-pointer ${
-                  formAspectRatio === 'auto'
+                  aspectRatio === 'auto'
                     ? 'border-amber-700 bg-amber-50 text-amber-800 ring-2 ring-amber-300'
                     : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
@@ -416,9 +383,9 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setFormAspectRatio('portrait')}
+                onClick={() => setAspectRatio('portrait')}
                 className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] text-center transition-all cursor-pointer ${
-                  formAspectRatio === 'portrait'
+                  aspectRatio === 'portrait'
                     ? 'border-amber-700 bg-amber-50 text-amber-800 ring-2 ring-amber-300'
                     : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
@@ -427,9 +394,9 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setFormAspectRatio('landscape')}
+                onClick={() => setAspectRatio('landscape')}
                 className={`py-2 px-2.5 rounded-lg border font-bold text-[11px] text-center transition-all cursor-pointer ${
-                  formAspectRatio === 'landscape'
+                  aspectRatio === 'landscape'
                     ? 'border-amber-700 bg-amber-50 text-amber-800 ring-2 ring-amber-300'
                     : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
@@ -445,14 +412,14 @@ export const DailyPosterModal: React.FC<DailyPosterModalProps> = ({
               Xem trước ảnh Poster:
             </label>
             <div className="w-full max-h-56 rounded-xl border border-gray-200 bg-slate-100 p-2 overflow-hidden flex items-center justify-center">
-              {formImage && formImage.trim() !== '' ? (
+              {imageUrl && imageUrl.trim() !== '' ? (
                 <img
-                  src={formImage}
+                  src={imageUrl}
                   alt="Preview"
                   className={`max-h-52 rounded-lg ${
-                    formAspectRatio === 'portrait'
+                    aspectRatio === 'portrait'
                       ? 'aspect-[3/4] object-cover'
-                      : formAspectRatio === 'landscape'
+                      : aspectRatio === 'landscape'
                       ? 'aspect-video object-cover'
                       : 'max-h-52 w-auto object-contain'
                   }`}

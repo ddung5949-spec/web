@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Award,
   BookOpen,
+  Car,
   ChevronRight,
   Code,
   Crosshair,
@@ -20,15 +21,18 @@ import {
   Globe,
   HardDriveDownload,
   Heart,
+  Image as ImageIcon,
   Laptop,
   Layers,
   Layout,
   LayoutGrid,
+  Maximize2,
   Newspaper,
   Plus,
   PlusCircle,
   Presentation,
   Shield,
+  ShieldAlert,
   Sliders,
   Sparkles,
   Star,
@@ -36,6 +40,7 @@ import {
   UserPen,
   UsersRound,
   Video,
+  X,
 } from 'lucide-react';
 import {
   Article,
@@ -68,6 +73,12 @@ import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
 import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
 import { LayoutManagerModal, normalizeWidgetsList } from './modals/LayoutManagerModal';
+import {
+  DailyPosterModal,
+  POSTER_ID_SAFETY,
+  POSTER_ID_TRAFFIC,
+  SavedDailyPosterPayload,
+} from './modals/DailyPosterModal';
 import { getSupabase } from '../utils/supabase';
 
 interface HomeViewProps {
@@ -160,6 +171,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [isQuickActionModalOpen, setIsQuickActionModalOpen] = useState(false);
   const [isSectionManagerModalOpen, setIsSectionManagerModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
+  const [editingPoster, setEditingPoster] = useState<{
+    id: string;
+    category_name: string;
+    title: string;
+    image_url: string;
+    aspect_ratio: 'auto' | 'portrait' | 'landscape';
+  } | null>(null);
+  const [lightboxPoster, setLightboxPoster] = useState<{
+    title: string;
+    image_url: string;
+    isTraffic: boolean;
+  } | null>(null);
 
   // Helper rút gọn metadata poster trước khi lưu cache localStorage - TUYỆT ĐỐI KHÔNG LƯU ẢNH BASE64
   const sanitizePostersForCache = (posters: any[]) => {
@@ -177,8 +200,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }));
   };
 
+  // Dữ liệu gốc trực tiếp từ Supabase bảng 'daily_posters' (ưu tiên tuyệt đối, không bị localStorage/fallback ghi đè)
+  const [supabasePosters, setSupabasePosters] = useState<Record<string, SavedDailyPosterPayload>>({});
+
   // State nạp poster từ bảng 'daily_posters' trên Supabase và cache localStorage
-  const [dailyPosters, setDailyPosters] = useState<Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }>>(() => {
+  const [dailyPosters, setDailyPosters] = useState<Record<string, { image_data: string; image_url?: string; aspect_ratio?: string; title?: string; category_name?: string; updated_at?: string }>>(() => {
     try {
       const cached = localStorage.getItem('daily_posters') || localStorage.getItem('daily_posters_cache');
       return cached ? JSON.parse(cached) : {};
@@ -188,11 +214,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
   });
 
   const effectiveDailyPosters = React.useMemo(() => {
-    return {
+    // Luôn ưu tiên dữ liệu đã fetch/lưu từ Supabase lên trên propsDailyPosters và localStorage
+    const merged: Record<string, any> = {
       ...(dailyPosters || {}),
       ...(propsDailyPosters || {}),
     };
-  }, [dailyPosters, propsDailyPosters]);
+    Object.entries(supabasePosters || {}).forEach(([k, val]) => {
+      if (val && (val.image_url || val.category_name)) {
+        merged[k] = {
+          ...(merged[k] || {}),
+          ...val,
+          image_data: val.image_url || merged[k]?.image_data || '',
+        };
+      }
+    });
+    return merged;
+  }, [dailyPosters, propsDailyPosters, supabasePosters]);
 
   // CƠ CHẾ FETCH DỮ LIỆU AN TOÀN, CÓ TIMEOUT 5 GIÂY, CHỐNG TREO LOADING VÔ TẬN
   React.useEffect(() => {
@@ -220,11 +257,48 @@ export const HomeView: React.FC<HomeViewProps> = ({
         const data = !res?.error ? res?.data : null;
 
         if (!res?.error && data && Array.isArray(data) && data.length > 0) {
-          const map: Record<string, { image_data: string; aspect_ratio?: string; title?: string; category_name?: string }> = {};
+          const map: Record<string, { image_data: string; image_url?: string; aspect_ratio?: string; title?: string; category_name?: string; updated_at?: string }> = {};
+          const sbLockedMap: Record<string, SavedDailyPosterPayload> = {};
+
+          // Ưu tiên tìm đúng bản ghi id === 'thong-diep-an-toan' và id === 'tinh-huong-giao-thong'
+          const exactSafetyRow = data.find((r: any) => r?.id === POSTER_ID_SAFETY);
+          const exactTrafficRow = data.find((r: any) => r?.id === POSTER_ID_TRAFFIC);
+
+          const toSavedPayload = (row: any, lockedId: string): SavedDailyPosterPayload => ({
+            id: lockedId,
+            category_name: row.category_name || row.categoryName || '',
+            title: row.title || '',
+            image_url: row.image_url || row.image_data || row.imageUrl || row.image || '',
+            aspect_ratio: row.aspect_ratio || row.aspectRatio || row.aspectRatioMode || 'portrait',
+            updated_at: row.updated_at || '',
+          });
+
+          if (exactSafetyRow && (exactSafetyRow.image_url || exactSafetyRow.image_data || exactSafetyRow.category_name)) {
+            sbLockedMap[POSTER_ID_SAFETY] = toSavedPayload(exactSafetyRow, POSTER_ID_SAFETY);
+          } else {
+            const legacySafety = data.find((r: any) => r?.id === 'safety_message' || r?.id === 'safety');
+            if (legacySafety && (legacySafety.image_url || legacySafety.image_data || legacySafety.category_name)) {
+              sbLockedMap[POSTER_ID_SAFETY] = toSavedPayload(legacySafety, POSTER_ID_SAFETY);
+            }
+          }
+
+          if (exactTrafficRow && (exactTrafficRow.image_url || exactTrafficRow.image_data || exactTrafficRow.category_name)) {
+            sbLockedMap[POSTER_ID_TRAFFIC] = toSavedPayload(exactTrafficRow, POSTER_ID_TRAFFIC);
+          } else {
+            const legacyTraffic = data.find((r: any) => r?.id === 'traffic_situation' || r?.id === 'traffic' || r?.id === 'tinh_huong_giao_thong');
+            if (legacyTraffic && (legacyTraffic.image_url || legacyTraffic.image_data || legacyTraffic.category_name)) {
+              sbLockedMap[POSTER_ID_TRAFFIC] = toSavedPayload(legacyTraffic, POSTER_ID_TRAFFIC);
+            }
+          }
+
           data.forEach((row: any) => {
             const rawId = (row.id || row.key || row.widget_id || '').replace(/^widget_/, '');
+            const isSafety =
+              rawId === POSTER_ID_SAFETY ||
+              rawId === 'safety_message' ||
+              rawId === 'safety';
             const isTraffic =
-              rawId === 'tinh-huong-giao-thong' ||
+              rawId === POSTER_ID_TRAFFIC ||
               rawId === 'tinh_huong_giao_thong' ||
               rawId === 'traffic_situation' ||
               rawId === 'traffic';
@@ -232,10 +306,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
             const normKey =
               rawId === 'uncle_ho' || rawId === 'uncleHo' || rawId === 'bac_ho'
                 ? 'uncle_ho'
-                : rawId === 'safety_message' || rawId === 'safety'
-                ? 'safety'
+                : isSafety
+                ? POSTER_ID_SAFETY
                 : isTraffic
-                ? 'tinh-huong-giao-thong'
+                ? POSTER_ID_TRAFFIC
                 : rawId === 'good_deed'
                 ? 'good_deed'
                 : rawId;
@@ -250,17 +324,30 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 category_name: row.category_name || row.categoryName || '',
                 updated_at: row.updated_at || '',
               };
-              map[normKey] = entry;
               map[rawId] = entry;
-              if (normKey === 'safety') map['safety_message'] = entry;
+              // Chỉ gán khóa chuẩn nếu chưa có bản ghi chính xác hoặc chính là bản ghi chính xác
+              if (
+                !map[normKey] ||
+                rawId === normKey ||
+                (!map[normKey].image_url && url)
+              ) {
+                map[normKey] = entry;
+              }
+              if (isSafety) {
+                map['safety'] = map[POSTER_ID_SAFETY] || entry;
+                map['safety_message'] = map[POSTER_ID_SAFETY] || entry;
+              }
               if (isTraffic) {
-                map['tinh-huong-giao-thong'] = entry;
-                map['traffic'] = entry;
-                map['traffic_situation'] = entry;
+                map['traffic'] = map[POSTER_ID_TRAFFIC] || entry;
+                map['traffic_situation'] = map[POSTER_ID_TRAFFIC] || entry;
               }
             }
           });
+
           if (isMounted) {
+            if (Object.keys(sbLockedMap).length > 0) {
+              setSupabasePosters((prev) => ({ ...prev, ...sbLockedMap }));
+            }
             setDailyPosters((prev) => ({ ...prev, ...map }));
           }
 
@@ -427,13 +514,45 @@ export const HomeView: React.FC<HomeViewProps> = ({
       const p = e?.detail?.poster;
       const id = e?.detail?.id;
       if (p && isMounted) {
+        if (id === POSTER_ID_SAFETY || id === 'safety' || id === 'safety_message') {
+          setSupabasePosters((prev) => ({
+            ...prev,
+            [POSTER_ID_SAFETY]: {
+              id: POSTER_ID_SAFETY,
+              category_name: p.category_name || p.categoryName || 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN',
+              title: p.title || '',
+              image_url: p.image_url || p.image_data || p.imageUrl || '',
+              aspect_ratio: p.aspect_ratio || p.aspectRatio || 'portrait',
+              updated_at: p.updated_at || new Date().toISOString(),
+            },
+          }));
+        } else if (
+          id === POSTER_ID_TRAFFIC ||
+          id === 'tinh_huong_giao_thong' ||
+          id === 'traffic' ||
+          id === 'traffic_situation'
+        ) {
+          setSupabasePosters((prev) => ({
+            ...prev,
+            [POSTER_ID_TRAFFIC]: {
+              id: POSTER_ID_TRAFFIC,
+              category_name: p.category_name || p.categoryName || 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG',
+              title: p.title || '',
+              image_url: p.image_url || p.image_data || p.imageUrl || '',
+              aspect_ratio: p.aspect_ratio || p.aspectRatio || 'portrait',
+              updated_at: p.updated_at || new Date().toISOString(),
+            },
+          }));
+        }
+
         setDailyPosters((prev) => {
           const next = { ...prev, [id]: p };
-          if (id === 'tinh-huong-giao-thong' || id === 'traffic' || id === 'traffic_situation') {
-            next['tinh-huong-giao-thong'] = p;
+          if (id === POSTER_ID_TRAFFIC || id === 'traffic' || id === 'traffic_situation') {
+            next[POSTER_ID_TRAFFIC] = p;
             next['traffic'] = p;
             next['traffic_situation'] = p;
-          } else if (id === 'safety' || id === 'safety_message') {
+          } else if (id === POSTER_ID_SAFETY || id === 'safety' || id === 'safety_message') {
+            next[POSTER_ID_SAFETY] = p;
             next['safety'] = p;
             next['safety_message'] = p;
           }
@@ -504,6 +623,196 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     return list.length > 0 ? list : (siteConfig?.dailyWidgets as any) || [];
   }, [siteConfig?.dailyWidgets, effectiveDailyPosters]);
+
+  // Lấy dữ liệu cho 2 khung Poster khóa cứng ID: ưu tiên tuyệt đối Supabase ('daily_posters')
+  const getLockedPosterData = (posterId: typeof POSTER_ID_SAFETY | typeof POSTER_ID_TRAFFIC) => {
+    const isTraffic = posterId === POSTER_ID_TRAFFIC;
+    const defaultCategory = isTraffic
+      ? 'MỖI NGÀY MỘT TÌNH HUỐNG GIAO THÔNG'
+      : 'MỖI NGÀY MỘT THÔNG ĐIỆP AN TOÀN';
+
+    // 1. Ưu tiên cao nhất: bản ghi trực tiếp từ Supabase (hoặc vừa lưu xong)
+    const fromSb = supabasePosters?.[posterId];
+
+    // 2. Fallback phụ từ state/props/siteConfig nếu Supabase chưa có trường đó
+    const legacyKeys = isTraffic
+      ? [POSTER_ID_TRAFFIC, 'tinh_huong_giao_thong', 'traffic_situation', 'traffic']
+      : [POSTER_ID_SAFETY, 'safety_message', 'safety'];
+
+    let fromProps: any = null;
+    for (const k of legacyKeys) {
+      const candidate = propsDailyPosters?.[k] || dailyPosters?.[k];
+      if (candidate && (candidate.image_url || candidate.image_data || candidate.imageUrl || candidate.category_name)) {
+        fromProps = candidate;
+        break;
+      }
+    }
+
+    const fromSiteWidgets = Array.isArray(siteConfig?.dailyWidgets)
+      ? siteConfig.dailyWidgets.find((w) => legacyKeys.includes(w.id))
+      : undefined;
+
+    const category_name =
+      (fromSb?.category_name && fromSb.category_name.trim()) ||
+      (fromProps?.category_name && String(fromProps.category_name).trim()) ||
+      (fromProps?.categoryName && String(fromProps.categoryName).trim()) ||
+      (fromSiteWidgets?.categoryName && fromSiteWidgets.categoryName.trim()) ||
+      defaultCategory;
+
+    const title =
+      (fromSb?.title && fromSb.title.trim()) ||
+      (fromProps?.title && String(fromProps.title).trim()) ||
+      (fromSiteWidgets?.title && fromSiteWidgets.title.trim()) ||
+      '';
+
+    const image_url =
+      (fromSb?.image_url && fromSb.image_url.trim()) ||
+      (fromProps?.image_url && String(fromProps.image_url).trim()) ||
+      (fromProps?.image_data && String(fromProps.image_data).trim()) ||
+      (fromProps?.imageUrl && String(fromProps.imageUrl).trim()) ||
+      (fromSiteWidgets?.imageUrl && fromSiteWidgets.imageUrl.trim()) ||
+      '';
+
+    const rawRatio =
+      fromSb?.aspect_ratio ||
+      fromProps?.aspect_ratio ||
+      fromProps?.aspectRatio ||
+      fromProps?.aspectRatioMode ||
+      fromSiteWidgets?.aspectRatioMode ||
+      'portrait';
+
+    const aspect_ratio: 'auto' | 'portrait' | 'landscape' =
+      rawRatio === 'portrait' || rawRatio === 'landscape' || rawRatio === 'auto'
+        ? rawRatio
+        : 'portrait';
+
+    const updated_at = fromSb?.updated_at || fromProps?.updated_at || fromSiteWidgets?.updatedAt || '';
+
+    return {
+      id: posterId,
+      category_name,
+      title,
+      image_url,
+      aspect_ratio,
+      updated_at,
+    };
+  };
+
+  const renderLockedPosterCard = (
+    posterId: typeof POSTER_ID_SAFETY | typeof POSTER_ID_TRAFFIC,
+    reactKey: string
+  ) => {
+    const isTraffic = posterId === POSTER_ID_TRAFFIC;
+    const data = getLockedPosterData(posterId);
+    const IconComp = isTraffic ? Car : ShieldAlert;
+    const headerBg = isTraffic
+      ? 'bg-gradient-to-r from-amber-700 to-yellow-800'
+      : 'bg-gradient-to-r from-red-800 to-rose-900';
+    const borderColor = isTraffic
+      ? 'border-amber-200 hover:border-amber-400'
+      : 'border-red-200 hover:border-red-400';
+
+    const aspectClass =
+      data.aspect_ratio === 'portrait'
+        ? 'aspect-[3/4] object-cover'
+        : data.aspect_ratio === 'landscape'
+        ? 'aspect-video object-cover'
+        : 'w-full h-auto max-h-[550px] object-contain';
+
+    const displaySrc = data.image_url
+      ? data.image_url.startsWith('data:')
+        ? data.image_url
+        : `${data.image_url.split('?')[0]}?t=${new Date(data.updated_at || Date.now()).getTime()}`
+      : '';
+
+    const handleOpenPosterEdit = () => {
+      setEditingPoster({
+        id: posterId,
+        category_name: data.category_name,
+        title: data.title,
+        image_url: data.image_url,
+        aspect_ratio: data.aspect_ratio,
+      });
+    };
+
+    return (
+      <div
+        key={reactKey}
+        id={`daily-poster-widget-${posterId}`}
+        className={`bg-white rounded-xl border ${borderColor} shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col`}
+      >
+        {/* Header */}
+        <div className={`${headerBg} text-white px-3.5 py-2.5 flex items-center justify-between shadow-2xs`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="p-1 rounded-md bg-white/20 shrink-0 shadow-inner">
+              <IconComp className="w-4 h-4 text-amber-300" />
+            </span>
+            <span className="font-bold text-sm sm:text-base tracking-wide uppercase text-white truncate">
+              {data.category_name}
+            </span>
+          </div>
+
+          {isAdmin && (
+            <button
+              type="button"
+              id={`edit-poster-btn-${posterId}`}
+              onClick={handleOpenPosterEdit}
+              className="bg-white/20 hover:bg-white/35 text-amber-200 hover:text-white px-2 py-0.5 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs shrink-0"
+              title="Chỉnh sửa ảnh Poster chuyên mục này"
+            >
+              <Edit3 className="w-3 h-3" />
+              <span>Sửa</span>
+            </button>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="p-2 sm:p-2.5 bg-slate-50/50 flex flex-col items-center justify-center">
+          {displaySrc ? (
+            <div
+              onClick={() =>
+                setLightboxPoster({
+                  title: data.category_name,
+                  image_url: displaySrc,
+                  isTraffic,
+                })
+              }
+              className="relative w-full rounded-lg overflow-hidden bg-slate-900/5 border border-gray-200/80 shadow-2xs group cursor-zoom-in transition-all flex items-center justify-center"
+              title="Bấm để phóng to xem trọn vẹn poster"
+            >
+              <img
+                key={data.updated_at || displaySrc}
+                src={displaySrc}
+                alt={data.category_name}
+                className={`rounded-lg transition-transform duration-300 group-hover:scale-[1.02] ${aspectClass}`}
+                loading="eager"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-bold pointer-events-none backdrop-blur-[1px]">
+                <Maximize2 className="w-4 h-4 text-amber-300" />
+                <span>Phóng to</span>
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={isAdmin ? handleOpenPosterEdit : undefined}
+              className={`w-full py-10 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 gap-2 bg-white ${
+                isAdmin ? 'cursor-pointer hover:border-amber-400 hover:bg-amber-50/40' : ''
+              }`}
+            >
+              <ImageIcon className="w-8 h-8 text-gray-300" />
+              <span className="text-xs font-medium">Chưa có ảnh poster</span>
+              {isAdmin && (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                  Bấm để tải ảnh lên
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Layout Settings
   const layout = siteConfig?.layoutSettings || {};
@@ -852,28 +1161,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     );
                   case 'safety_message':
                   case 'widget_safety_message':
-                    return (
-                      <DailyPosterWidget
-                        key={`widget-left-safety-${widget.id}`}
-                        widgetId="safety_message"
-                        dailyWidgets={mergedDailyWidgets}
-                        dailyPosters={effectiveDailyPosters}
-                        currentUser={currentUser}
-                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                      />
-                    );
+                    return renderLockedPosterCard(POSTER_ID_SAFETY, `widget-left-safety-${widget.id}`);
                   case 'traffic_situation':
                   case 'widget_traffic_situation':
-                    return (
-                      <DailyPosterWidget
-                        key={`widget-left-traffic-${widget.id}`}
-                        widgetId="traffic_situation"
-                        dailyWidgets={mergedDailyWidgets}
-                        dailyPosters={effectiveDailyPosters}
-                        currentUser={currentUser}
-                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                      />
-                    );
+                    return renderLockedPosterCard(POSTER_ID_TRAFFIC, `widget-left-traffic-${widget.id}`);
                   case 'good_deed':
                   case 'widget_good_deed':
                     return (
@@ -889,20 +1180,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   case 'daily_widgets':
                     return (
                       <div key="widget-left-daily-widgets-group" className="flex flex-col gap-4">
-                        <DailyPosterWidget
-                          widgetId="safety_message"
-                          dailyWidgets={mergedDailyWidgets}
-                          dailyPosters={effectiveDailyPosters}
-                          currentUser={currentUser}
-                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                        />
-                        <DailyPosterWidget
-                          widgetId="traffic_situation"
-                          dailyWidgets={mergedDailyWidgets}
-                          dailyPosters={effectiveDailyPosters}
-                          currentUser={currentUser}
-                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                        />
+                        {renderLockedPosterCard(POSTER_ID_SAFETY, 'widget-left-group-safety')}
+                        {renderLockedPosterCard(POSTER_ID_TRAFFIC, 'widget-left-group-traffic')}
                         <DailyPosterWidget
                           widgetId="good_deed"
                           dailyWidgets={mergedDailyWidgets}
@@ -999,28 +1278,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     );
                   case 'safety_message':
                   case 'widget_safety_message':
-                    return (
-                      <DailyPosterWidget
-                        key={`widget-right-safety-${widget.id}`}
-                        widgetId="safety_message"
-                        dailyWidgets={mergedDailyWidgets}
-                        dailyPosters={effectiveDailyPosters}
-                        currentUser={currentUser}
-                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                      />
-                    );
+                    return renderLockedPosterCard(POSTER_ID_SAFETY, `widget-right-safety-${widget.id}`);
                   case 'traffic_situation':
                   case 'widget_traffic_situation':
-                    return (
-                      <DailyPosterWidget
-                        key={`widget-right-traffic-${widget.id}`}
-                        widgetId="traffic_situation"
-                        dailyWidgets={mergedDailyWidgets}
-                        dailyPosters={effectiveDailyPosters}
-                        currentUser={currentUser}
-                        onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                      />
-                    );
+                    return renderLockedPosterCard(POSTER_ID_TRAFFIC, `widget-right-traffic-${widget.id}`);
                   case 'good_deed':
                   case 'widget_good_deed':
                     return (
@@ -1036,20 +1297,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   case 'daily_widgets':
                     return (
                       <div key="widget-right-daily-widgets-group" className="flex flex-col gap-4">
-                        <DailyPosterWidget
-                          widgetId="safety_message"
-                          dailyWidgets={mergedDailyWidgets}
-                          dailyPosters={effectiveDailyPosters}
-                          currentUser={currentUser}
-                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                        />
-                        <DailyPosterWidget
-                          widgetId="traffic_situation"
-                          dailyWidgets={mergedDailyWidgets}
-                          dailyPosters={effectiveDailyPosters}
-                          currentUser={currentUser}
-                          onSaveDailyWidgets={onSaveDailyWidgets || (() => {})}
-                        />
+                        {renderLockedPosterCard(POSTER_ID_SAFETY, 'widget-right-group-safety')}
+                        {renderLockedPosterCard(POSTER_ID_TRAFFIC, 'widget-right-group-traffic')}
                         <DailyPosterWidget
                           widgetId="good_deed"
                           dailyWidgets={mergedDailyWidgets}
@@ -1439,6 +1688,73 @@ export const HomeView: React.FC<HomeViewProps> = ({
             }
           }}
         />
+      )}
+
+      {/* Daily Poster Modal (Khóa cứng ID 'thong-diep-an-toan' & 'tinh-huong-giao-thong') */}
+      <DailyPosterModal
+        isOpen={!!editingPoster}
+        onClose={() => setEditingPoster(null)}
+        posterId={editingPoster?.id}
+        initialCategory={editingPoster?.category_name}
+        initialTitle={editingPoster?.title}
+        initialImage={editingPoster?.image_url}
+        initialAspectRatio={editingPoster?.aspect_ratio || 'portrait'}
+        onSaved={(saved) => {
+          setSupabasePosters((prev) => ({
+            ...prev,
+            [saved.id]: saved,
+          }));
+          setDailyPosters((prev) => ({
+            ...prev,
+            [saved.id]: {
+              ...saved,
+              image_data: saved.image_url,
+            },
+          }));
+        }}
+      />
+
+      {/* Lightbox Zoom cho 2 khung Poster */}
+      {lightboxPoster && lightboxPoster.image_url && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+          onClick={() => setLightboxPoster(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[95vh] flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between text-white pb-3 px-2 gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                {lightboxPoster.isTraffic ? (
+                  <Car className="w-5 h-5 text-amber-400 shrink-0" />
+                ) : (
+                  <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
+                )}
+                <h3 className="font-bold text-sm sm:text-base text-amber-200 truncate">
+                  {lightboxPoster.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxPoster(null)}
+                className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+                title="Đóng xem toàn màn hình"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 shadow-2xl flex items-center justify-center max-h-[85vh]">
+              <img
+                src={lightboxPoster.image_url}
+                alt={lightboxPoster.title}
+                className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
