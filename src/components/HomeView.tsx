@@ -1663,9 +1663,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <div
                   key={col.id}
-                  className={`${colSpanClass} bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col justify-between h-auto hover:shadow-lg transition-all duration-200 group`}
+                  className={
+                    isEmbed
+                      ? `${colSpanClass} relative rounded-xl border-2 border-amber-400/75 bg-white shadow-[0_0_20px_rgba(245,158,11,0.28)] hover:-translate-y-1 hover:border-amber-400 hover:shadow-[0_0_32px_rgba(245,158,11,0.6)] overflow-hidden flex flex-col justify-between h-auto transition-all duration-300 group`
+                      : `${colSpanClass} bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden flex flex-col justify-between h-auto hover:shadow-lg transition-all duration-200 group`
+                  }
                 >
-                  <div className="flex-1 flex flex-col">
+                  {isEmbed && (
+                    <>
+                      {/* Dải ánh sáng viền quét nhẹ và phát sáng dịu quanh khung nhúng */}
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-amber-300/60 shadow-[inset_0_0_16px_rgba(245,158,11,0.18)] animate-pulse z-10"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-linear-to-r from-transparent via-amber-200/20 to-transparent z-10"
+                      />
+                    </>
+                  )}
+                  <div className="flex-1 flex flex-col relative z-0">
                     {/* Column Header */}
                     <div
                       className={`px-3.5 py-2.5 ${
@@ -1702,10 +1719,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                     {/* Column Body: Either Embedded Code, Articles, or Documents/Lectures fallback */}
                     {isEmbed ? (
-                      <div className="p-3 flex-1 flex flex-col justify-center">
+                      <div className="p-3 pb-3.5 flex-1 flex flex-col justify-center">
                         {rawEmbedHtml && !isDirectEmbedUrl ? (
                           <div
-                            className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-black/5 [&_iframe]:w-full [&_iframe]:border-0 [&_iframe]:rounded-lg ${
+                            className={`w-full rounded-lg overflow-hidden ring-2 ring-amber-400/50 shadow-inner bg-black/5 [&_iframe]:w-full [&_iframe]:border-0 [&_iframe]:rounded-lg ${
                               (rawEmbedHtml.includes('youtube') ||
                                 rawEmbedHtml.includes('youtu.be') ||
                                 rawEmbedHtml.includes('vimeo')) &&
@@ -1721,7 +1738,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           />
                         ) : resolvedEmbedUrl ? (
                           <div
-                            className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-black ${
+                            className={`w-full rounded-lg overflow-hidden ring-2 ring-amber-400/50 shadow-inner bg-black ${
                               col.heightMode === 'expanded' ? 'min-h-[400px]' : 'aspect-video'
                             }`}
                           >
@@ -1809,9 +1826,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     )}
                   </div>
 
-                  {/* Column Footer */}
-                  <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center mt-auto">
-                    {!isEmbed && col.sectionKey ? (
+                  {/* Column Footer (ẩn hoàn toàn đối với các khung nhúng) */}
+                  {!isEmbed && col.sectionKey && (
+                    <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center mt-auto">
                       <button
                         type="button"
                         onClick={() => onSelectSection(col.sectionKey as PageView)}
@@ -1820,22 +1837,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         <span>Vào chuyên mục {displayTitle}</span>
                         <ChevronRight className="w-3 h-3" />
                       </button>
-                    ) : isEmbed && resolvedEmbedUrl ? (
-                      <a
-                        href={resolvedEmbedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Xem nguồn trực tiếp</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-[10px] text-gray-400 font-medium">
-                        Khung nhúng nội dung số
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
