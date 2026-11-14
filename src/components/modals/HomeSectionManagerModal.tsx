@@ -121,44 +121,140 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
     }));
   }, [availableCategories]);
 
-  // Hàm tự động đồng bộ tên và tiểu mục mới nhất từ Tab 3, Tab 4 vào các cột
+  // Chuẩn hóa 1 khối chuyên mục/nhúng, giữ nguyên toàn bộ thuộc tính tùy chỉnh
+  const normalizeSectionItem = React.useCallback((col: any, idx: number): HomeCategoryColumn => {
+    const rawEmbed = col?.embedCode ?? col?.embedHtml ?? '';
+    const hasEmbed =
+      col?.type === 'embed_code' ||
+      col?.type === 'embed' ||
+      col?.type === 'video' ||
+      (typeof rawEmbed === 'string' && rawEmbed.trim() !== '') ||
+      (typeof col?.embedUrl === 'string' && col.embedUrl.trim() !== '');
+
+    return {
+      ...col,
+      id: col?.id || `col-${Date.now()}-${idx}`,
+      title: col?.title || '',
+      subtitle: col?.subtitle ?? '',
+      type: hasEmbed ? 'embed_code' : (col?.type || 'category_articles'),
+      embedCode: hasEmbed ? (col?.embedCode ?? col?.embedHtml ?? '') : col?.embedCode,
+      embedHtml: hasEmbed ? (col?.embedHtml ?? col?.embedCode ?? '') : col?.embedHtml,
+      embedUrl: col?.embedUrl,
+      headerBgColor: col?.headerBgColor || col?.color || 'bg-red-800',
+      headerTextColor: col?.headerTextColor || 'text-amber-200',
+      iconName: col?.iconName || col?.icon || (hasEmbed ? 'video' : 'flag'),
+      colSpan: col?.colSpan || '1',
+      heightMode: col?.heightMode || col?.height || 'auto',
+      enabled: col?.enabled !== false,
+      order: typeof col?.order === 'number' ? col.order : idx,
+    };
+  }, []);
+
+  // Đọc danh sách chuyên mục đã lưu từ Supabase config hoặc localStorage (TUYỆT ĐỐI không bị ghi đè bởi mặc định nếu đã có dữ liệu)
+  const readSavedColumns = React.useCallback((): HomeCategoryColumn[] | null => {
+    const fromSiteConfig =
+      (Array.isArray((siteConfig as any)?.home_sections) && (siteConfig as any).home_sections.length > 0
+        ? (siteConfig as any).home_sections
+        : null) ||
+      (Array.isArray((siteConfig as any)?.config?.home_sections) &&
+      (siteConfig as any).config.home_sections.length > 0
+        ? (siteConfig as any).config.home_sections
+        : null) ||
+      (Array.isArray(siteConfig?.homeCategoryColumns) && siteConfig.homeCategoryColumns.length > 0
+        ? siteConfig.homeCategoryColumns
+        : null) ||
+      (Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
+        ? (siteConfig as any).home_layout
+        : null);
+
+    if (fromSiteConfig) {
+      return fromSiteConfig.map((c: any, idx: number) => normalizeSectionItem(c, idx));
+    }
+
+    try {
+      const cacheKeys = ['cached_home_sections', 'cached_home_category_columns', 'cached_home_layout'];
+      for (const key of cacheKeys) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((c: any, idx: number) => normalizeSectionItem(c, idx));
+          }
+        }
+      }
+
+      const rawSiteCfg =
+        localStorage.getItem('mangyang_site_config') ||
+        localStorage.getItem('site_config_cache') ||
+        localStorage.getItem('cached_site_config');
+      if (rawSiteCfg) {
+        const parsedCfg = JSON.parse(rawSiteCfg);
+        const nested =
+          (Array.isArray(parsedCfg?.home_sections) && parsedCfg.home_sections.length > 0
+            ? parsedCfg.home_sections
+            : null) ||
+          (Array.isArray(parsedCfg?.config?.home_sections) && parsedCfg.config.home_sections.length > 0
+            ? parsedCfg.config.home_sections
+            : null) ||
+          (Array.isArray(parsedCfg?.homeCategoryColumns) && parsedCfg.homeCategoryColumns.length > 0
+            ? parsedCfg.homeCategoryColumns
+            : null);
+        if (nested) {
+          return nested.map((c: any, idx: number) => normalizeSectionItem(c, idx));
+        }
+      }
+    } catch {
+      // ignore localStorage read error
+    }
+
+    return null;
+  }, [siteConfig, normalizeSectionItem]);
+
+  // Hàm bổ sung thông tin còn thiếu từ danh mục nhưng TUYỆT ĐỐI giữ nguyên các thuộc tính đã tùy chỉnh và khối nhúng
   const syncColumnsWithCategories = React.useCallback(
     (cols: HomeCategoryColumn[]): HomeCategoryColumn[] => {
-      return cols.map((col) => {
-        if (col.type === 'embed_code' || (col.type as string) === 'video' || (col.type as string) === 'embed') return col;
+      return cols.map((col, idx) => {
+        const normCol = normalizeSectionItem(col, idx);
+        if (
+          normCol.type === 'embed_code' ||
+          (normCol.type as string) === 'embed' ||
+          (normCol.type as string) === 'video' ||
+          Boolean((normCol.embedCode || normCol.embedHtml || normCol.embedUrl || '').trim())
+        ) {
+          return normCol;
+        }
         const matched = availableCategories.find(
-          (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+          (c) => c.id === normCol.sectionKey || c.sectionKey === normCol.sectionKey
         );
         if (matched) {
           return {
-            ...col,
-            title: matched.name || col.title,
+            ...normCol,
+            title: normCol.title || matched.name || '',
             subtitle:
-              Array.isArray(matched.subcategories) && matched.subcategories.length > 0
+              normCol.subtitle !== undefined && normCol.subtitle !== ''
+                ? normCol.subtitle
+                : Array.isArray(matched.subcategories) && matched.subcategories.length > 0
                 ? matched.subcategories.join(' • ')
-                : col.subtitle || '',
+                : '',
           };
         }
-        return col;
+        return normCol;
       });
     },
-    [availableCategories]
+    [availableCategories, normalizeSectionItem]
   );
 
   const getInitialColumns = (): HomeCategoryColumn[] => {
-    const rawCols =
-      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
-        ? (siteConfig as any).home_layout
-        : siteConfig.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
-        ? siteConfig.homeCategoryColumns
-        : getDefaultDynamicColumns();
-    return syncColumnsWithCategories(rawCols);
+    const saved = readSavedColumns();
+    return syncColumnsWithCategories(saved ?? getDefaultDynamicColumns());
   };
 
   const [columns, setColumns] = useState<HomeCategoryColumn[]>(getInitialColumns);
   const [editingCol, setEditingCol] = useState<HomeCategoryColumn | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const wasOpenRef = React.useRef(false);
 
   // Form State
   const [formType, setFormType] = useState<'category_articles' | 'embed_code'>('category_articles');
@@ -174,57 +270,105 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
   const [formHeightMode, setFormHeightMode] = useState<'auto' | 'compact' | 'expanded'>('auto');
 
   React.useEffect(() => {
-    const rawCols =
-      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
-        ? (siteConfig as any).home_layout
-        : siteConfig.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
-        ? siteConfig.homeCategoryColumns
-        : getDefaultDynamicColumns();
-    setColumns(syncColumnsWithCategories(rawCols));
-  }, [siteConfig.homeCategoryColumns, (siteConfig as any)?.home_layout, availableCategories, isOpen]);
+    const justOpened = isOpen && !wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (!isOpen) return;
+    if (!justOpened && (isCreating || editingCol)) return;
+
+    const saved = readSavedColumns();
+    if (saved) {
+      setColumns(syncColumnsWithCategories(saved));
+    } else if (justOpened) {
+      setColumns(syncColumnsWithCategories(getDefaultDynamicColumns()));
+    }
+  }, [
+    isOpen,
+    isCreating,
+    editingCol,
+    (siteConfig as any)?.home_sections,
+    siteConfig.homeCategoryColumns,
+    readSavedColumns,
+    syncColumnsWithCategories,
+    getDefaultDynamicColumns,
+  ]);
 
   if (!isOpen) return null;
 
-  // Lưu trực tiếp lên Supabase và cập nhật State Trang chủ
-  const persistColumns = async (updated: HomeCategoryColumn[]) => {
-    setColumns(updated);
-    onSaveColumns(updated);
+  // Lưu vĩnh viễn vào Supabase (site_config.config.home_sections), localStorage và cập nhật State Trang chủ
+  const persistColumns = async (updated: HomeCategoryColumn[]): Promise<boolean> => {
+    const updatedSections = updated.map((c, idx) => normalizeSectionItem({ ...c, order: idx }, idx));
+    setColumns(updatedSections);
+
     try {
-      localStorage.setItem('cached_home_layout', JSON.stringify(updated));
-      localStorage.setItem('cached_home_category_columns', JSON.stringify(updated));
+      localStorage.setItem('cached_home_sections', JSON.stringify(updatedSections));
+      localStorage.setItem('cached_home_category_columns', JSON.stringify(updatedSections));
+
+      const rawSiteCfg = localStorage.getItem('mangyang_site_config');
+      if (rawSiteCfg) {
+        try {
+          const parsed = JSON.parse(rawSiteCfg);
+          if (parsed && typeof parsed === 'object') {
+            parsed.home_sections = updatedSections;
+            parsed.homeCategoryColumns = updatedSections;
+            localStorage.setItem('mangyang_site_config', JSON.stringify(parsed));
+          }
+        } catch {}
+      }
+      const rawSiteCache = localStorage.getItem('site_config_cache');
+      if (rawSiteCache) {
+        try {
+          const parsed = JSON.parse(rawSiteCache);
+          if (parsed && typeof parsed === 'object') {
+            parsed.home_sections = updatedSections;
+            parsed.homeCategoryColumns = updatedSections;
+            localStorage.setItem('site_config_cache', JSON.stringify(parsed));
+          }
+        } catch {}
+      }
     } catch {}
 
+    setIsSaving(true);
     try {
       const client = supabase || getSupabase();
       if (client) {
-        let { error } = await client
+        const { data: existing } = await client
+          .from('site_config')
+          .select('config')
+          .eq('id', 'default')
+          .maybeSingle();
+
+        const baseConfig =
+          existing?.config && typeof existing.config === 'object' ? existing.config : {};
+        const mergedConfig = {
+          ...baseConfig,
+          home_sections: updatedSections,
+        };
+
+        const { error } = await client
           .from('site_config')
           .upsert(
             {
               id: 'default',
-              home_layout: updated,
-              home_category_columns: updated,
+              config: mergedConfig,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'id' }
           );
 
         if (error) {
-          await client
-            .from('site_config')
-            .upsert(
-              {
-                id: 'default',
-                home_layout: updated,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'id' }
-            );
+          alert('❌ Lỗi lưu cấu hình khối nhúng: ' + error.message);
+          return false;
         }
       }
-    } catch (err) {
-      console.warn('[HomeSectionManagerModal] Supabase save warning:', err);
+    } catch (err: any) {
+      alert('❌ Lỗi lưu cấu hình khối nhúng: ' + (err?.message || 'Không thể kết nối CSDL'));
+      return false;
+    } finally {
+      setIsSaving(false);
     }
+
+    onSaveColumns(updatedSections);
+    return true;
   };
 
   const handleStartCreate = (type: 'category_articles' | 'embed_code' = 'category_articles') => {
@@ -264,24 +408,31 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
     setEditingCol(col);
     setIsCreating(false);
     setConfirmDeleteId(null);
-    setFormType(col.type || 'category_articles');
+    const isEmbedCol =
+      col.type === 'embed_code' ||
+      (col.type as string) === 'embed' ||
+      (col.type as string) === 'video' ||
+      Boolean((col.embedCode || col.embedHtml || col.embedUrl || '').trim());
+    setFormType(isEmbedCol ? 'embed_code' : 'category_articles');
     const matched = availableCategories.find(
       (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
     );
-    setFormTitle(matched?.name || col.title);
+    setFormTitle(col.title || matched?.name || '');
     setFormSubtitle(
-      Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
+      col.subtitle !== undefined && col.subtitle !== ''
+        ? col.subtitle
+        : Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
         ? matched.subcategories.join(' • ')
-        : col.subtitle || ''
+        : ''
     );
     setFormSectionKey(col.sectionKey || availableCategories[0]?.id || 'ctd');
     setFormCategoryFilter(col.categoryFilter || 'all');
-    setFormEmbedCode(col.embedCode || col.embedHtml || '');
-    setFormHeaderBgColor(col.headerBgColor || 'bg-red-800');
-    setFormIconName(col.iconName || 'flag');
+    setFormEmbedCode(col.embedCode || col.embedHtml || col.embedUrl || '');
+    setFormHeaderBgColor(col.headerBgColor || (col as any).color || 'bg-red-800');
+    setFormIconName(col.iconName || (col as any).icon || 'flag');
     setFormArticleLimit(col.articleLimit || 5);
     setFormColSpan(col.colSpan || '1');
-    setFormHeightMode(col.heightMode || 'auto');
+    setFormHeightMode(col.heightMode || (col as any).height || 'auto');
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -291,6 +442,9 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
       return;
     }
 
+    const trimmedEmbed = formEmbedCode.trim();
+    const isDirectUrl = /^https?:\/\//i.test(trimmedEmbed) && !trimmedEmbed.includes('<');
+
     const payload: HomeCategoryColumn = {
       id: editingCol ? editingCol.id : `col-${Date.now()}`,
       title: formTitle.trim(),
@@ -298,8 +452,12 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
       type: formType,
       sectionKey: formType === 'category_articles' ? formSectionKey : undefined,
       categoryFilter: formType === 'category_articles' ? formCategoryFilter : undefined,
-      embedCode: formType === 'embed_code' ? formEmbedCode : undefined,
-      embedHtml: formType === 'embed_code' ? formEmbedCode : undefined,
+      embedCode: formType === 'embed_code' ? trimmedEmbed : undefined,
+      embedHtml: formType === 'embed_code' ? trimmedEmbed : undefined,
+      embedUrl:
+        formType === 'embed_code' && isDirectUrl
+          ? normalizeYouTubeEmbedUrl(trimmedEmbed)
+          : undefined,
       headerBgColor: formHeaderBgColor,
       headerTextColor: 'text-amber-200',
       iconName: formIconName,
@@ -307,6 +465,7 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
       colSpan: formColSpan,
       heightMode: formHeightMode,
       enabled: editingCol ? editingCol.enabled : true,
+      order: editingCol?.order,
     };
 
     let updated: HomeCategoryColumn[];
@@ -316,10 +475,12 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
       updated = [...columns, payload];
     }
 
-    await persistColumns(updated);
-    toast.success('Thành công', editingCol ? 'Đã cập nhật chuyên mục' : 'Đã thêm chuyên mục mới');
-    setEditingCol(null);
-    setIsCreating(false);
+    const ok = await persistColumns(updated);
+    if (ok) {
+      toast.success('Thành công', editingCol ? 'Đã lưu thay đổi lên CSDL' : 'Đã thêm chuyên mục mới lên CSDL');
+      setEditingCol(null);
+      setIsCreating(false);
+    }
   };
 
   const handleDeleteColumn = async (id: string) => {
@@ -415,16 +576,41 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
               onSubmit={handleSaveForm}
               className="bg-white p-4 rounded-xl border-2 border-red-500/40 shadow-md space-y-3 animate-in fade-in duration-150"
             >
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2 gap-2 flex-wrap">
                 <span className="font-extrabold text-xs text-red-900 uppercase flex items-center gap-1.5">
                   <LayoutGrid className="w-4 h-4 text-red-700" />
                   <span>
                     {editingCol ? 'Chỉnh sửa chuyên mục' : 'Thêm mới chuyên mục Trang chủ'}
                   </span>
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-800">
-                  {formType === 'embed_code' ? 'Khung nhúng HTML / Iframe' : 'Bài viết chuyên mục'}
-                </span>
+                <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setFormType('category_articles')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      formType === 'category_articles'
+                        ? 'bg-red-700 text-white shadow-2xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Bài viết chuyên mục
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormType('embed_code');
+                      if (!formIconName || formIconName === 'flag') setFormIconName('video');
+                    }}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      formType === 'embed_code'
+                        ? 'bg-indigo-700 text-white shadow-2xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Code className="w-3 h-3" />
+                    <span>Khung nhúng HTML / Iframe</span>
+                  </button>
+                </div>
               </div>
 
               {/* Dynamic Category & Subcategory Selection */}
@@ -654,10 +840,11 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  disabled={isSaving}
+                  className="px-4 py-1.5 bg-red-700 hover:bg-red-800 disabled:opacity-60 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{editingCol ? 'Lưu thay đổi' : 'Thêm chuyên mục'}</span>
+                  <span>{isSaving ? 'Đang lưu...' : editingCol ? 'Lưu thay đổi' : 'Thêm chuyên mục'}</span>
                 </button>
               </div>
             </form>
@@ -666,15 +853,23 @@ export const HomeSectionManagerModal: React.FC<HomeSectionManagerModalProps> = (
           {/* List of Columns */}
           <div className="space-y-2">
             {columns.map((col, index) => {
-              const isEmbed = col.type === 'embed_code';
-              const matched = availableCategories.find(
-                (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
-              );
-              const displayTitle = matched?.name || col.title;
+              const isEmbed =
+                col.type === 'embed_code' ||
+                (col.type as string) === 'embed' ||
+                (col.type as string) === 'video' ||
+                Boolean((col.embedCode || col.embedHtml || col.embedUrl || '').trim());
+              const matched = isEmbed
+                ? undefined
+                : availableCategories.find(
+                    (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+                  );
+              const displayTitle = col.title || matched?.name || '';
               const displaySubtitle =
-                Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
+                col.subtitle !== undefined && col.subtitle !== ''
+                  ? col.subtitle
+                  : Array.isArray(matched?.subcategories) && matched.subcategories.length > 0
                   ? matched.subcategories.join(' • ')
-                  : col.subtitle;
+                  : '';
 
               return (
                 <div

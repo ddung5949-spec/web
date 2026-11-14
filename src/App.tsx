@@ -176,6 +176,34 @@ export function App() {
       }
     } catch {}
 
+    // Hydrate home_sections (khối chuyên mục & khối nhúng cuối trang chủ) từ cache localStorage
+    try {
+      const existingSections =
+        (Array.isArray((cachedObj as any)?.home_sections) &&
+        (cachedObj as any).home_sections.length > 0
+          ? (cachedObj as any).home_sections
+          : null) ||
+        (Array.isArray(cachedObj?.homeCategoryColumns) &&
+        cachedObj.homeCategoryColumns.length > 0
+          ? cachedObj.homeCategoryColumns
+          : null);
+      if (existingSections) {
+        (initial as any).home_sections = existingSections;
+        initial.homeCategoryColumns = existingSections;
+      } else {
+        const rawCachedSections =
+          localStorage.getItem("cached_home_sections") ||
+          localStorage.getItem("cached_home_category_columns");
+        if (rawCachedSections) {
+          const parsedSections = JSON.parse(rawCachedSections);
+          if (Array.isArray(parsedSections) && parsedSections.length > 0) {
+            (initial as any).home_sections = parsedSections;
+            initial.homeCategoryColumns = parsedSections;
+          }
+        }
+      }
+    } catch {}
+
     // Ensure titles are consistent with standardized branding
     if (initial.header_title) {
       initial.title = initial.header_title;
@@ -269,9 +297,15 @@ export function App() {
     }
 
     // Ensure standardized 3-column layout initialization across all devices, private tabs, and reloads
+    const safeHomeLayoutObj =
+      initial.home_layout &&
+      typeof initial.home_layout === "object" &&
+      !Array.isArray(initial.home_layout)
+        ? initial.home_layout
+        : {};
     const initialWidgets = normalizeWidgetsList(
       initial.layoutSettings?.sidebarWidgets ||
-        initial.home_layout?.sidebarWidgets ||
+        (safeHomeLayoutObj as any)?.sidebarWidgets ||
         initial.sidebarWidgets ||
         defaultSidebarWidgets,
     );
@@ -287,7 +321,7 @@ export function App() {
       topColumnsOrder: ["left", "middle", "right"] as (
         "left" | "middle" | "right"
       )[],
-      ...(initial.layoutSettings || initial.home_layout || {}),
+      ...(initial.layoutSettings || safeHomeLayoutObj || {}),
       sidebarWidgets: initialWidgets,
     };
     initial.layoutSettings = standardLayout;
@@ -908,11 +942,13 @@ export function App() {
       if (config.enable_logo_glow !== undefined || config.enableLogoGlow !== undefined) {
         mergedConfig.enableLogoGlow = config.enable_logo_glow ?? config.enableLogoGlow;
       }
-      if (Array.isArray(config.home_layout)) {
-        mergedConfig.homeCategoryColumns = config.home_layout;
-        (mergedConfig as any).home_layout = config.home_layout;
-      } else if (config.home_layout || config.layout_settings) {
-        const rawLayout = config.home_layout || config.layout_settings;
+      const layoutSource =
+        !Array.isArray(config.home_layout) && config.home_layout
+          ? config.home_layout
+          : config.layout_settings && !Array.isArray(config.layout_settings)
+            ? config.layout_settings
+            : null;
+      if (layoutSource && typeof layoutSource === "object") {
         const normalizedLayout = {
           showUncleHoSection: true,
           showAnnouncementsWidget: true,
@@ -925,12 +961,15 @@ export function App() {
           topColumnsOrder: ["left", "middle", "right"] as (
             "left" | "middle" | "right"
           )[],
-          ...rawLayout,
-          sidebarWidgets: normalizeWidgetsList(rawLayout?.sidebarWidgets),
+          ...layoutSource,
+          sidebarWidgets: normalizeWidgetsList(layoutSource?.sidebarWidgets),
         };
         mergedConfig.layoutSettings = normalizedLayout;
         mergedConfig.home_layout = normalizedLayout;
         mergedConfig.sidebarWidgets = normalizedLayout.sidebarWidgets;
+      } else if (Array.isArray(config.home_layout) && config.home_layout.length > 0) {
+        (mergedConfig as any).home_sections = config.home_layout;
+        mergedConfig.homeCategoryColumns = config.home_layout;
       }
       const catsList =
         config.categories_config ||
@@ -991,8 +1030,37 @@ export function App() {
         mergedConfig.navigation_tabs = cleanTabs;
         mergedConfig.navTabs = cleanTabs;
       }
-      if (config.home_category_columns) {
-        mergedConfig.homeCategoryColumns = config.home_category_columns;
+      const resolvedHomeSections =
+        (Array.isArray(parsed?.home_sections) && parsed.home_sections.length > 0
+          ? parsed.home_sections
+          : null) ||
+        (Array.isArray(config?.home_sections) && config.home_sections.length > 0
+          ? config.home_sections
+          : null) ||
+        (Array.isArray(config?.home_category_columns) &&
+        config.home_category_columns.length > 0
+          ? config.home_category_columns
+          : null) ||
+        (Array.isArray(parsed?.homeCategoryColumns) &&
+        parsed.homeCategoryColumns.length > 0
+          ? parsed.homeCategoryColumns
+          : null) ||
+        (Array.isArray(config?.home_layout) && config.home_layout.length > 0
+          ? config.home_layout
+          : null);
+      if (resolvedHomeSections) {
+        (mergedConfig as any).home_sections = resolvedHomeSections;
+        mergedConfig.homeCategoryColumns = resolvedHomeSections;
+        try {
+          localStorage.setItem(
+            "cached_home_sections",
+            JSON.stringify(resolvedHomeSections),
+          );
+          localStorage.setItem(
+            "cached_home_category_columns",
+            JSON.stringify(resolvedHomeSections),
+          );
+        } catch {}
       }
       if (config.daily_widgets || config.dailyWidgets) {
         mergedConfig.dailyWidgets = config.daily_widgets || config.dailyWidgets;
@@ -1075,10 +1143,32 @@ export function App() {
       }
 
       setSiteConfig((prev) => {
-        const nextConfig = {
+        const nextConfig: any = {
           ...prev,
           ...mergedConfig,
         };
+        // Giữ nguyên home_sections / homeCategoryColumns nếu bản ghi Supabase trả về chưa có trường này
+        const keptSections =
+          (Array.isArray((mergedConfig as any).home_sections) &&
+          (mergedConfig as any).home_sections.length > 0
+            ? (mergedConfig as any).home_sections
+            : null) ||
+          (Array.isArray(mergedConfig.homeCategoryColumns) &&
+          mergedConfig.homeCategoryColumns.length > 0
+            ? mergedConfig.homeCategoryColumns
+            : null) ||
+          (Array.isArray((prev as any).home_sections) &&
+          (prev as any).home_sections.length > 0
+            ? (prev as any).home_sections
+            : null) ||
+          (Array.isArray(prev.homeCategoryColumns) &&
+          prev.homeCategoryColumns.length > 0
+            ? prev.homeCategoryColumns
+            : null);
+        if (keptSections) {
+          nextConfig.home_sections = keptSections;
+          nextConfig.homeCategoryColumns = keptSections;
+        }
         try {
           localStorage.setItem("mangyang_site_config", JSON.stringify(nextConfig));
           localStorage.setItem("site_config_cache", JSON.stringify(nextConfig));
@@ -3207,6 +3297,21 @@ export function App() {
     const resolvedHeaderTitle = newConfig.header_title || newConfig.title || "";
     const resolvedSubTitle = newConfig.sub_title || newConfig.subtitle || "";
 
+    const preservedSections =
+      (newConfig as any).home_sections ??
+      (siteConfig as any).home_sections ??
+      newConfig.homeCategoryColumns ??
+      siteConfig.homeCategoryColumns;
+    const configWithSections: any = {
+      ...newConfig,
+      ...(Array.isArray(preservedSections) && preservedSections.length > 0
+        ? {
+            home_sections: preservedSections,
+            homeCategoryColumns: preservedSections,
+          }
+        : {}),
+    };
+
     const unifiedPayload = {
       id: "default",
       logo_url: resolvedLogoUrl,
@@ -3238,10 +3343,10 @@ export function App() {
       layout_settings: newConfig.layoutSettings,
       categories_config: newConfig.categories_config,
       navigation_tabs: newConfig.categories_config,
-      home_category_columns: newConfig.homeCategoryColumns,
+      home_category_columns: configWithSections.homeCategoryColumns,
       daily_widgets: newConfig.dailyWidgets,
-      config: newConfig,
-      config_json: newConfig,
+      config: configWithSections,
+      config_json: configWithSections,
       updated_at: nowIso,
     };
 
@@ -3534,7 +3639,7 @@ export function App() {
     await cloudStorage.saveSiteConfig(updatedConfig);
   };
 
-  // Home Category Columns Save Handler (LƯU VÀ CẬP NHẬT TRỰC TIẾP LÊN SUPABASE)
+  // Home Category Columns Save Handler (CẬP NHẬT STATE & CACHE AN TOÀN, KHÔNG GHI ĐÈ home_layout)
   const handleSaveHomeCategoryColumns = async (
     columns: HomeCategoryColumn[],
   ) => {
@@ -3542,54 +3647,28 @@ export function App() {
     const updatedConfig: SiteConfig = {
       ...siteConfig,
       homeCategoryColumns: columns,
-      home_layout: columns as any,
     };
+    (updatedConfig as any).home_sections = columns;
     setSiteConfig(updatedConfig);
+
     try {
-      localStorage.setItem("cached_home_layout", JSON.stringify(columns));
+      localStorage.setItem("cached_home_sections", JSON.stringify(columns));
       localStorage.setItem(
         "cached_home_category_columns",
         JSON.stringify(columns),
+      );
+      localStorage.setItem(
+        "mangyang_site_config",
+        JSON.stringify(updatedConfig),
       );
       localStorage.setItem("cached_site_config", JSON.stringify(updatedConfig));
       localStorage.setItem("site_config_cache", JSON.stringify(updatedConfig));
     } catch {}
 
-    // 2. Lưu trực tiếp lên Supabase
-    try {
-      const client = supabase || getSupabase();
-      if (client) {
-        let { error } = await client.from("site_config").upsert(
-          {
-            id: "default",
-            home_layout: columns,
-            home_category_columns: columns,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" },
-        );
-
-        if (error) {
-          // Retry chỉ với home_layout nếu cột home_category_columns chưa tồn tại
-          await client.from("site_config").upsert(
-            {
-              id: "default",
-              home_layout: columns,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" },
-          );
-        }
-      }
-    } catch (err) {
-      console.error("[App] Error saving home_layout to Supabase:", err);
-    }
-
-    await cloudStorage.saveSiteConfig(updatedConfig);
     showToast(
       "success",
       "Đã lưu cấu hình chuyên mục",
-      "Cột hiển thị tin bài trang chủ đã được lưu và đồng bộ thành công.",
+      "Khối chuyên mục và nội dung nhúng trang chủ đã được lưu vĩnh viễn.",
     );
   };
 

@@ -71,7 +71,7 @@ import { HomeQuickActionsWidget } from './HomeQuickActionsWidget';
 import { HomeSpotlightSection } from './HomeSpotlightSection';
 import { UncleHoDailySection } from './UncleHoDailySection';
 import { QuickActionManagerModal } from './modals/QuickActionManagerModal';
-import { HomeSectionManagerModal } from './modals/HomeSectionManagerModal';
+import { HomeSectionManagerModal, normalizeYouTubeEmbedUrl } from './modals/HomeSectionManagerModal';
 import { LayoutManagerModal, normalizeWidgetsList } from './modals/LayoutManagerModal';
 import {
   DailyPosterModal,
@@ -1041,33 +1041,106 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }));
   }, [availableCategories]);
 
-  // Dynamic Category Columns from siteConfig (home_layout hoặc homeCategoryColumns) or dynamic default
+  // Dynamic Category Columns from siteConfig (home_sections hoặc homeCategoryColumns) or localStorage, fallback default only when both are empty
   const configuredColumns: HomeCategoryColumn[] = React.useMemo(() => {
-    const rawCols =
-      Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
-        ? (siteConfig as any).home_layout
-        : siteConfig?.homeCategoryColumns && siteConfig.homeCategoryColumns.length > 0
+    let rawCols: any[] | null =
+      (Array.isArray((siteConfig as any)?.home_sections) && (siteConfig as any).home_sections.length > 0
+        ? (siteConfig as any).home_sections
+        : null) ||
+      (Array.isArray((siteConfig as any)?.config?.home_sections) &&
+      (siteConfig as any).config.home_sections.length > 0
+        ? (siteConfig as any).config.home_sections
+        : null) ||
+      (Array.isArray(siteConfig?.homeCategoryColumns) && siteConfig.homeCategoryColumns.length > 0
         ? siteConfig.homeCategoryColumns
-        : defaultDynamicColumns;
+        : null) ||
+      (Array.isArray((siteConfig as any)?.home_layout) && (siteConfig as any).home_layout.length > 0
+        ? (siteConfig as any).home_layout
+        : null);
 
-    return rawCols.map((col: HomeCategoryColumn) => {
-      if (col.type === 'embed_code') return col;
+    if (!rawCols) {
+      try {
+        const cacheKeys = ['cached_home_sections', 'cached_home_category_columns', 'cached_home_layout'];
+        for (const key of cacheKeys) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              rawCols = parsed;
+              break;
+            }
+          }
+        }
+        if (!rawCols) {
+          const rawCfg =
+            localStorage.getItem('mangyang_site_config') ||
+            localStorage.getItem('site_config_cache') ||
+            localStorage.getItem('cached_site_config');
+          if (rawCfg) {
+            const parsedCfg = JSON.parse(rawCfg);
+            const nested =
+              (Array.isArray(parsedCfg?.home_sections) && parsedCfg.home_sections.length > 0
+                ? parsedCfg.home_sections
+                : null) ||
+              (Array.isArray(parsedCfg?.config?.home_sections) && parsedCfg.config.home_sections.length > 0
+                ? parsedCfg.config.home_sections
+                : null) ||
+              (Array.isArray(parsedCfg?.homeCategoryColumns) && parsedCfg.homeCategoryColumns.length > 0
+                ? parsedCfg.homeCategoryColumns
+                : null);
+            if (nested) rawCols = nested;
+          }
+        }
+      } catch {}
+    }
+
+    const effectiveCols = rawCols && rawCols.length > 0 ? rawCols : defaultDynamicColumns;
+
+    return effectiveCols.map((col: any, idx: number): HomeCategoryColumn => {
+      const rawEmbed = col?.embedCode ?? col?.embedHtml ?? '';
+      const hasEmbed =
+        col?.type === 'embed_code' ||
+        col?.type === 'embed' ||
+        col?.type === 'video' ||
+        (typeof rawEmbed === 'string' && rawEmbed.trim() !== '') ||
+        (typeof col?.embedUrl === 'string' && col.embedUrl.trim() !== '');
+
+      const normalizedBase: HomeCategoryColumn = {
+        ...col,
+        id: col?.id || `col-${idx}`,
+        type: hasEmbed ? 'embed_code' : (col?.type || 'category_articles'),
+        headerBgColor: col?.headerBgColor || col?.color || (hasEmbed ? 'bg-indigo-900' : 'bg-red-800'),
+        iconName: col?.iconName || col?.icon || (hasEmbed ? 'video' : 'flag'),
+        heightMode: col?.heightMode || col?.height || 'auto',
+      };
+
+      if (hasEmbed) return normalizedBase;
+
       const matched = availableCategories.find(
-        (c) => c.id === col.sectionKey || c.sectionKey === col.sectionKey
+        (c) => c.id === normalizedBase.sectionKey || c.sectionKey === normalizedBase.sectionKey
       );
       if (matched) {
         return {
-          ...col,
-          title: matched.name || col.title,
+          ...normalizedBase,
+          title: normalizedBase.title || matched.name || '',
           subtitle:
-            Array.isArray(matched.subcategories) && matched.subcategories.length > 0
+            normalizedBase.subtitle !== undefined && normalizedBase.subtitle !== ''
+              ? normalizedBase.subtitle
+              : Array.isArray(matched.subcategories) && matched.subcategories.length > 0
               ? matched.subcategories.join(' • ')
-              : col.subtitle || '',
+              : '',
         };
       }
-      return col;
+      return normalizedBase;
     });
-  }, [(siteConfig as any)?.home_layout, siteConfig?.homeCategoryColumns, defaultDynamicColumns, availableCategories]);
+  }, [
+    (siteConfig as any)?.home_sections,
+    (siteConfig as any)?.config?.home_sections,
+    (siteConfig as any)?.home_layout,
+    siteConfig?.homeCategoryColumns,
+    defaultDynamicColumns,
+    availableCategories,
+  ]);
 
   const activeColumns = configuredColumns
     .filter((col) => col.enabled !== false)
@@ -1480,18 +1553,36 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {/* Dynamic Equal-Height / Dynamic Size Categories & Embedded Content Columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             {(activeColumns || []).map((col) => {
-              const isEmbed = col.type === 'embed_code';
-              const matchedCat = (availableCategories || []).find(
-                (c) =>
-                  c.id === col.sectionKey ||
-                  c.sectionKey === col.sectionKey ||
-                  norm(c.name) === norm(col.title)
-              );
-              const displayTitle = matchedCat?.name || col.title;
-              const displaySubtitle =
-                matchedCat && Array.isArray(matchedCat.subcategories) && matchedCat.subcategories.length > 0
-                  ? matchedCat.subcategories.join(' • ')
-                  : col.subtitle;
+              const rawEmbedHtml = (col.embedCode || col.embedHtml || '').trim();
+              const isDirectEmbedUrl =
+                /^https?:\/\//i.test(rawEmbedHtml) && !rawEmbedHtml.includes('<');
+              const resolvedEmbedUrl = isDirectEmbedUrl
+                ? normalizeYouTubeEmbedUrl(rawEmbedHtml)
+                : col.embedUrl
+                ? normalizeYouTubeEmbedUrl(col.embedUrl)
+                : '';
+              const isEmbed =
+                col.type === 'embed_code' ||
+                (col.type as string) === 'embed' ||
+                (col.type as string) === 'video' ||
+                Boolean(rawEmbedHtml) ||
+                Boolean(resolvedEmbedUrl);
+              const matchedCat = isEmbed
+                ? undefined
+                : (availableCategories || []).find(
+                    (c) =>
+                      c.id === col.sectionKey ||
+                      c.sectionKey === col.sectionKey ||
+                      norm(c.name) === norm(col.title)
+                  );
+              const displayTitle = isEmbed ? col.title : col.title || matchedCat?.name || '';
+              const displaySubtitle = isEmbed
+                ? col.subtitle || ''
+                : col.subtitle !== undefined && col.subtitle !== ''
+                ? col.subtitle
+                : matchedCat && Array.isArray(matchedCat.subcategories) && matchedCat.subcategories.length > 0
+                ? matchedCat.subcategories.join(' • ')
+                : '';
 
               const sectionIds = [col.sectionKey, matchedCat?.id, matchedCat?.sectionKey].filter(Boolean);
               const sectionNameNorm = norm(displayTitle);
@@ -1591,7 +1682,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           {displayTitle}
                         </span>
                       </div>
-                      {col.sectionKey && (
+                      {!isEmbed && col.sectionKey && (
                         <button
                           type="button"
                           onClick={() => onSelectSection(col.sectionKey as PageView)}
@@ -1612,17 +1703,36 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     {/* Column Body: Either Embedded Code, Articles, or Documents/Lectures fallback */}
                     {isEmbed ? (
                       <div className="p-3 flex-1 flex flex-col justify-center">
-                        {col.embedCode || col.embedHtml ? (
+                        {rawEmbedHtml && !isDirectEmbedUrl ? (
                           <div
-                            className="w-full flex-1 min-h-[240px] rounded-lg overflow-hidden border border-gray-200 bg-black/5 flex items-center justify-center"
-                            dangerouslySetInnerHTML={{ __html: col.embedCode || col.embedHtml || '' }}
+                            className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-black/5 [&_iframe]:w-full [&_iframe]:border-0 [&_iframe]:rounded-lg ${
+                              (rawEmbedHtml.includes('youtube') ||
+                                rawEmbedHtml.includes('youtu.be') ||
+                                rawEmbedHtml.includes('vimeo')) &&
+                              col.heightMode !== 'expanded'
+                                ? 'aspect-video [&_iframe]:h-full'
+                                : col.heightMode === 'expanded'
+                                ? 'min-h-[400px] [&_iframe]:min-h-[400px]'
+                                : col.heightMode === 'compact'
+                                ? 'min-h-[200px] [&_iframe]:min-h-[200px]'
+                                : 'min-h-[260px] [&_iframe]:min-h-[260px]'
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: rawEmbedHtml }}
                           />
-                        ) : col.embedUrl && col.embedUrl.trim() !== '' ? (
-                          <iframe
-                            src={col.embedUrl}
-                            title={col.title}
-                            className="w-full flex-1 min-h-[240px] rounded-lg border border-gray-200"
-                          />
+                        ) : resolvedEmbedUrl ? (
+                          <div
+                            className={`w-full rounded-lg overflow-hidden border border-gray-200 bg-black ${
+                              col.heightMode === 'expanded' ? 'min-h-[400px]' : 'aspect-video'
+                            }`}
+                          >
+                            <iframe
+                              src={resolvedEmbedUrl}
+                              title={displayTitle || 'Nội dung nhúng'}
+                              className="w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
                         ) : (
                           <div className="text-center text-xs text-gray-400 py-8 italic flex-1 flex items-center justify-center">
                             Chưa cấu hình mã nhúng hoặc liên kết nguồn
@@ -1701,7 +1811,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                   {/* Column Footer */}
                   <div className="p-2.5 bg-gray-50 border-t border-gray-100 text-center mt-auto">
-                    {col.sectionKey ? (
+                    {!isEmbed && col.sectionKey ? (
                       <button
                         type="button"
                         onClick={() => onSelectSection(col.sectionKey as PageView)}
@@ -1710,9 +1820,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         <span>Vào chuyên mục {displayTitle}</span>
                         <ChevronRight className="w-3 h-3" />
                       </button>
-                    ) : isEmbed && col.embedUrl ? (
+                    ) : isEmbed && resolvedEmbedUrl ? (
                       <a
-                        href={col.embedUrl}
+                        href={resolvedEmbedUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[11px] font-bold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 cursor-pointer"
