@@ -58,7 +58,7 @@ import { UnitLogo, LogoEffectType, LogoSizePreset } from '../UnitLogo';
 import { safeStore, cloudStorage } from '../../utils/storage';
 import { toast } from '../Toast';
 import { getSupabase, supabaseDb } from '../../utils/supabase';
-import { compressLogoImage } from './SiteConfigModal';
+import { resizeLogoToLightBlob, sanitizeConfigForDbJson } from './SiteConfigModal';
 
 interface CustomizerModalProps {
   isOpen: boolean;
@@ -202,6 +202,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       : (siteConfig?.logo_effect === 'all' || siteConfig?.logo_effect === 'glow' || siteConfig?.logoEffect === 'all' || siteConfig?.logoEffect === 'glow')
   );
   const [isSyncingLogo, setIsSyncingLogo] = useState(false);
+  const [selectedLogoBlob, setSelectedLogoBlob] = useState<Blob | null>(null);
 
   // Font Size & Typography Settings
   const [scalePreset, setScalePreset] = useState<'standard' | 'large' | 'very_large' | 'maximum' | 'custom'>(
@@ -370,6 +371,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           : 'default';
       setLogoType(effLogoType);
       setCustomLogoUrl(initLogoUrl);
+      setSelectedLogoBlob(null);
       const rawLogoSizeNum = Number(siteConfig?.logoSizePx ?? siteConfig?.logo_size ?? siteConfig?.logoSize);
       const effPreset: LogoSizePreset = (() => {
         const raw = siteConfig?.logo_size || siteConfig?.logoSize;
@@ -556,17 +558,22 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       return;
     }
     try {
-      // Tự động thu nhỏ và nén logo qua HTML Canvas về tối đa 250x250px (dung lượng 15KB - 30KB)
-      const compressed = await compressLogoImage(file);
-      setCustomLogoUrl(compressed);
+      // Nén logo siêu nhẹ ngay khi chọn file qua HTML Canvas (max 200x200px, < 25KB)
+      const { blob, base64 } = await resizeLogoToLightBlob(file);
+      setSelectedLogoBlob(blob);
+      setCustomLogoUrl(base64);
       setLogoType('custom');
-      toast.success('Đã nén và tải logo!', 'Biểu trưng đã được tối ưu hóa siêu nhẹ (15KB - 30KB), hiển thị sắc nét.');
+      toast.success(
+        'Đã nén và tải logo!',
+        `Biểu trưng đã được thu nhỏ tối đa 200x200px (${Math.round(blob.size / 1024)}KB), sẵn sàng đồng bộ nhanh.`
+      );
     } catch (err) {
       console.warn('Lỗi nén ảnh qua Canvas, dùng fallback:', err);
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
         const result = loadEvent.target?.result as string;
         if (result) {
+          setSelectedLogoBlob(null);
           setCustomLogoUrl(result);
           setLogoType('custom');
         }
@@ -575,13 +582,49 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
     }
   };
 
+  // Helper upload tệp Logo đã nén lên Supabase Storage bucket 'assets' để lấy URL ngắn gọn
+  const uploadLogoBlobToStorageIfNeeded = async (
+    currentUrl: string,
+    activeLogoType: 'default' | 'custom'
+  ): Promise<string> => {
+    if (activeLogoType !== 'custom') return '';
+    let finalLogoUrl = currentUrl.trim();
+    const supabase = getSupabase();
+
+    if (selectedLogoBlob && supabase?.storage) {
+      try {
+        const fileName = `logo_${Date.now()}.png`;
+        const { error: uploadErr } = await supabase.storage
+          .from('assets')
+          .upload(fileName, selectedLogoBlob, {
+            contentType: 'image/png',
+            upsert: true,
+          });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('assets').getPublicUrl(fileName);
+          if (urlData?.publicUrl) {
+            finalLogoUrl = urlData.publicUrl;
+            setCustomLogoUrl(finalLogoUrl);
+            setSelectedLogoBlob(null);
+          }
+        } else {
+          console.warn('[SiteConfigModal] Upload lên bucket assets thất bại, dùng fallback nhẹ:', uploadErr.message);
+        }
+      } catch (storageErr) {
+        console.warn('[SiteConfigModal] Lỗi upload Storage, dùng fallback nhẹ:', storageErr);
+      }
+    }
+    return finalLogoUrl;
+  };
+
   // LƯU & ĐỒNG BỘ LOGO REALTIME THEO YÊU CẦU TAB 1
   const handleSyncLogoRealtime = async () => {
     setIsSyncingLogo(true);
     try {
       const resolvedSizePreset = logoSizePreset;
-      const finalLogoUrl = logoType === 'custom' ? customLogoUrl.trim() : '';
-      const finalLogoType = logoType || (finalLogoUrl ? 'custom' : 'default');
+      const finalLogoType = logoType || (customLogoUrl.trim() ? 'custom' : 'default');
+      const finalLogoUrl = await uploadLogoBlobToStorageIfNeeded(customLogoUrl, finalLogoType);
       const finalLogoSize = Number(logoSizePx) || 48;
       const finalLogoEffect = logoEffect || 'shine';
       const headerTitle = title.trim();
@@ -613,8 +656,10 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
       };
 
       // 1. Lưu vĩnh viễn vào dòng id = 'default' trong bảng site_config trên Supabase
+      // KHÔNG lưu lặp lại chuỗi ảnh dài vào cột JSON `config` để hoàn tất < 0.5s, chống statement timeout
       const supabase = getSupabase();
       if (supabase) {
+        const lightweightConfigForDb = sanitizeConfigForDbJson(updatedConfig, finalLogoUrl);
         const payload: Record<string, any> = {
           id: 'default',
           logo_url: finalLogoUrl,
@@ -627,8 +672,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           founded_date: foundedDate,
           title: headerTitle,
           subtitle: subTitle,
-          config: updatedConfig,
-          config_json: updatedConfig,
+          config: lightweightConfigForDb,
           updated_at: new Date().toISOString(),
         };
 
@@ -1351,13 +1395,20 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
 
     try {
       const supabase = getSupabase();
+      const uploadedLogoUrl = await uploadLogoBlobToStorageIfNeeded(customLogoUrl, logoType);
+      if (uploadedLogoUrl !== updatedConfig.logo_url) {
+        updatedConfig.logo_url = uploadedLogoUrl;
+        updatedConfig.customLogoUrl = uploadedLogoUrl;
+      }
+
       if (supabase) {
         const finalLogoUrl = updatedConfig.logo_url || updatedConfig.customLogoUrl || '';
         const finalLogoType = updatedConfig.logo_type || updatedConfig.logoType || (finalLogoUrl ? 'custom' : 'default');
         const finalLogoSize = Number(updatedConfig.logoSizePx ?? updatedConfig.logo_size ?? 48) || 48;
         const finalLogoEffect = updatedConfig.logo_effect || updatedConfig.logoEffect || 'shine';
+        const lightweightConfigForDb = sanitizeConfigForDbJson(updatedConfig, finalLogoUrl);
 
-        // Lưu ĐỒNG THỜI và AN TOÀN vào dòng id = 'default' chứa đầy đủ cột rời và JSON config
+        // Lưu ĐỒNG THỜI và AN TOÀN vào dòng id = 'default', KHÔNG lặp lại ảnh dài vào cột config
         const fullPayload: Record<string, any> = {
           id: 'default',
           logo_url: finalLogoUrl,
@@ -1372,8 +1423,7 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           subtitle: updatedConfig.subtitle,
           categories_config: categoriesList,
           navigation_tabs: categoriesList,
-          config: updatedConfig,
-          config_json: updatedConfig,
+          config: lightweightConfigForDb,
           marquee_text: updatedConfig.ticker,
           marquee_mode: updatedConfig.marquee_mode,
           marquee_days: updatedConfig.marquee_days,
@@ -1387,7 +1437,6 @@ export const CustomizerModal: React.FC<CustomizerModalProps> = ({
           home_layout: updatedConfig.layoutSettings,
           layout_settings: updatedConfig.layoutSettings,
           home_category_columns: updatedConfig.homeCategoryColumns,
-          daily_widgets: updatedConfig.dailyWidgets,
           updated_at: new Date().toISOString(),
         };
 
