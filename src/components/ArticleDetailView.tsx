@@ -9,8 +9,6 @@ import {
   Eye,
   Grid,
   Home,
-  Image as ImageIcon,
-  Link as LinkIcon,
   Newspaper,
   Send,
   Share2,
@@ -18,12 +16,10 @@ import {
   Trash2,
   Type,
   UserPen,
-  Volume2,
   X,
 } from 'lucide-react';
-import { Article, ArticleImage, PageView, SectionType, User } from '../types';
+import { Article, ArticleImage, PageView, User } from '../types';
 import { MILITARY_FALLBACK_BANNER } from '../data/initialData';
-import { AIVoiceReader } from './AIVoiceReader';
 import { updatePageSEO } from '../utils/seo';
 import { sanitizeHtml } from '../utils/sanitizer';
 
@@ -250,18 +246,10 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
         </button>
       </div>
 
-      {/* 4. Reading Tools Bar: AI Voice Reader & Font Size Scaler */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex-1">
-          <AIVoiceReader
-            title="Đọc bài viết báo chí"
-            textToRead={`${article.title}. ${article.excerpt}. ${paragraphs.join('. ')}`}
-            sourceType="article"
-          />
-        </div>
-
+      {/* 4. Reading Tool Bar: Font Size Scaler */}
+      <div className="flex items-center justify-end">
         {/* Quick Reader Font Scaler (A- / A+) */}
-        <div className="flex items-center justify-between sm:justify-end gap-1.5 px-2 py-1 bg-white rounded-md border border-gray-200 shadow-2xs">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 rounded-lg border border-gray-200 shadow-2xs">
           <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
             <Type className="w-3.5 h-3.5 text-gray-700" />
             <span>Cỡ chữ:</span>
@@ -270,7 +258,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
             <button
               type="button"
               onClick={() => setReaderFontScale((s) => Math.max(85, s - 10))}
-              className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
+              className="px-2 py-0.5 rounded bg-white hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
               title="Giảm cỡ chữ (A-)"
             >
               A-
@@ -281,7 +269,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
               className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition-colors ${
                 readerFontScale === 100
                   ? 'bg-red-50 text-red-700 border border-red-200'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  : 'bg-white hover:bg-gray-200 text-gray-700 border border-gray-200'
               }`}
               title="Cỡ chữ mặc định 100%"
             >
@@ -290,7 +278,7 @@ export const ArticleDetailView: React.FC<ArticleDetailViewProps> = ({
             <button
               type="button"
               onClick={() => setReaderFontScale((s) => Math.min(150, s + 10))}
-              className="px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
+              className="px-2 py-0.5 rounded bg-white hover:bg-gray-200 text-gray-800 text-xs font-black cursor-pointer transition-colors border border-gray-300"
               title="Tăng cỡ chữ (A+)"
             >
               A+
